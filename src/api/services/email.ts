@@ -10,7 +10,25 @@ interface EmailParams {
   lang?: 'en' | 'fr'
 }
 
+export interface EmailLogEntry {
+  to: string
+  subject: string
+  body: string
+  lang: string
+  sentAt: string
+}
+
+// In-memory email log for dev — remove in production
+const emailLog: EmailLogEntry[] = []
+
+export function getRecentEmails(maxAgeMs = 60 * 60 * 1000): EmailLogEntry[] {
+  const cutoff = new Date(Date.now() - maxAgeMs).toISOString()
+  return emailLog.filter((e) => e.sentAt >= cutoff)
+}
+
 export function sendEmail({ to, subject, body, lang = 'en' }: EmailParams): void {
+  emailLog.push({ to, subject, body, lang, sentAt: new Date().toISOString() })
+
   console.log('═══════════════════════════════════════════════════════════════')
   console.log(`📧 EMAIL STUB [${lang.toUpperCase()}]`)
   console.log(`   To:      ${to}`)
@@ -24,8 +42,8 @@ export function sendMagicLinkEmail(email: string, token: string, baseUrl: string
   const link = `${baseUrl}/auth/verify?token=${token}`
   const subject = lang === 'fr' ? 'Votre lien de connexion — Atletica Genève' : 'Your login link — Atletica Geneve'
   const body = lang === 'fr'
-    ? `Bonjour,\n\nCliquez sur le lien suivant pour vous connecter :\n${link}\n\nCe lien expire dans 30 minutes.\n\nAtletica Genève`
-    : `Hello,\n\nClick the following link to log in:\n${link}\n\nThis link expires in 30 minutes.\n\nAtletica Geneve`
+    ? `Bonjour,\n\nCliquez sur le lien suivant pour vous connecter :\n${link}\n\nCe lien est à usage unique et expire dans 30 minutes.\n\nAtletica Genève`
+    : `Hello,\n\nClick the following link to log in:\n${link}\n\nThis link is single-use and expires in 30 minutes.\n\nAtletica Geneve`
 
   sendEmail({ to: email, subject, body, lang })
 }
