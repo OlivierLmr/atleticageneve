@@ -13,6 +13,7 @@ import ManagerRegisterPage from '@web/pages/manager/RegisterPage'
 import ManagerPortalPage from '@web/pages/manager/PortalPage'
 import CandidatesPage from '@web/pages/collaborator/CandidatesPage'
 import CollaboratorAthletePage from '@web/pages/collaborator/AthletePage'
+import DashboardPage from '@web/pages/committee/DashboardPage'
 import type { ReactNode } from 'react'
 import type { UserRole } from '@shared/types'
 
@@ -218,7 +219,7 @@ export default function App() {
             {/* Committee — requires committee role */}
             <Route path="/committee/dashboard" element={
               <ProtectedRoute roles={['committee']}>
-                <PlaceholderPage title="Committee Dashboard" />
+                <DashboardPage />
               </ProtectedRoute>
             } />
           </Routes>

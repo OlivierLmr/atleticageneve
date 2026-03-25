@@ -10,6 +10,7 @@ import managerRoutes from './routes/managers'
 import applicationRoutes from './routes/applications'
 import contractRoutes from './routes/contracts'
 import portalRoutes from './routes/portal'
+import dashboardRoutes from './routes/dashboard'
 
 export type Env = {
   Bindings: {
@@ -51,6 +52,7 @@ app.route('/api/v1/managers', managerRoutes)
 app.route('/api/v1/applications', applicationRoutes)
 app.route('/api/v1/applications', contractRoutes)
 app.route('/api/v1/portal', portalRoutes)
+app.route('/api/v1/dashboard', dashboardRoutes)
 
 app.get('/api/v1/editions/current', async (c) => {
   const db = c.get('db')
