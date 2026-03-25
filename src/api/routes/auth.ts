@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
 import { zValidator } from '@hono/zod-validator'
-import { eq } from 'drizzle-orm'
+import { eq, or } from 'drizzle-orm'
 import * as schema from '../db/schema'
 import { loginSchema, magicLinkRequestSchema, magicLinkVerifySchema } from '@shared/validation'
 import { verifyPassword, generateToken, sessionExpiresAt, magicLinkExpiresAt } from '../services/auth'
@@ -88,6 +88,104 @@ auth.post('/magic-link', zValidator('json', magicLinkRequestSchema), async (c) =
   sendMagicLinkEmail(email, token, baseUrl, lang)
 
   return c.json({ message: 'If an account exists, a login link has been sent' })
+})
+
+// ── POST /auth/identify — unified login: check if password or magic link ──────
+
+auth.post('/identify', async (c) => {
+  const body = await c.req.json() as { identifier?: string }
+  const identifier = body.identifier?.trim()
+  if (!identifier) {
+    return c.json({ error: 'Identifier required' }, 400)
+  }
+
+  const db = c.get('db')
+
+  // Look up by email or username
+  const users = await db
+    .select()
+    .from(schema.user)
+    .where(or(eq(schema.user.email, identifier), eq(schema.user.username, identifier)))
+    .limit(1)
+
+  if (users.length === 0) {
+    // Don't reveal whether the account exists
+    return c.json({ method: 'magic_link', message: 'If this email is registered, a login link has been sent.' })
+  }
+
+  const user = users[0]
+
+  // User has a password → prompt for it
+  if (user.passwordHash) {
+    return c.json({ method: 'password' })
+  }
+
+  // User is athlete/manager → send magic link
+  if (user.email) {
+    const token = generateToken()
+    await db.insert(schema.magicLink).values({
+      userId: user.id,
+      token,
+      expiresAt: magicLinkExpiresAt(),
+    })
+    const baseUrl = c.req.header('Origin') ?? 'http://localhost:5173'
+    const lang = (user.preferredLang as 'en' | 'fr') ?? 'en'
+    sendMagicLinkEmail(user.email, token, baseUrl, lang)
+  }
+
+  return c.json({ method: 'magic_link', message: 'If this email is registered, a login link has been sent.' })
+})
+
+// ── POST /auth/login-with-password — for identified password users ────────────
+
+auth.post('/login-with-password', async (c) => {
+  const body = await c.req.json() as { identifier?: string; password?: string }
+  const identifier = body.identifier?.trim()
+  const password = body.password
+  if (!identifier || !password) {
+    return c.json({ error: 'Identifier and password required' }, 400)
+  }
+
+  const db = c.get('db')
+
+  const users = await db
+    .select()
+    .from(schema.user)
+    .where(or(eq(schema.user.email, identifier), eq(schema.user.username, identifier)))
+    .limit(1)
+
+  if (users.length === 0) {
+    return c.json({ error: 'Invalid credentials' }, 401)
+  }
+
+  const user = users[0]
+  if (!user.passwordHash || !user.isActive) {
+    return c.json({ error: 'Invalid credentials' }, 401)
+  }
+
+  const valid = await verifyPassword(password, user.passwordHash)
+  if (!valid) {
+    return c.json({ error: 'Invalid credentials' }, 401)
+  }
+
+  const token = generateToken()
+  await db.insert(schema.session).values({
+    userId: user.id,
+    token,
+    expiresAt: sessionExpiresAt(),
+  })
+
+  return c.json({
+    token,
+    user: {
+      id: user.id,
+      role: user.role,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      email: user.email,
+      preferredLang: user.preferredLang,
+    },
+  })
 })
 
 // ── POST /auth/verify-magic-link — verify token and create session ────────────
