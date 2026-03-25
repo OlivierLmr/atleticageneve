@@ -89,7 +89,12 @@ export default function AthleteRegisterPage() {
           <div className="bg-white rounded-lg border p-6">
             <div className="text-3xl mb-3">&#10003;</div>
             <p className="font-semibold text-sm mb-1">{t('athlete.registration')} — {form.firstName} {form.lastName}</p>
-            <p className="text-xs text-gray-500">Your application has been submitted successfully.</p>
+            <p className="text-xs text-gray-500 mb-2">Your application has been submitted successfully.</p>
+            {form.email && (
+              <p className="text-xs text-blue-600">
+                A login link has been sent to {form.email} — use it to track your application.
+              </p>
+            )}
           </div>
           <Link to="/" className="text-xs text-gray-400 underline mt-4 inline-block">{t('common.back')}</Link>
         </div>

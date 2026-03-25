@@ -5,7 +5,8 @@ import * as schema from '../db/schema'
 import { athleteRegistrationSchema, batchAthleteRegistrationSchema } from '@shared/validation'
 import { parsePerf, computeScore } from '@shared/scoring'
 import { requireAuth } from '../middleware/auth'
-import { sendEmail } from '../services/email'
+import { sendEmail, sendMagicLinkEmail } from '../services/email'
+import { generateToken, magicLinkExpiresAt } from '../services/auth'
 import type { Env } from '../index'
 
 const athletes = new Hono<Env>()
@@ -95,13 +96,48 @@ athletes.post('/', zValidator('json', athleteRegistrationSchema), async (c) => {
     authorName: `${data.firstName} ${data.lastName}`,
   })
 
-  // Email stub
+  // If email provided, create a user record so the athlete can log in later
+  let magicLinkSent = false
   if (data.athleteEmail) {
-    sendEmail({
-      to: data.athleteEmail,
-      subject: `Application received — ${data.firstName} ${data.lastName}`,
-      body: `Your application for ${events[0].name} has been received.\nWe will review it shortly.`,
+    // Check if a user with this email already exists
+    const existingUsers = await db
+      .select()
+      .from(schema.user)
+      .where(eq(schema.user.email, data.athleteEmail))
+      .limit(1)
+
+    let userId: string
+    if (existingUsers.length > 0) {
+      userId = existingUsers[0].id
+    } else {
+      userId = crypto.randomUUID()
+      await db.insert(schema.user).values({
+        id: userId,
+        role: 'athlete',
+        email: data.athleteEmail,
+        phone: data.athletePhone ?? null,
+        firstName: data.firstName,
+        lastName: data.lastName,
+      })
+    }
+
+    // Link athlete to user
+    await db
+      .update(schema.athlete)
+      .set({ userId })
+      .where(eq(schema.athlete.id, athleteId))
+
+    // Generate and send magic link
+    const token = generateToken()
+    await db.insert(schema.magicLink).values({
+      userId,
+      token,
+      expiresAt: magicLinkExpiresAt(),
     })
+
+    const baseUrl = c.req.header('Origin') ?? 'http://localhost:5173'
+    sendMagicLinkEmail(data.athleteEmail, token, baseUrl)
+    magicLinkSent = true
   }
 
   return c.json({
@@ -109,6 +145,7 @@ athletes.post('/', zValidator('json', athleteRegistrationSchema), async (c) => {
     applicationId,
     score: scoreResult.finalScore,
     recommendation: scoreResult.recommendation,
+    magicLinkSent,
   }, 201)
 })
 

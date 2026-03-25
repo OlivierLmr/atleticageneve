@@ -1,5 +1,5 @@
 import { Hono } from 'hono'
-import { eq, desc } from 'drizzle-orm'
+import { eq, or, desc } from 'drizzle-orm'
 import * as schema from '../db/schema'
 import { contractOfferSchema, statusChangeSchema } from '@shared/validation'
 import { VALID_TRANSITIONS, HOTEL_COST_PER_NIGHT } from '@shared/constants'
@@ -17,11 +17,11 @@ portal.get('/athlete', requireAuth('athlete', 'manager'), async (c) => {
   const db = c.get('db')
   const user = c.get('user')!
 
-  // Find athlete records linked to this user
+  // Find athlete records linked to this user (by userId or managerId)
   const athletes = await db
     .select()
     .from(schema.athlete)
-    .where(eq(schema.athlete.userId, user.id))
+    .where(or(eq(schema.athlete.userId, user.id), eq(schema.athlete.managerId, user.id)))
 
   if (athletes.length === 0) {
     return c.json({ applications: [] })
