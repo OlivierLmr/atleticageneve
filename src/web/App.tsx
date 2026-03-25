@@ -5,6 +5,10 @@ import { AuthProvider, useAuth } from '@web/lib/auth'
 import LoginPage from '@web/pages/auth/LoginPage'
 import MagicLinkPage from '@web/pages/auth/MagicLinkPage'
 import VerifyMagicLinkPage from '@web/pages/auth/VerifyMagicLinkPage'
+import SignupPage from '@web/pages/signup/SignupPage'
+import AthleteRegisterPage from '@web/pages/athlete/RegisterPage'
+import ManagerSignupPage from '@web/pages/manager/SignupPage'
+import ManagerRegisterPage from '@web/pages/manager/RegisterPage'
 import type { ReactNode } from 'react'
 import type { UserRole } from '@shared/types'
 
@@ -175,8 +179,11 @@ export default function App() {
             <Route path="/auth/magic-link" element={<MagicLinkPage />} />
             <Route path="/auth/verify" element={<VerifyMagicLinkPage />} />
 
-            {/* Signup — public */}
-            <Route path="/signup" element={<PlaceholderPage title="Sign Up" />} />
+            {/* Signup & Registration — public */}
+            <Route path="/signup" element={<SignupPage />} />
+            <Route path="/athlete/register" element={<AthleteRegisterPage />} />
+            <Route path="/manager/signup" element={<ManagerSignupPage />} />
+            <Route path="/manager/register" element={<ManagerRegisterPage />} />
 
             {/* Athlete — requires athlete or manager role */}
             <Route path="/athlete/portal" element={

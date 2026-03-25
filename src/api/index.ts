@@ -4,6 +4,9 @@ import { logger } from 'hono/logger'
 import { drizzle } from 'drizzle-orm/d1'
 import * as schema from './db/schema'
 import authRoutes from './routes/auth'
+import athleteRoutes from './routes/athletes'
+import eventRoutes from './routes/events'
+import managerRoutes from './routes/managers'
 
 export type Env = {
   Bindings: {
@@ -39,6 +42,9 @@ app.get('/api/health', (c) => c.json({ status: 'ok', timestamp: new Date().toISO
 // ── Routes ────────────────────────────────────────────────────────────────────
 
 app.route('/api/v1/auth', authRoutes)
+app.route('/api/v1/athletes', athleteRoutes)
+app.route('/api/v1/events', eventRoutes)
+app.route('/api/v1/managers', managerRoutes)
 
 app.get('/api/v1/editions/current', async (c) => {
   const db = c.get('db')
@@ -47,12 +53,6 @@ app.get('/api/v1/editions/current', async (c) => {
     return c.json({ error: 'No edition configured' }, 404)
   }
   return c.json(editions[0])
-})
-
-app.get('/api/v1/events', async (c) => {
-  const db = c.get('db')
-  const events = await db.select().from(schema.event)
-  return c.json(events)
 })
 
 export default app
