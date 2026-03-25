@@ -1,0 +1,9 @@
+name = "atletica-api"
+main = "src/api/index.ts"
+compatibility_date = "2025-12-01"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "atletica-db"
+database_id = "local"
+migrations_dir = "src/api/db/migrations"
