@@ -5,5 +5,5 @@ compatibility_date = "2025-12-01"
 [[d1_databases]]
 binding = "DB"
 database_name = "atletica-db"
-database_id = "local"
+database_id = "3b02051e-27b6-487b-acda-7b9224f74bee"
 migrations_dir = "src/api/db/migrations"

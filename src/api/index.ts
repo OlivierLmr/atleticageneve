@@ -11,6 +11,7 @@ import applicationRoutes from './routes/applications'
 import contractRoutes from './routes/contracts'
 import portalRoutes from './routes/portal'
 import dashboardRoutes from './routes/dashboard'
+import { getRecentEmails } from './services/email'
 
 export type Env = {
   Bindings: {
@@ -28,7 +29,7 @@ const app = new Hono<Env>()
 
 app.use('*', logger())
 app.use('*', cors({
-  origin: ['http://localhost:5173', 'http://localhost:8787'],
+  origin: ['http://localhost:5173', 'http://localhost:8787', 'https://atleticageneve.pages.dev'],
   credentials: true,
 }))
 
@@ -53,6 +54,9 @@ app.route('/api/v1/applications', applicationRoutes)
 app.route('/api/v1/applications', contractRoutes)
 app.route('/api/v1/portal', portalRoutes)
 app.route('/api/v1/dashboard', dashboardRoutes)
+
+// DEV ONLY — email log viewer (remove in production)
+app.get('/api/v1/dev/emails', (c) => c.json(getRecentEmails()))
 
 app.get('/api/v1/editions/current', async (c) => {
   const db = c.get('db')
