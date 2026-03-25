@@ -9,6 +9,8 @@ import SignupPage from '@web/pages/signup/SignupPage'
 import AthleteRegisterPage from '@web/pages/athlete/RegisterPage'
 import ManagerSignupPage from '@web/pages/manager/SignupPage'
 import ManagerRegisterPage from '@web/pages/manager/RegisterPage'
+import CandidatesPage from '@web/pages/collaborator/CandidatesPage'
+import CollaboratorAthletePage from '@web/pages/collaborator/AthletePage'
 import type { ReactNode } from 'react'
 import type { UserRole } from '@shared/types'
 
@@ -202,7 +204,12 @@ export default function App() {
             {/* Collaborator — requires collaborator role */}
             <Route path="/collaborator/candidates" element={
               <ProtectedRoute roles={['collaborator', 'committee']}>
-                <PlaceholderPage title="Selection Console" />
+                <CandidatesPage />
+              </ProtectedRoute>
+            } />
+            <Route path="/collaborator/athletes/:id" element={
+              <ProtectedRoute roles={['collaborator', 'committee']}>
+                <CollaboratorAthletePage />
               </ProtectedRoute>
             } />
 
