@@ -1,6 +1,12 @@
-import { BrowserRouter, Routes, Route, Link } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Link, Navigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { AuthProvider, useAuth } from '@web/lib/auth'
+import LoginPage from '@web/pages/auth/LoginPage'
+import MagicLinkPage from '@web/pages/auth/MagicLinkPage'
+import VerifyMagicLinkPage from '@web/pages/auth/VerifyMagicLinkPage'
+import type { ReactNode } from 'react'
+import type { UserRole } from '@shared/types'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -8,7 +14,9 @@ const queryClient = new QueryClient({
   },
 })
 
-function LanguageSwitcher() {
+// ── Language switcher ─────────────────────────────────────────────────────────
+
+export function LanguageSwitcher() {
   const { i18n } = useTranslation()
   const toggle = () => {
     const next = i18n.language === 'fr' ? 'en' : 'fr'
@@ -25,8 +33,31 @@ function LanguageSwitcher() {
   )
 }
 
+// ── Protected route wrapper ───────────────────────────────────────────────────
+
+function ProtectedRoute({ children, roles }: { children: ReactNode; roles?: UserRole[] }) {
+  const { user, isLoading } = useAuth()
+
+  if (isLoading) {
+    return <div className="min-h-screen flex items-center justify-center text-gray-400">Loading...</div>
+  }
+
+  if (!user) {
+    return <Navigate to="/auth/login" replace />
+  }
+
+  if (roles && !roles.includes(user.role)) {
+    return <Navigate to="/" replace />
+  }
+
+  return <>{children}</>
+}
+
+// ── Home page ─────────────────────────────────────────────────────────────────
+
 function HomePage() {
   const { t } = useTranslation()
+  const { user, logout } = useAuth()
 
   const routes = [
     {
@@ -35,7 +66,10 @@ function HomePage() {
     },
     {
       group: t('nav.athletePortal'),
-      links: [{ label: t('nav.athletePortal'), path: '/athlete/portal' }],
+      links: [
+        { label: t('nav.athletePortal'), path: '/athlete/portal' },
+        { label: `${t('auth.login')} (${t('auth.magicLinkPrompt')})`, path: '/auth/magic-link' },
+      ],
     },
     {
       group: t('nav.managerPortal'),
@@ -43,7 +77,10 @@ function HomePage() {
     },
     {
       group: t('nav.selectionConsole'),
-      links: [{ label: t('nav.selectionConsole'), path: '/collaborator/candidates' }],
+      links: [
+        { label: t('nav.selectionConsole'), path: '/collaborator/candidates' },
+        { label: `${t('auth.login')} (${t('auth.username')}/${t('auth.password')})`, path: '/auth/login' },
+      ],
     },
     {
       group: t('nav.dashboard'),
@@ -55,7 +92,17 @@ function HomePage() {
     <div className="max-w-md mx-auto mt-20 px-6">
       <div className="flex items-center justify-between mb-2">
         <h1 className="text-xl font-bold">Atletica Genève</h1>
-        <LanguageSwitcher />
+        <div className="flex items-center gap-2">
+          {user && (
+            <button
+              onClick={() => logout()}
+              className="text-xs text-gray-400 hover:text-gray-600"
+            >
+              {t('auth.logout')} ({user.firstName})
+            </button>
+          )}
+          <LanguageSwitcher />
+        </div>
       </div>
       <p className="text-gray-500 text-sm mb-8">{t('signup.subtitle')}</p>
       {routes.map(({ group, links }) => (
@@ -80,15 +127,87 @@ function HomePage() {
   )
 }
 
+// ── Placeholder pages ─────────────────────────────────────────────────────────
+
+function PlaceholderPage({ title }: { title: string }) {
+  const { t } = useTranslation()
+  const { user, logout } = useAuth()
+  return (
+    <div className="max-w-2xl mx-auto mt-20 px-6">
+      <div className="flex items-center justify-between mb-4">
+        <h1 className="text-xl font-bold">{title}</h1>
+        <div className="flex items-center gap-2">
+          {user && (
+            <span className="text-xs text-gray-400">
+              {user.firstName} {user.lastName} ({user.role})
+            </span>
+          )}
+          {user && (
+            <button onClick={() => logout()} className="text-xs text-red-500 hover:text-red-700">
+              {t('auth.logout')}
+            </button>
+          )}
+          <LanguageSwitcher />
+        </div>
+      </div>
+      <div className="bg-white rounded-lg border p-8 text-center text-gray-400 text-sm">
+        Coming in next phase
+      </div>
+      <p className="text-center mt-4">
+        <Link to="/" className="text-xs text-gray-400 underline">{t('common.back')}</Link>
+      </p>
+    </div>
+  )
+}
+
+// ── App ───────────────────────────────────────────────────────────────────────
+
 export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<HomePage />} />
-          {/* Portal routes will be added in subsequent phases */}
-        </Routes>
-      </BrowserRouter>
+      <AuthProvider>
+        <BrowserRouter>
+          <Routes>
+            <Route path="/" element={<HomePage />} />
+
+            {/* Auth */}
+            <Route path="/auth/login" element={<LoginPage />} />
+            <Route path="/auth/magic-link" element={<MagicLinkPage />} />
+            <Route path="/auth/verify" element={<VerifyMagicLinkPage />} />
+
+            {/* Signup — public */}
+            <Route path="/signup" element={<PlaceholderPage title="Sign Up" />} />
+
+            {/* Athlete — requires athlete or manager role */}
+            <Route path="/athlete/portal" element={
+              <ProtectedRoute roles={['athlete', 'manager']}>
+                <PlaceholderPage title="Athlete Portal" />
+              </ProtectedRoute>
+            } />
+
+            {/* Manager — requires manager role */}
+            <Route path="/manager/portal" element={
+              <ProtectedRoute roles={['manager']}>
+                <PlaceholderPage title="Manager Portal" />
+              </ProtectedRoute>
+            } />
+
+            {/* Collaborator — requires collaborator role */}
+            <Route path="/collaborator/candidates" element={
+              <ProtectedRoute roles={['collaborator', 'committee']}>
+                <PlaceholderPage title="Selection Console" />
+              </ProtectedRoute>
+            } />
+
+            {/* Committee — requires committee role */}
+            <Route path="/committee/dashboard" element={
+              <ProtectedRoute roles={['committee']}>
+                <PlaceholderPage title="Committee Dashboard" />
+              </ProtectedRoute>
+            } />
+          </Routes>
+        </BrowserRouter>
+      </AuthProvider>
     </QueryClientProvider>
   )
 }

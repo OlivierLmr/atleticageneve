@@ -3,6 +3,7 @@ import { cors } from 'hono/cors'
 import { logger } from 'hono/logger'
 import { drizzle } from 'drizzle-orm/d1'
 import * as schema from './db/schema'
+import authRoutes from './routes/auth'
 
 export type Env = {
   Bindings: {
@@ -35,7 +36,9 @@ app.use('/api/*', async (c, next) => {
 
 app.get('/api/health', (c) => c.json({ status: 'ok', timestamp: new Date().toISOString() }))
 
-// ── Routes (to be added in subsequent phases) ─────────────────────────────────
+// ── Routes ────────────────────────────────────────────────────────────────────
+
+app.route('/api/v1/auth', authRoutes)
 
 app.get('/api/v1/editions/current', async (c) => {
   const db = c.get('db')
