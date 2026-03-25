@@ -7,8 +7,10 @@ import MagicLinkPage from '@web/pages/auth/MagicLinkPage'
 import VerifyMagicLinkPage from '@web/pages/auth/VerifyMagicLinkPage'
 import SignupPage from '@web/pages/signup/SignupPage'
 import AthleteRegisterPage from '@web/pages/athlete/RegisterPage'
+import AthletePortalPage from '@web/pages/athlete/PortalPage'
 import ManagerSignupPage from '@web/pages/manager/SignupPage'
 import ManagerRegisterPage from '@web/pages/manager/RegisterPage'
+import ManagerPortalPage from '@web/pages/manager/PortalPage'
 import CandidatesPage from '@web/pages/collaborator/CandidatesPage'
 import CollaboratorAthletePage from '@web/pages/collaborator/AthletePage'
 import type { ReactNode } from 'react'
@@ -190,14 +192,14 @@ export default function App() {
             {/* Athlete — requires athlete or manager role */}
             <Route path="/athlete/portal" element={
               <ProtectedRoute roles={['athlete', 'manager']}>
-                <PlaceholderPage title="Athlete Portal" />
+                <AthletePortalPage />
               </ProtectedRoute>
             } />
 
             {/* Manager — requires manager role */}
             <Route path="/manager/portal" element={
               <ProtectedRoute roles={['manager']}>
-                <PlaceholderPage title="Manager Portal" />
+                <ManagerPortalPage />
               </ProtectedRoute>
             } />
 
