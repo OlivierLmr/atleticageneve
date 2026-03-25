@@ -136,39 +136,6 @@ function HomePage() {
   )
 }
 
-// ── Placeholder pages ─────────────────────────────────────────────────────────
-
-function PlaceholderPage({ title }: { title: string }) {
-  const { t } = useTranslation()
-  const { user, logout } = useAuth()
-  return (
-    <div className="max-w-2xl mx-auto mt-20 px-6">
-      <div className="flex items-center justify-between mb-4">
-        <h1 className="text-xl font-bold">{title}</h1>
-        <div className="flex items-center gap-2">
-          {user && (
-            <span className="text-xs text-gray-400">
-              {user.firstName} {user.lastName} ({user.role})
-            </span>
-          )}
-          {user && (
-            <button onClick={() => logout()} className="text-xs text-red-500 hover:text-red-700">
-              {t('auth.logout')}
-            </button>
-          )}
-          <LanguageSwitcher />
-        </div>
-      </div>
-      <div className="bg-white rounded-lg border p-8 text-center text-gray-400 text-sm">
-        Coming in next phase
-      </div>
-      <p className="text-center mt-4">
-        <Link to="/" className="text-xs text-gray-400 underline">{t('common.back')}</Link>
-      </p>
-    </div>
-  )
-}
-
 // ── App ───────────────────────────────────────────────────────────────────────
 
 export default function App() {
