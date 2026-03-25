@@ -88,6 +88,9 @@ export default function AthletePage() {
   const [contract, setContract] = useState(() => defaultContract(latestContract))
   const [showContractForm, setShowContractForm] = useState(false)
 
+  // Confirmation dialog
+  const [confirmAction, setConfirmAction] = useState<ApplicationStatus | null>(null)
+
   // Note form
   const [noteType, setNoteType] = useState<'note' | 'call' | 'email'>('note')
   const [noteContent, setNoteContent] = useState('')
@@ -311,38 +314,78 @@ export default function AthletePage() {
             <div className="bg-white rounded-lg border p-4">
               <h3 className="font-semibold text-sm mb-3">{t('common.actions')}</h3>
               <div className="flex flex-wrap gap-2">
-                {allowedTransitions.map((status) => (
-                  <button
-                    key={status}
-                    onClick={() => {
-                      if (status === 'contract_sent') {
-                        setShowContractForm(true)
-                      } else {
-                        statusMutation.mutate(status as ApplicationStatus)
-                      }
-                    }}
-                    disabled={statusMutation.isPending}
-                    className={`text-xs px-3 py-1.5 rounded font-medium border ${
-                      status === 'accepted'
-                        ? 'bg-green-600 text-white border-green-600 hover:bg-green-700'
-                        : status === 'rejected'
-                        ? 'bg-red-50 text-red-600 border-red-200 hover:bg-red-100'
-                        : status === 'withdrawn'
-                        ? 'bg-gray-50 text-gray-500 border-gray-200 hover:bg-gray-100'
-                        : status === 'contract_sent'
-                        ? 'bg-blue-600 text-white border-blue-600 hover:bg-blue-700'
-                        : 'bg-gray-100 text-gray-700 border-gray-200 hover:bg-gray-200'
-                    }`}
-                  >
-                    {t(`status.${status}`)}
-                  </button>
-                ))}
+                {allowedTransitions.map((status) => {
+                  const needsConfirm = ['accepted', 'rejected', 'withdrawn'].includes(status)
+                  return (
+                    <button
+                      key={status}
+                      onClick={() => {
+                        if (status === 'contract_sent') {
+                          setShowContractForm(true)
+                        } else if (needsConfirm) {
+                          setConfirmAction(status as ApplicationStatus)
+                        } else {
+                          statusMutation.mutate(status as ApplicationStatus)
+                        }
+                      }}
+                      disabled={statusMutation.isPending}
+                      className={`text-xs px-3 py-1.5 rounded font-medium border ${
+                        status === 'accepted'
+                          ? 'bg-green-600 text-white border-green-600 hover:bg-green-700'
+                          : status === 'rejected'
+                          ? 'bg-red-50 text-red-600 border-red-200 hover:bg-red-100'
+                          : status === 'withdrawn'
+                          ? 'bg-gray-50 text-gray-500 border-gray-200 hover:bg-gray-100'
+                          : status === 'contract_sent'
+                          ? 'bg-blue-600 text-white border-blue-600 hover:bg-blue-700'
+                          : 'bg-gray-100 text-gray-700 border-gray-200 hover:bg-gray-200'
+                      }`}
+                    >
+                      {t(`status.${status}`)}
+                    </button>
+                  )
+                })}
                 {allowedTransitions.length === 0 && (
                   <span className="text-xs text-gray-400">No available actions</span>
                 )}
               </div>
               {statusMutation.isError && (
                 <p className="text-xs text-red-600 mt-2">{t('common.error')}</p>
+              )}
+
+              {/* Confirmation dialog */}
+              {confirmAction && (
+                <div className="mt-3 p-3 rounded border border-yellow-300 bg-yellow-50">
+                  <p className="text-sm text-gray-900 mb-3">
+                    {t('confirm.statusChange', {
+                      athlete: `${app.athlete.firstName} ${app.athlete.lastName}`,
+                      status: t(`status.${confirmAction}`),
+                    })}
+                  </p>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => {
+                        statusMutation.mutate(confirmAction)
+                        setConfirmAction(null)
+                      }}
+                      className={`text-xs px-3 py-1.5 rounded font-medium ${
+                        confirmAction === 'accepted'
+                          ? 'bg-green-600 text-white hover:bg-green-700'
+                          : confirmAction === 'rejected'
+                          ? 'bg-red-600 text-white hover:bg-red-700'
+                          : 'bg-gray-600 text-white hover:bg-gray-700'
+                      }`}
+                    >
+                      {t('common.confirm')}
+                    </button>
+                    <button
+                      onClick={() => setConfirmAction(null)}
+                      className="text-xs px-3 py-1.5 rounded border border-gray-300 hover:bg-gray-50"
+                    >
+                      {t('common.cancel')}
+                    </button>
+                  </div>
+                </div>
               )}
             </div>
 

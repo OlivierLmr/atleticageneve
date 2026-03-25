@@ -64,6 +64,9 @@
     "magicLinkExplainer": "Si vous êtes déjà inscrit, entrez votre email et nous vous enverrons un lien de connexion à usage unique.",
     "sendLoginLink": "Envoyer le lien de connexion"
   },
+  "confirm": {
+    "statusChange": "Voulez-vous vraiment passer {{athlete}} à « {{status}} » ? Cette action ne peut pas être facilement annulée."
+  },
   "signup": {
     "title": "Bienvenue à Atletica Genève",
     "subtitle": "Sélectionnez votre rôle pour commencer",

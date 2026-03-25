@@ -64,6 +64,9 @@
     "magicLinkExplainer": "If you already registered, enter your email and we'll send you a one-time login link.",
     "sendLoginLink": "Send login link"
   },
+  "confirm": {
+    "statusChange": "Are you sure you want to set {{athlete}} to \"{{status}}\"? This action cannot be easily undone."
+  },
   "signup": {
     "title": "Welcome to Atletica Geneve",
     "subtitle": "Select your role to get started",
