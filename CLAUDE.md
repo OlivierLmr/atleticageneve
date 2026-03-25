@@ -1,0 +1,2 @@
+- after each piece of work is done, commit it.
+- do not deploy unless asked to.

@@ -29,7 +29,13 @@ const app = new Hono<Env>()
 
 app.use('*', logger())
 app.use('*', cors({
-  origin: ['http://localhost:5173', 'http://localhost:8787', 'https://atleticageneve.pages.dev'],
+  origin: (origin) => {
+    // Allow any localhost origin in dev, plus the production domain
+    if (!origin) return 'https://atleticageneve.pages.dev'
+    if (origin.startsWith('http://localhost:')) return origin
+    if (origin === 'https://atleticageneve.pages.dev') return origin
+    return null as unknown as string
+  },
   credentials: true,
 }))
 
