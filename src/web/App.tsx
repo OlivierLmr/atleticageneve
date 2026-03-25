@@ -106,12 +106,14 @@ function HomePage() {
     setError('')
     setLoading(true)
     try {
-      const res = await api.post<{ method: 'password' | 'magic_link'; message?: string }>(
+      const res = await api.post<{ method: 'password' | 'magic_link' | 'not_found' }>(
         '/api/v1/auth/identify',
         { identifier: identifier.trim() },
       )
       if (res.method === 'password') {
         setStep('password')
+      } else if (res.method === 'not_found') {
+        setError(t('auth.notRegistered'))
       } else {
         setStep('magic_link_sent')
       }

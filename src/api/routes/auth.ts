@@ -109,8 +109,7 @@ auth.post('/identify', async (c) => {
     .limit(1)
 
   if (users.length === 0) {
-    // Don't reveal whether the account exists
-    return c.json({ method: 'magic_link', message: 'If this email is registered, a login link has been sent.' })
+    return c.json({ method: 'not_found' })
   }
 
   const user = users[0]

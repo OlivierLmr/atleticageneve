@@ -39,7 +39,8 @@
     "enterEmailOrUsername": "Email ou nom d'utilisateur",
     "continue": "Continuer",
     "registerAsAthleteOrManager": "S'inscrire en tant qu'athlète ou manager",
-    "enterPassword": "Entrez votre mot de passe"
+    "enterPassword": "Entrez votre mot de passe",
+    "notRegistered": "Cet email n'est pas enregistré."
   },
   "nav": {
     "home": "Accueil",
