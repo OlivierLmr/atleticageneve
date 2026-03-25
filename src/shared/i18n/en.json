@@ -58,6 +58,12 @@
     "rejected": "Not selected",
     "withdrawn": "Withdrawn"
   },
+  "home": {
+    "iAmAthleteManager": "I'm an athlete or manager",
+    "iAmAdmin": "I'm an admin / selector",
+    "magicLinkExplainer": "If you already registered, enter your email and we'll send you a one-time login link.",
+    "sendLoginLink": "Send login link"
+  },
   "signup": {
     "title": "Welcome to Atletica Geneve",
     "subtitle": "Select your role to get started",

@@ -76,10 +76,12 @@ interface DevEmail {
 
 function HomePage() {
   const { t } = useTranslation()
-  const { user, logout } = useAuth()
+  const { user } = useAuth()
+
+  const [mode, setMode] = useState<'choose' | 'admin' | 'athlete' | 'admin_password' | 'magic_link_sent'>('choose')
   const [identifier, setIdentifier] = useState('')
+  const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [step, setStep] = useState<'identifier' | 'password' | 'magic_link_sent'>('identifier')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
@@ -100,42 +102,17 @@ function HomePage() {
     return <Navigate to={dest[user.role] ?? '/'} replace />
   }
 
-  const handleIdentify = async (e: React.FormEvent) => {
+  const handleAdminLogin = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!identifier.trim()) return
+    if (!identifier.trim() || !password) return
     setError('')
     setLoading(true)
     try {
-      const res = await api.post<{ method: 'password' | 'magic_link' | 'not_found' }>(
-        '/api/v1/auth/identify',
-        { identifier: identifier.trim() },
-      )
-      if (res.method === 'password') {
-        setStep('password')
-      } else if (res.method === 'not_found') {
-        setError(t('auth.notRegistered'))
-      } else {
-        setStep('magic_link_sent')
-      }
-    } catch {
-      setError(t('common.error'))
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const handlePasswordLogin = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!password) return
-    setError('')
-    setLoading(true)
-    try {
-      const res = await api.post<{ token: string; user: { id: string; role: string; firstName: string; lastName: string; email: string | null; preferredLang: 'en' | 'fr' } }>(
+      const res = await api.post<{ token: string; user: { id: string; role: string } }>(
         '/api/v1/auth/login-with-password',
         { identifier: identifier.trim(), password },
       )
       localStorage.setItem('session_token', res.token)
-      // Trigger auth context refresh by navigating
       window.location.href = res.user.role === 'committee' ? '/committee/dashboard' : '/collaborator/candidates'
     } catch {
       setError(t('auth.invalidCredentials'))
@@ -144,8 +121,29 @@ function HomePage() {
     }
   }
 
+  const handleMagicLink = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!email.trim()) return
+    setError('')
+    setLoading(true)
+    try {
+      const res = await api.post<{ method: string }>('/api/v1/auth/identify', { identifier: email.trim() })
+      if (res.method === 'not_found') {
+        setError(t('auth.notRegistered'))
+      } else {
+        setMode('magic_link_sent')
+      }
+    } catch {
+      setError(t('common.error'))
+    } finally {
+      setLoading(false)
+    }
+  }
+
   const handleBack = () => {
-    setStep('identifier')
+    setMode('choose')
+    setIdentifier('')
+    setEmail('')
     setPassword('')
     setError('')
   }
@@ -159,97 +157,125 @@ function HomePage() {
       <p className="text-gray-500 text-sm mb-8">{t('signup.subtitle')}</p>
 
       <div className="bg-white rounded-lg border border-gray-200 p-6 mb-6">
-        {step === 'identifier' && (
-          <form onSubmit={handleIdentify}>
+        {/* Step 1: Choose role */}
+        {mode === 'choose' && (
+          <div className="flex flex-col gap-3">
+            <button
+              onClick={() => setMode('athlete')}
+              className="w-full px-3 py-3 rounded-md border border-gray-200 text-sm text-gray-900 hover:bg-gray-50 transition-colors text-left"
+            >
+              <span className="font-medium">{t('home.iAmAthleteManager')}</span>
+            </button>
+            <button
+              onClick={() => setMode('admin')}
+              className="w-full px-3 py-3 rounded-md border border-gray-200 text-sm text-gray-900 hover:bg-gray-50 transition-colors text-left"
+            >
+              <span className="font-medium">{t('home.iAmAdmin')}</span>
+            </button>
+          </div>
+        )}
+
+        {/* Admin: username + password */}
+        {mode === 'admin' && (
+          <form onSubmit={handleAdminLogin}>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              {t('auth.enterEmailOrUsername')}
+              {t('auth.username')}
             </label>
             <input
               type="text"
               value={identifier}
               onChange={(e) => setIdentifier(e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
-              placeholder="email@example.com"
               autoFocus
             />
-            {error && <p className="text-sm text-red-600 mb-3">{error}</p>}
-            <button
-              type="submit"
-              disabled={loading || !identifier.trim()}
-              className="w-full bg-gray-900 text-white text-sm font-medium py-2.5 rounded-md hover:bg-gray-800 disabled:opacity-50"
-            >
-              {loading ? t('common.loading') : t('auth.continue')}
-            </button>
-          </form>
-        )}
-
-        {step === 'password' && (
-          <form onSubmit={handlePasswordLogin}>
-            <p className="text-sm text-gray-500 mb-3">{identifier}</p>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              {t('auth.enterPassword')}
+              {t('auth.password')}
             </label>
             <input
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
-              autoFocus
             />
             {error && <p className="text-sm text-red-600 mb-3">{error}</p>}
             <button
               type="submit"
-              disabled={loading || !password}
+              disabled={loading || !identifier.trim() || !password}
               className="w-full bg-gray-900 text-white text-sm font-medium py-2.5 rounded-md hover:bg-gray-800 disabled:opacity-50 mb-2"
             >
               {loading ? t('common.loading') : t('auth.login')}
             </button>
-            <button
-              type="button"
-              onClick={handleBack}
-              className="w-full text-sm text-gray-500 hover:text-gray-700 py-1"
-            >
+            <button type="button" onClick={handleBack} className="w-full text-sm text-gray-500 hover:text-gray-700 py-1">
               {t('common.back')}
             </button>
           </form>
         )}
 
-        {step === 'magic_link_sent' && (
+        {/* Athlete/Manager: email for magic link */}
+        {mode === 'athlete' && (
+          <div>
+            <p className="text-sm text-gray-500 mb-4">{t('home.magicLinkExplainer')}</p>
+            <form onSubmit={handleMagicLink}>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                {t('auth.email')}
+              </label>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+                placeholder="email@example.com"
+                autoFocus
+              />
+              {error && <p className="text-sm text-red-600 mb-3">{error}</p>}
+              <button
+                type="submit"
+                disabled={loading || !email.trim()}
+                className="w-full bg-gray-900 text-white text-sm font-medium py-2.5 rounded-md hover:bg-gray-800 disabled:opacity-50 mb-3"
+              >
+                {loading ? t('common.loading') : t('home.sendLoginLink')}
+              </button>
+            </form>
+            <div className="border-t border-gray-100 pt-3">
+              <Link
+                to="/signup"
+                className="block w-full text-center text-sm text-gray-900 font-medium hover:underline"
+              >
+                {t('auth.registerAsAthleteOrManager')}
+              </Link>
+            </div>
+            <button type="button" onClick={handleBack} className="w-full text-sm text-gray-500 hover:text-gray-700 py-1 mt-2">
+              {t('common.back')}
+            </button>
+          </div>
+        )}
+
+        {/* Magic link sent confirmation */}
+        {mode === 'magic_link_sent' && (
           <div>
             <p className="text-sm text-gray-700 mb-4">{t('auth.magicLinkSent')}</p>
-            <button
-              type="button"
-              onClick={handleBack}
-              className="w-full text-sm text-gray-500 hover:text-gray-700 py-1"
-            >
+            <button type="button" onClick={handleBack} className="w-full text-sm text-gray-500 hover:text-gray-700 py-1">
               {t('common.back')}
             </button>
           </div>
         )}
       </div>
 
-      <Link
-        to="/signup"
-        className="block w-full text-center px-3 py-2.5 rounded-md border border-gray-200 text-sm text-gray-900 hover:bg-gray-50 transition-colors"
-      >
-        {t('auth.registerAsAthleteOrManager')}
-      </Link>
-
       {/* DEV ONLY — email log */}
       {emails.length > 0 && (
-        <div className="mt-8 mb-12">
+        <div className="mt-4 mb-12">
           <p className="text-xs font-semibold uppercase tracking-wide text-orange-500 mb-2">
             Dev — Emails sent (last hour)
           </p>
           <div className="flex flex-col gap-2">
-            {emails.slice().reverse().map((email, i) => (
+            {emails.slice().reverse().map((em, i) => (
               <div key={i} className="border border-orange-200 bg-orange-50 rounded-md px-3 py-2">
                 <div className="flex justify-between text-[10px] text-orange-400 mb-1">
-                  <span>To: {email.to}</span>
-                  <span>{new Date(email.sentAt).toLocaleTimeString()}</span>
+                  <span>To: {em.to}</span>
+                  <span>{new Date(em.sentAt).toLocaleTimeString()}</span>
                 </div>
-                <p className="text-xs font-medium text-gray-900 mb-1">{email.subject}</p>
-                <pre className="text-[10px] text-gray-600 whitespace-pre-wrap font-mono">{email.body}</pre>
+                <p className="text-xs font-medium text-gray-900 mb-1">{em.subject}</p>
+                <pre className="text-[10px] text-gray-600 whitespace-pre-wrap font-mono">{em.body}</pre>
               </div>
             ))}
           </div>
