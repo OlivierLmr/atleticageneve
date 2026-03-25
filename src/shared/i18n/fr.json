@@ -32,10 +32,14 @@
     "phone": "Téléphone",
     "username": "Nom d'utilisateur",
     "password": "Mot de passe",
-    "magicLinkSent": "Un lien de connexion a été envoyé à votre email",
+    "magicLinkSent": "Si cet email est enregistré en tant qu'athlète ou manager, un lien de connexion a été envoyé.",
     "magicLinkPrompt": "Entrez votre email pour recevoir un lien de connexion",
-    "invalidCredentials": "Nom d'utilisateur ou mot de passe incorrect",
-    "sessionExpired": "Votre session a expiré, veuillez vous reconnecter"
+    "invalidCredentials": "Identifiants invalides",
+    "sessionExpired": "Votre session a expiré, veuillez vous reconnecter",
+    "enterEmailOrUsername": "Email ou nom d'utilisateur",
+    "continue": "Continuer",
+    "registerAsAthleteOrManager": "S'inscrire en tant qu'athlète ou manager",
+    "enterPassword": "Entrez votre mot de passe"
   },
   "nav": {
     "home": "Accueil",
