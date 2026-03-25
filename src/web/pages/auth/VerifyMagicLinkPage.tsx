@@ -21,9 +21,9 @@ export default function VerifyMagicLinkPage() {
     }
 
     verifyMagicLink(token)
-      .then(() => {
-        // Redirect based on user role — for now, go to home
-        navigate('/')
+      .then((user) => {
+        const dest = user.role === 'manager' ? '/manager/portal' : '/athlete/portal'
+        navigate(dest)
       })
       .catch(() => {
         setError(t('auth.sessionExpired'))

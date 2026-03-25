@@ -18,7 +18,7 @@ interface AuthContextType {
   isLoading: boolean
   login: (username: string, password: string) => Promise<void>
   requestMagicLink: (email: string) => Promise<void>
-  verifyMagicLink: (token: string) => Promise<void>
+  verifyMagicLink: (token: string) => Promise<AuthUser>
   logout: () => Promise<void>
 }
 
@@ -63,6 +63,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     })
     localStorage.setItem('session_token', res.token)
     setUser(res.user)
+    return res.user
   }, [])
 
   const logout = useCallback(async () => {
