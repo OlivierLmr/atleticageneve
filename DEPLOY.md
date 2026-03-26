@@ -20,9 +20,9 @@
 
 | Role | Username | Password | Name |
 |------|----------|----------|------|
-| Collaborator | `pierre` | `password` | Pierre Dupont |
-| Collaborator | `sophie` | `password` | Sophie Martin |
-| Committee | `admin` | `password` | Jean Président |
+| Collaborator | `pierre` | `atletica2026` | Pierre Dupont |
+| Collaborator | `sophie` | `atletica2026` | Sophie Martin |
+| Committee | `admin` | `atletica2026` | Jean Président |
 
 ### Managers (magic link login at `/auth/magic-link`)
 
@@ -85,16 +85,13 @@ npx wrangler pages deploy dist --project-name=atleticageneve --commit-dirty=true
 
 ```bash
 # API only
-npx wrangler deploy src/api/index.ts
+npm run deploy:api
 
-# Frontend only
-VITE_API_URL=https://atletica-api.olivier-lemer.workers.dev npm run build:web
-npx wrangler pages deploy dist --project-name=atleticageneve --commit-dirty=true
+# Frontend only (builds with correct API URL automatically)
+npm run deploy:web
 
 # Both
-npx wrangler deploy src/api/index.ts && \
-VITE_API_URL=https://atletica-api.olivier-lemer.workers.dev npm run build:web && \
-npx wrangler pages deploy dist --project-name=atleticageneve --commit-dirty=true
+npm run deploy:api && npm run deploy:web
 
 # Database migrations (when schema changes)
 npx wrangler d1 migrations apply atletica-db --remote
@@ -103,7 +100,7 @@ npx wrangler d1 migrations apply atletica-db --remote
 ## Architecture Notes
 
 - **API base URL**: controlled by `VITE_API_URL` env var at build time (defaults to empty string for local dev)
-- **CORS**: configured in `src/api/index.ts` — update the `origin` array if you add a custom domain
+- **CORS**: configured in `src/api/index.ts` — allows any `localhost` origin in dev + the production domain
 - **Magic link URLs**: derived from the `Origin` request header, so they automatically point to the correct frontend
 - **SPA routing**: `public/_redirects` ensures all routes serve `index.html` on Cloudflare Pages
 
