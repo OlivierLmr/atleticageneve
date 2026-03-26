@@ -102,19 +102,15 @@ function HomePage() {
     return <Navigate to={dest[user.role] ?? '/'} replace />
   }
 
-  const handleAdminLogin = async (e: React.FormEvent<HTMLFormElement>) => {
+  const handleAdminLogin = async (e: React.FormEvent) => {
     e.preventDefault()
-    // Read from DOM to handle browser autofill (onChange may not fire)
-    const form = e.currentTarget
-    const id = (form.elements.namedItem('username') as HTMLInputElement)?.value?.trim()
-    const pw = (form.elements.namedItem('password') as HTMLInputElement)?.value
-    if (!id || !pw) return
+    if (!identifier.trim() || !password) return
     setError('')
     setLoading(true)
     try {
       const res = await api.post<{ token: string; user: { id: string; role: string } }>(
         '/api/v1/auth/login-with-password',
-        { identifier: id, password: pw },
+        { identifier: identifier.trim(), password },
       )
       localStorage.setItem('session_token', res.token)
       window.location.href = res.user.role === 'committee' ? '/committee/dashboard' : '/collaborator/candidates'
@@ -125,14 +121,13 @@ function HomePage() {
     }
   }
 
-  const handleMagicLink = async (e: React.FormEvent<HTMLFormElement>) => {
+  const handleMagicLink = async (e: React.FormEvent) => {
     e.preventDefault()
-    const addr = (e.currentTarget.elements.namedItem('email') as HTMLInputElement)?.value?.trim()
-    if (!addr) return
+    if (!email.trim()) return
     setError('')
     setLoading(true)
     try {
-      const res = await api.post<{ method: string }>('/api/v1/auth/identify', { identifier: addr })
+      const res = await api.post<{ method: string }>('/api/v1/auth/identify', { identifier: email.trim() })
       if (res.method === 'not_found') {
         setError(t('auth.notRegistered'))
       } else {
@@ -187,7 +182,6 @@ function HomePage() {
               {t('auth.username')}
             </label>
             <input
-              name="username"
               type="text"
               value={identifier}
               onChange={(e) => setIdentifier(e.target.value)}
@@ -198,7 +192,6 @@ function HomePage() {
               {t('auth.password')}
             </label>
             <input
-              name="password"
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
@@ -227,7 +220,6 @@ function HomePage() {
                 {t('auth.email')}
               </label>
               <input
-                name="email"
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
