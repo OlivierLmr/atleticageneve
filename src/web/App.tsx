@@ -200,7 +200,7 @@ function HomePage() {
             {error && <p className="text-sm text-red-600 mb-3">{error}</p>}
             <button
               type="submit"
-              disabled={loading || !identifier.trim() || !password}
+              disabled={loading}
               className="w-full bg-gray-900 text-white text-sm font-medium py-2.5 rounded-md hover:bg-gray-800 disabled:opacity-50 mb-2"
             >
               {loading ? t('common.loading') : t('auth.login')}
@@ -230,7 +230,7 @@ function HomePage() {
               {error && <p className="text-sm text-red-600 mb-3">{error}</p>}
               <button
                 type="submit"
-                disabled={loading || !email.trim()}
+                disabled={loading}
                 className="w-full bg-gray-900 text-white text-sm font-medium py-2.5 rounded-md hover:bg-gray-800 disabled:opacity-50 mb-3"
               >
                 {loading ? t('common.loading') : t('home.sendLoginLink')}
