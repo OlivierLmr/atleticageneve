@@ -18,6 +18,16 @@ test.describe('Authentication', () => {
     await expect(page).toHaveURL(/\/committee\/dashboard/)
   })
 
+  test('admin login submits on Enter key', async ({ page }) => {
+    await page.goto('/')
+    await page.getByText(/admin.*selector/i).click()
+    await page.locator('input[type="text"]').fill('admin')
+    await page.locator('input[type="password"]').fill('atletica2026')
+    await page.locator('input[type="password"]').press('Enter')
+    await page.waitForURL(/\/committee\/dashboard/)
+    await expect(page).toHaveURL(/\/committee\/dashboard/)
+  })
+
   test('admin login with wrong password shows error', async ({ page }) => {
     await page.goto('/')
     await page.getByText(/admin.*selector/i).click()
