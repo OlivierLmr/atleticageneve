@@ -12,9 +12,8 @@ describe('athleteRegistrationSchema', () => {
     lastName: 'Jacobs',
     nationality: 'ITA',
     gender: 'M' as const,
-    eventId: '100m-m',
-    personalBest: '9.80',
-    seasonBest: '9.95',
+    athleteEmail: 'marcell@example.com',
+    eventIds: ['100m-m'],
   }
 
   it('accepts minimal valid data', () => {
@@ -31,12 +30,10 @@ describe('athleteRegistrationSchema', () => {
       distanceFromGva: 880,
       waProfileUrl: 'https://worldathletics.org/athletes/italy/marcell-jacobs-14655484',
       swiLicence: '',
-      athleteEmail: 'marcell@example.com',
       athletePhone: '+39123456',
       managerId: 'u-mgr-1',
-      worldRanking: 3,
-      iRunClean: 'yes',
-      dopingFree: 'yes',
+      iRunClean: true,
+      dopingFree: true,
       participantNotes: 'Ground floor preferred',
       additionalNotes: 'Arriving from Rome',
     })
@@ -55,6 +52,19 @@ describe('athleteRegistrationSchema', () => {
   it('rejects nationality with 4+ chars', () => {
     expect(athleteRegistrationSchema.safeParse({ ...valid, nationality: 'ITAL' }).success).toBe(false)
   })
+
+  it('requires athleteEmail', () => {
+    const { athleteEmail: _, ...noEmail } = valid
+    expect(athleteRegistrationSchema.safeParse(noEmail).success).toBe(false)
+  })
+
+  it('requires eventIds with at least one event', () => {
+    expect(athleteRegistrationSchema.safeParse({ ...valid, eventIds: [] }).success).toBe(false)
+  })
+
+  it('accepts multiple eventIds', () => {
+    expect(athleteRegistrationSchema.safeParse({ ...valid, eventIds: ['100m-m', '200m-m'] }).success).toBe(true)
+  })
 })
 
 describe('batchAthleteRegistrationSchema', () => {
@@ -63,9 +73,8 @@ describe('batchAthleteRegistrationSchema', () => {
     lastName: 'Runner',
     nationality: 'GBR',
     gender: 'M' as const,
-    eventId: '100m-m',
-    personalBest: '10.05',
-    seasonBest: '10.10',
+    dateOfBirth: '1995-01-01',
+    eventIds: ['100m-m'],
   }
 
   it('accepts array of 1+ valid athletes', () => {

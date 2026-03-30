@@ -30,26 +30,26 @@ describe('Dashboard API', () => {
     const evt1 = await createEvent(ctx, editionId, { id: 'evt-dash-1', name: '100m Men', discipline: '100m', gender: 'M' })
     const evt2 = await createEvent(ctx, editionId, { id: 'evt-dash-2', name: '200m Women', discipline: '200m', gender: 'F' })
 
-    // Create athletes and applications in various states
-    const ath1 = await createAthlete(ctx, { firstName: 'Dash1', lastName: 'A', isSwiss: true })
-    const ath2 = await createAthlete(ctx, { firstName: 'Dash2', lastName: 'B', isEap: true })
-    const ath3 = await createAthlete(ctx, { firstName: 'Dash3', lastName: 'C' })
-    const ath4 = await createAthlete(ctx, { firstName: 'Dash4', lastName: 'D' })
+    // Create athletes with negotiation statuses and applications with participation statuses
+    const ath1 = await createAthlete(ctx, { firstName: 'Dash1', lastName: 'A', isSwiss: true, negotiationStatus: 'accepted', editionId })
+    const ath2 = await createAthlete(ctx, { firstName: 'Dash2', lastName: 'B', isEap: true, negotiationStatus: 'contract_sent', editionId })
+    const ath3 = await createAthlete(ctx, { firstName: 'Dash3', lastName: 'C', negotiationStatus: 'to_review', editionId })
+    const ath4 = await createAthlete(ctx, { firstName: 'Dash4', lastName: 'D', negotiationStatus: 'rejected', editionId })
 
-    await createApplication(ctx, { athleteId: ath1, eventId: evt1, editionId, status: 'accepted' })
-    await createApplication(ctx, { athleteId: ath2, eventId: evt1, editionId, status: 'contract_sent' })
-    await createApplication(ctx, { athleteId: ath3, eventId: evt2, editionId, status: 'to_review' })
-    await createApplication(ctx, { athleteId: ath4, eventId: evt2, editionId, status: 'rejected' })
+    await createApplication(ctx, { athleteId: ath1, eventId: evt1, editionId, status: 'accepted', participationStatus: 'selected' })
+    await createApplication(ctx, { athleteId: ath2, eventId: evt1, editionId, status: 'contract_sent', participationStatus: 'pending' })
+    await createApplication(ctx, { athleteId: ath3, eventId: evt2, editionId, status: 'to_review', participationStatus: 'pending' })
+    await createApplication(ctx, { athleteId: ath4, eventId: evt2, editionId, status: 'rejected', participationStatus: 'not_selected' })
 
     // Add a contract for committed budget calculation
     await ctx.db.insert(schema.contractOffer).values({
+      athleteId: ath1,
       applicationId: (await ctx.db.select().from(schema.application))[0].id,
       version: 1,
       direction: 'to_athlete',
       bonus: 5000,
       transport: 500,
-      catering: 200,
-      totalCost: 6150,
+      totalCost: 5500,
       sentBy: userId,
     })
   })
@@ -67,10 +67,10 @@ describe('Dashboard API', () => {
       const body = await res.json() as any
 
       expect(body.kpi).toBeDefined()
+      expect(body.kpi.totalAthletes).toBe(4)
       expect(body.kpi.confirmed).toBe(1)
       expect(body.kpi.inNegotiation).toBe(1) // contract_sent
       expect(body.kpi.toReview).toBe(1)
-      expect(body.kpi.totalApplications).toBeGreaterThanOrEqual(4)
     })
 
     it('returns event fill rates', async () => {
@@ -83,7 +83,7 @@ describe('Dashboard API', () => {
 
       const evt1 = body.events.find((e: any) => e.eventId === 'evt-dash-1')
       expect(evt1).toBeDefined()
-      expect(evt1.confirmed).toBeGreaterThanOrEqual(1)
+      expect(evt1.selected).toBeGreaterThanOrEqual(1)
     })
 
     it('rejects non-committee users', async () => {

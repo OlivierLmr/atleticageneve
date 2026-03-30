@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { VALID_TRANSITIONS, HOTEL_COST_PER_NIGHT } from '@shared/constants'
+import { VALID_TRANSITIONS } from '@shared/constants'
 import { contractOfferSchema } from '@shared/validation'
 import type { ApplicationStatus } from '@shared/types'
 
@@ -85,7 +85,7 @@ describe('counter-offer validation', () => {
   it('rejects counter-offer with negative values', () => {
     expect(contractOfferSchema.safeParse({ bonus: -5000 }).success).toBe(false)
     expect(contractOfferSchema.safeParse({ transport: -100 }).success).toBe(false)
-    expect(contractOfferSchema.safeParse({ catering: -50 }).success).toBe(false)
+    expect(contractOfferSchema.safeParse({ otherCompensation: -50 }).success).toBe(false)
   })
 })
 

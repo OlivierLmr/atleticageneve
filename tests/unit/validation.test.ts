@@ -44,9 +44,8 @@ describe('athleteRegistrationSchema', () => {
     lastName: 'Jacobs',
     nationality: 'ITA',
     gender: 'M' as const,
-    eventId: '100m-m',
-    personalBest: '9.80',
-    seasonBest: '9.95',
+    athleteEmail: 'marcell@example.com',
+    eventIds: ['100m-m'],
   }
 
   it('accepts valid minimal athlete data', () => {
@@ -75,8 +74,8 @@ describe('athleteRegistrationSchema', () => {
       dateOfBirth: '1994-09-26',
       federation: 'FIDAL',
       isEap: true,
-      worldRanking: 3,
-      iRunClean: 'yes',
+      iRunClean: true,
+      dopingFree: true,
       participantNotes: 'Some notes',
     })
     expect(result.success).toBe(true)
@@ -87,9 +86,18 @@ describe('athleteRegistrationSchema', () => {
     expect(result.isEap).toBe(false)
   })
 
-  it('defaults iRunClean to unknown', () => {
+  it('defaults iRunClean to false', () => {
     const result = athleteRegistrationSchema.parse(validAthlete)
-    expect(result.iRunClean).toBe('unknown')
+    expect(result.iRunClean).toBe(false)
+  })
+
+  it('requires athleteEmail', () => {
+    const { athleteEmail: _, ...noEmail } = validAthlete
+    expect(athleteRegistrationSchema.safeParse(noEmail).success).toBe(false)
+  })
+
+  it('requires eventIds array with at least one event', () => {
+    expect(athleteRegistrationSchema.safeParse({ ...validAthlete, eventIds: [] }).success).toBe(false)
   })
 })
 
@@ -122,7 +130,6 @@ describe('contractOfferSchema', () => {
       transport: 1200,
       hotelNightFri: true,
       hotelNightSat: true,
-      catering: 300,
     })
     expect(result.success).toBe(true)
   })
@@ -131,9 +138,10 @@ describe('contractOfferSchema', () => {
     const result = contractOfferSchema.parse({})
     expect(result.bonus).toBe(0)
     expect(result.transport).toBe(0)
-    expect(result.catering).toBe(0)
     expect(result.hotelNightTue).toBe(false)
-    expect(result.localTransport).toBe(false)
+    expect(result.transportAirportHotel).toBe(false)
+    expect(result.dinnerTue).toBe(false)
+    expect(result.stadiumMeals).toBe(false)
   })
 
   it('rejects negative bonus', () => {

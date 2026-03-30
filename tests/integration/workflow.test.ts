@@ -15,7 +15,6 @@ describe('Application Workflow API', () => {
   let collabToken: string
   let editionId: string
   let eventId: string
-  let athleteId: string
 
   beforeAll(async () => {
     ctx = await setupTestContext()
@@ -28,7 +27,6 @@ describe('Application Workflow API', () => {
     collabToken = token
     editionId = await createEdition(ctx)
     eventId = await createEvent(ctx, editionId)
-    athleteId = await createAthlete(ctx)
   })
 
   afterAll(async () => {
@@ -40,23 +38,24 @@ describe('Application Workflow API', () => {
     'Content-Type': 'application/json',
   })
 
-  // Helper: create a fresh event + application to avoid UNIQUE conflicts
-  async function freshApp(status: string = 'to_review') {
+  // Helper: create a fresh athlete + event + application to avoid UNIQUE conflicts
+  async function freshApp(negotiationStatus: string = 'to_review') {
+    const athleteId = await createAthlete(ctx, { negotiationStatus, editionId })
     const evtId = await createEvent(ctx, editionId)
     const appId = await createApplication(ctx, {
       athleteId,
       eventId: evtId,
       editionId,
-      status,
+      status: negotiationStatus,
     })
-    return appId
+    return { appId, athleteId }
   }
 
   // ── Status transitions ────────────────────────────────────────────────────
 
   describe('Status transitions', () => {
     it('transitions to_review → contract_sent', async () => {
-      const appId = await freshApp('to_review')
+      const { appId } = await freshApp('to_review')
 
       const res = await ctx.request(`/api/v1/applications/${appId}/status`, {
         method: 'PATCH',
@@ -69,7 +68,7 @@ describe('Application Workflow API', () => {
     })
 
     it('transitions contract_sent → accepted', async () => {
-      const appId = await freshApp('contract_sent')
+      const { appId } = await freshApp('contract_sent')
 
       const res = await ctx.request(`/api/v1/applications/${appId}/status`, {
         method: 'PATCH',
@@ -82,7 +81,7 @@ describe('Application Workflow API', () => {
     })
 
     it('transitions contract_sent → rejected', async () => {
-      const appId = await freshApp('contract_sent')
+      const { appId } = await freshApp('contract_sent')
 
       const res = await ctx.request(`/api/v1/applications/${appId}/status`, {
         method: 'PATCH',
@@ -93,7 +92,7 @@ describe('Application Workflow API', () => {
     })
 
     it('rejects invalid transition to_review → accepted', async () => {
-      const appId = await freshApp('to_review')
+      const { appId } = await freshApp('to_review')
 
       const res = await ctx.request(`/api/v1/applications/${appId}/status`, {
         method: 'PATCH',
@@ -104,12 +103,12 @@ describe('Application Workflow API', () => {
     })
 
     it('rejects transition from terminal state', async () => {
-      const appId = await freshApp('accepted')
+      const { appId } = await freshApp('rejected')
 
       const res = await ctx.request(`/api/v1/applications/${appId}/status`, {
         method: 'PATCH',
         headers: authHeaders(),
-        body: JSON.stringify({ status: 'rejected' }),
+        body: JSON.stringify({ status: 'contract_sent' }),
       })
       expect(res.status).toBe(400)
     })
@@ -119,23 +118,30 @@ describe('Application Workflow API', () => {
 
   describe('Contract offers', () => {
     it('creates a contract offer and transitions to contract_sent', async () => {
-      const appId = await freshApp('to_review')
+      const { athleteId } = await freshApp('to_review')
 
-      const res = await ctx.request(`/api/v1/applications/${appId}/contracts`, {
+      const res = await ctx.request(`/api/v1/athletes/${athleteId}/contracts`, {
         method: 'POST',
         headers: authHeaders(),
         body: JSON.stringify({
           bonus: 5000,
           otherCompensation: 0,
           transport: 500,
-          localTransport: true,
+          transportAirportHotel: true,
+          transportHotelStadium: false,
           hotelNightThu: true,
           hotelNightFri: true,
           hotelNightSat: true,
           hotelNightTue: false,
           hotelNightWed: false,
           hotelNightSun: false,
-          catering: 200,
+          dinnerThu: true,
+          dinnerFri: true,
+          dinnerSat: false,
+          dinnerTue: false,
+          dinnerWed: false,
+          dinnerSun: false,
+          stadiumMeals: true,
           notes: 'Welcome offer',
         }),
       })
@@ -147,17 +153,21 @@ describe('Application Workflow API', () => {
     })
 
     it('increments version on subsequent offers (after counter-offer)', async () => {
-      const appId = await freshApp('to_review')
+      const { appId, athleteId } = await freshApp('to_review')
 
       // Send first offer (transitions to contract_sent)
-      const res1 = await ctx.request(`/api/v1/applications/${appId}/contracts`, {
+      const res1 = await ctx.request(`/api/v1/athletes/${athleteId}/contracts`, {
         method: 'POST',
         headers: authHeaders(),
         body: JSON.stringify({
           bonus: 3000, otherCompensation: 0, transport: 300,
-          localTransport: false, hotelNightTue: false, hotelNightWed: false,
+          transportAirportHotel: false, transportHotelStadium: false,
+          hotelNightTue: false, hotelNightWed: false,
           hotelNightThu: true, hotelNightFri: true, hotelNightSat: false,
-          hotelNightSun: false, catering: 100, notes: '',
+          hotelNightSun: false,
+          dinnerTue: false, dinnerWed: false, dinnerThu: false,
+          dinnerFri: false, dinnerSat: false, dinnerSun: false,
+          stadiumMeals: false, notes: '',
         }),
       })
       expect(res1.status).toBe(201)
@@ -172,14 +182,18 @@ describe('Application Workflow API', () => {
       })
 
       // Send revised offer from counter_offer status
-      const res2 = await ctx.request(`/api/v1/applications/${appId}/contracts`, {
+      const res2 = await ctx.request(`/api/v1/athletes/${athleteId}/contracts`, {
         method: 'POST',
         headers: authHeaders(),
         body: JSON.stringify({
           bonus: 4000, otherCompensation: 0, transport: 400,
-          localTransport: false, hotelNightTue: false, hotelNightWed: false,
+          transportAirportHotel: false, transportHotelStadium: false,
+          hotelNightTue: false, hotelNightWed: false,
           hotelNightThu: true, hotelNightFri: true, hotelNightSat: true,
-          hotelNightSun: false, catering: 150, notes: 'Revised',
+          hotelNightSun: false,
+          dinnerTue: false, dinnerWed: false, dinnerThu: true,
+          dinnerFri: true, dinnerSat: false, dinnerSun: false,
+          stadiumMeals: false, notes: 'Revised',
         }),
       })
       expect(res2.status).toBe(201)
@@ -192,7 +206,7 @@ describe('Application Workflow API', () => {
 
   describe('Interactions', () => {
     it('creates an interaction note', async () => {
-      const appId = await freshApp()
+      const { appId } = await freshApp()
 
       const res = await ctx.request(`/api/v1/applications/${appId}/interactions`, {
         method: 'POST',

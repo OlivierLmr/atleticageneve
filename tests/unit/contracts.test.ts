@@ -1,66 +1,128 @@
 import { describe, it, expect } from 'vitest'
-import { HOTEL_COST_PER_NIGHT, VALID_TRANSITIONS } from '@shared/constants'
+import { VALID_TRANSITIONS } from '@shared/constants'
 import { contractOfferSchema, statusChangeSchema } from '@shared/validation'
-import type { ApplicationStatus } from '@shared/types'
+import type { NegotiationStatus } from '@shared/types'
 
 // ── Cost calculation (mirrors the logic in contracts.ts) ─────────────────────
+// Now uses configurable costs from edition, not a hardcoded constant
+
+interface EditionCosts {
+  hotelCostPerNight: number
+  dinnerCostPp: number
+  stadiumMealCost: number
+  transportAirportHotelCost: number
+  transportHotelStadiumCost: number
+}
 
 function calculateTotalCost(data: {
   bonus: number
   otherCompensation: number
   transport: number
-  catering: number
+  transportAirportHotel: boolean
+  transportHotelStadium: boolean
   hotelNightTue: boolean
   hotelNightWed: boolean
   hotelNightThu: boolean
   hotelNightFri: boolean
   hotelNightSat: boolean
   hotelNightSun: boolean
-}, hotelCostPerNight: number): number {
+  dinnerTue: boolean
+  dinnerWed: boolean
+  dinnerThu: boolean
+  dinnerFri: boolean
+  dinnerSat: boolean
+  dinnerSun: boolean
+  stadiumMeals: boolean
+}, costs: EditionCosts): number {
   const nights = [
     data.hotelNightTue, data.hotelNightWed, data.hotelNightThu,
     data.hotelNightFri, data.hotelNightSat, data.hotelNightSun,
   ].filter(Boolean).length
+  const dinners = [
+    data.dinnerTue, data.dinnerWed, data.dinnerThu,
+    data.dinnerFri, data.dinnerSat, data.dinnerSun,
+  ].filter(Boolean).length
   return data.bonus + data.otherCompensation + data.transport +
-    data.catering + (nights * hotelCostPerNight)
+    (nights * costs.hotelCostPerNight) +
+    (dinners * costs.dinnerCostPp) +
+    (data.stadiumMeals ? costs.stadiumMealCost : 0) +
+    (data.transportAirportHotel ? costs.transportAirportHotelCost : 0) +
+    (data.transportHotelStadium ? costs.transportHotelStadiumCost : 0)
 }
 
 describe('contract cost calculation', () => {
+  const costs: EditionCosts = {
+    hotelCostPerNight: 180,
+    dinnerCostPp: 80,
+    stadiumMealCost: 30,
+    transportAirportHotelCost: 60,
+    transportHotelStadiumCost: 40,
+  }
+
   const base = {
     bonus: 0,
     otherCompensation: 0,
     transport: 0,
-    catering: 0,
+    transportAirportHotel: false,
+    transportHotelStadium: false,
     hotelNightTue: false,
     hotelNightWed: false,
     hotelNightThu: false,
     hotelNightFri: false,
     hotelNightSat: false,
     hotelNightSun: false,
+    dinnerTue: false,
+    dinnerWed: false,
+    dinnerThu: false,
+    dinnerFri: false,
+    dinnerSat: false,
+    dinnerSun: false,
+    stadiumMeals: false,
   }
 
   it('returns 0 for an empty contract', () => {
-    expect(calculateTotalCost(base, HOTEL_COST_PER_NIGHT)).toBe(0)
+    expect(calculateTotalCost(base, costs)).toBe(0)
   })
 
-  it('sums bonus, transport, catering', () => {
+  it('sums bonus and transport', () => {
     expect(
-      calculateTotalCost({ ...base, bonus: 5000, transport: 1200, catering: 300 }, HOTEL_COST_PER_NIGHT)
-    ).toBe(6500)
+      calculateTotalCost({ ...base, bonus: 5000, transport: 1200 }, costs)
+    ).toBe(6200)
   })
 
   it('includes other compensation', () => {
     expect(
-      calculateTotalCost({ ...base, bonus: 1000, otherCompensation: 500 }, HOTEL_COST_PER_NIGHT)
+      calculateTotalCost({ ...base, bonus: 1000, otherCompensation: 500 }, costs)
     ).toBe(1500)
   })
 
   it('adds hotel nights at the correct rate', () => {
     const total = calculateTotalCost(
       { ...base, hotelNightThu: true, hotelNightFri: true, hotelNightSat: true },
-      HOTEL_COST_PER_NIGHT
+      costs
     )
-    expect(total).toBe(3 * HOTEL_COST_PER_NIGHT)
+    expect(total).toBe(3 * 180)
+  })
+
+  it('adds dinners at the correct rate', () => {
+    const total = calculateTotalCost(
+      { ...base, dinnerThu: true, dinnerFri: true },
+      costs
+    )
+    expect(total).toBe(2 * 80)
+  })
+
+  it('adds stadium meals cost', () => {
+    const total = calculateTotalCost({ ...base, stadiumMeals: true }, costs)
+    expect(total).toBe(30)
+  })
+
+  it('adds local transport costs', () => {
+    const total = calculateTotalCost(
+      { ...base, transportAirportHotel: true, transportHotelStadium: true },
+      costs
+    )
+    expect(total).toBe(60 + 40)
   })
 
   it('calculates a realistic full contract', () => {
@@ -69,17 +131,25 @@ describe('contract cost calculation', () => {
         bonus: 8000,
         otherCompensation: 500,
         transport: 1500,
-        catering: 200,
+        transportAirportHotel: true,
+        transportHotelStadium: true,
         hotelNightTue: false,
         hotelNightWed: false,
         hotelNightThu: true,
         hotelNightFri: true,
         hotelNightSat: true,
         hotelNightSun: false,
+        dinnerThu: true,
+        dinnerFri: true,
+        dinnerSat: true,
+        dinnerTue: false,
+        dinnerWed: false,
+        dinnerSun: false,
+        stadiumMeals: true,
       },
-      HOTEL_COST_PER_NIGHT
+      costs
     )
-    expect(total).toBe(8000 + 500 + 1500 + 200 + 3 * HOTEL_COST_PER_NIGHT)
+    expect(total).toBe(8000 + 500 + 1500 + 3 * 180 + 3 * 80 + 30 + 60 + 40)
   })
 
   it('handles all 6 nights', () => {
@@ -93,9 +163,9 @@ describe('contract cost calculation', () => {
         hotelNightSat: true,
         hotelNightSun: true,
       },
-      HOTEL_COST_PER_NIGHT
+      costs
     )
-    expect(total).toBe(6 * HOTEL_COST_PER_NIGHT)
+    expect(total).toBe(6 * 180)
   })
 })
 
@@ -109,12 +179,16 @@ describe('contractOfferSchema validation', () => {
       contractOfferSchema.safeParse({
         bonus: 5000,
         otherCompensation: 200,
+        otherCompensationDesc: 'Pacemaker fee',
         transport: 800,
-        localTransport: true,
+        transportAirportHotel: true,
+        transportHotelStadium: true,
         hotelNightThu: true,
         hotelNightFri: true,
         hotelNightSat: true,
-        catering: 100,
+        dinnerThu: true,
+        dinnerFri: true,
+        stadiumMeals: true,
         notes: 'Welcome to Geneva!',
       }).success
     ).toBe(true)
@@ -160,7 +234,7 @@ describe('workflow transitions for contract flow', () => {
   })
 
   it('statusChangeSchema validates all statuses', () => {
-    const statuses: ApplicationStatus[] = [
+    const statuses: NegotiationStatus[] = [
       'to_review', 'contract_sent', 'counter_offer', 'accepted', 'rejected', 'withdrawn',
     ]
     for (const status of statuses) {

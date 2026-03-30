@@ -28,7 +28,7 @@ describe('Portal API', () => {
   // ── Athlete portal ────────────────────────────────────────────────────────
 
   describe('GET /api/v1/portal/athlete', () => {
-    it('returns applications for athlete user', async () => {
+    it('returns athletes for athlete user', async () => {
       const { userId, token } = await createUserWithSession(ctx, {
         role: 'athlete',
         firstName: 'Marcell',
@@ -42,11 +42,11 @@ describe('Portal API', () => {
       })
       expect(res.status).toBe(200)
       const body = await res.json() as any
-      expect(body.applications.length).toBe(1)
-      expect(body.applications[0].athlete.firstName).toBe('Test')
+      expect(body.athletes.length).toBe(1)
+      expect(body.athletes[0].firstName).toBe('Test')
     })
 
-    it('returns applications for manager acting on behalf', async () => {
+    it('returns athletes for manager acting on behalf', async () => {
       const { userId: managerId, token } = await createUserWithSession(ctx, {
         role: 'manager',
         firstName: 'Agent',
@@ -60,7 +60,7 @@ describe('Portal API', () => {
       })
       expect(res.status).toBe(200)
       const body = await res.json() as any
-      expect(body.applications.length).toBeGreaterThanOrEqual(1)
+      expect(body.athletes.length).toBeGreaterThanOrEqual(1)
     })
 
     it('returns empty for user with no athletes', async () => {
@@ -75,28 +75,28 @@ describe('Portal API', () => {
       })
       expect(res.status).toBe(200)
       const body = await res.json() as any
-      expect(body.applications).toEqual([])
+      expect(body.athletes).toEqual([])
     })
   })
 
-  // ── Athlete respond ───────────────────────────────────────────────────────
+  // ── Athlete respond (now by athleteId) ─────────────────────────────────────
 
-  describe('POST /api/v1/portal/athlete/:appId/respond', () => {
+  describe('POST /api/v1/portal/athlete/:athleteId/respond', () => {
     it('allows athlete to accept an offer', async () => {
       const { userId, token } = await createUserWithSession(ctx, {
         role: 'athlete',
         firstName: 'Accept',
         lastName: 'Test',
       })
-      const athleteId = await createAthlete(ctx, { userId })
-      const appId = await createApplication(ctx, {
+      const athleteId = await createAthlete(ctx, { userId, negotiationStatus: 'contract_sent' })
+      await createApplication(ctx, {
         athleteId,
         eventId,
         editionId,
         status: 'contract_sent',
       })
 
-      const res = await ctx.request(`/api/v1/portal/athlete/${appId}/respond`, {
+      const res = await ctx.request(`/api/v1/portal/athlete/${athleteId}/respond`, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${token}`,
@@ -115,15 +115,15 @@ describe('Portal API', () => {
         firstName: 'Withdraw',
         lastName: 'Test',
       })
-      const athleteId = await createAthlete(ctx, { userId })
-      const appId = await createApplication(ctx, {
+      const athleteId = await createAthlete(ctx, { userId, negotiationStatus: 'contract_sent' })
+      await createApplication(ctx, {
         athleteId,
         eventId,
         editionId,
         status: 'contract_sent',
       })
 
-      const res = await ctx.request(`/api/v1/portal/athlete/${appId}/respond`, {
+      const res = await ctx.request(`/api/v1/portal/athlete/${athleteId}/respond`, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${token}`,
@@ -137,28 +137,26 @@ describe('Portal API', () => {
     })
 
     it('rejects action from unauthorized user', async () => {
-      // Create athlete owned by one user
       const { userId: ownerId } = await createUserWithSession(ctx, {
         role: 'athlete',
         firstName: 'Owner',
         lastName: 'Ath',
       })
-      const athleteId = await createAthlete(ctx, { userId: ownerId })
-      const appId = await createApplication(ctx, {
+      const athleteId = await createAthlete(ctx, { userId: ownerId, negotiationStatus: 'contract_sent' })
+      await createApplication(ctx, {
         athleteId,
         eventId,
         editionId,
         status: 'contract_sent',
       })
 
-      // Try to act as a different user
       const { token: otherToken } = await createUserWithSession(ctx, {
         role: 'athlete',
         firstName: 'Other',
         lastName: 'User',
       })
 
-      const res = await ctx.request(`/api/v1/portal/athlete/${appId}/respond`, {
+      const res = await ctx.request(`/api/v1/portal/athlete/${athleteId}/respond`, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${otherToken}`,
@@ -175,15 +173,15 @@ describe('Portal API', () => {
         firstName: 'Invalid',
         lastName: 'Trans',
       })
-      const athleteId = await createAthlete(ctx, { userId })
-      const appId = await createApplication(ctx, {
+      const athleteId = await createAthlete(ctx, { userId, negotiationStatus: 'to_review' })
+      await createApplication(ctx, {
         athleteId,
         eventId,
         editionId,
-        status: 'to_review', // can't accept from to_review
+        status: 'to_review',
       })
 
-      const res = await ctx.request(`/api/v1/portal/athlete/${appId}/respond`, {
+      const res = await ctx.request(`/api/v1/portal/athlete/${athleteId}/respond`, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${token}`,
@@ -204,8 +202,8 @@ describe('Portal API', () => {
         firstName: 'KPI',
         lastName: 'Manager',
       })
-      const ath1 = await createAthlete(ctx, { managerId, firstName: 'A1', lastName: 'Test' })
-      const ath2 = await createAthlete(ctx, { managerId, firstName: 'A2', lastName: 'Test' })
+      const ath1 = await createAthlete(ctx, { managerId, firstName: 'A1', lastName: 'Test', negotiationStatus: 'to_review' })
+      const ath2 = await createAthlete(ctx, { managerId, firstName: 'A2', lastName: 'Test', negotiationStatus: 'accepted' })
       await createApplication(ctx, { athleteId: ath1, eventId, editionId, status: 'to_review' })
       await createApplication(ctx, { athleteId: ath2, eventId, editionId, status: 'accepted' })
 
@@ -214,7 +212,7 @@ describe('Portal API', () => {
       })
       expect(res.status).toBe(200)
       const body = await res.json() as any
-      expect(body.applications.length).toBe(2)
+      expect(body.athletes.length).toBe(2)
       expect(body.kpi).toBeDefined()
       expect(body.kpi.total).toBe(2)
       expect(body.kpi.confirmed).toBe(1)

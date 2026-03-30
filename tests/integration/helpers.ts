@@ -9,7 +9,10 @@ import app from '@api/index'
 import fs from 'fs'
 import path from 'path'
 
-const MIGRATION_PATH = path.resolve(__dirname, '../../src/api/db/migrations/0001_initial.sql')
+const MIGRATION_PATHS = [
+  path.resolve(__dirname, '../../src/api/db/migrations/0001_initial.sql'),
+  path.resolve(__dirname, '../../src/api/db/migrations/0002_client_feedback_refactor.sql'),
+]
 
 export interface TestContext {
   mf: Miniflare
@@ -28,17 +31,19 @@ export async function setupTestContext(): Promise<TestContext> {
   const d1 = await mf.getD1Database('DB') as unknown as D1Database
   const db = drizzle(d1, { schema })
 
-  // Run migration — use batch with prepared statements
-  const migrationSql = fs.readFileSync(MIGRATION_PATH, 'utf-8')
-  // Split on semicolons followed by newline (to avoid splitting inside CHECK constraints)
-  // then strip comments
-  const statements = migrationSql
-    .split(/;\s*\n/)
-    .map((s) => s.replace(/--.*$/gm, '').trim())
-    .filter((s) => s.length > 0)
+  // Run migrations — use batch with prepared statements
+  for (const migrationPath of MIGRATION_PATHS) {
+    const migrationSql = fs.readFileSync(migrationPath, 'utf-8')
+    // Split on semicolons followed by newline (to avoid splitting inside CHECK constraints)
+    // then strip comments
+    const statements = migrationSql
+      .split(/;\s*\n/)
+      .map((s) => s.replace(/--.*$/gm, '').trim())
+      .filter((s) => s.length > 0)
 
-  const batch = statements.map((s) => d1.prepare(s))
-  await d1.batch(batch)
+    const batch = statements.map((s) => d1.prepare(s))
+    await d1.batch(batch)
+  }
 
   // Request helper — runs directly against the Hono app with a mocked env
   const request = async (urlPath: string, init?: RequestInit): Promise<Response> => {
