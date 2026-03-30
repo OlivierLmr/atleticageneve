@@ -1,4 +1,4 @@
-import type { PerfType } from './types'
+import type { PerfType, NegotiationStatus, ParticipationStatus } from './types'
 
 // ── Event metadata for scoring ────────────────────────────────────────────────
 
@@ -19,11 +19,10 @@ export const EVENT_META: Record<string, EventMeta> = {
   'lj-f':     { type: 'MAX', intMinima: 6.86,   swiMinima: 6.70   },
 }
 
-// ── Valid workflow transitions ─────────────────────────────────────────────────
+// ── Valid workflow transitions — negotiation (athlete-level) ─────────────────
 
-import type { ApplicationStatus } from './types'
-
-export const VALID_TRANSITIONS: Record<ApplicationStatus, ApplicationStatus[]> = {
+/** @deprecated Use NEGOTIATION_TRANSITIONS */
+export const VALID_TRANSITIONS: Record<NegotiationStatus, NegotiationStatus[]> = {
   to_review:     ['contract_sent', 'rejected'],
   contract_sent: ['accepted', 'rejected', 'counter_offer', 'withdrawn'],
   counter_offer: ['contract_sent', 'rejected', 'withdrawn'],
@@ -32,15 +31,25 @@ export const VALID_TRANSITIONS: Record<ApplicationStatus, ApplicationStatus[]> =
   withdrawn:     [],
 }
 
+export const NEGOTIATION_TRANSITIONS = VALID_TRANSITIONS
+
+// ── Valid transitions — participation (per-event) ────────────────────────────
+
+export const PARTICIPATION_TRANSITIONS: Record<ParticipationStatus, ParticipationStatus[]> = {
+  pending:      ['selected', 'not_selected'],
+  selected:     ['not_selected'],
+  not_selected: ['selected'],
+}
+
 // ── Budget & quotas ───────────────────────────────────────────────────────────
 
 export const DEFAULT_TOTAL_BUDGET = 250_000
-
-// ── Hotel cost per night (CHF) ────────────────────────────────────────────────
-
-export const HOTEL_COST_PER_NIGHT = 150
 
 // ── Night labels for hotel night picker ───────────────────────────────────────
 
 export const NIGHT_LABELS = ['tue', 'wed', 'thu', 'fri', 'sat', 'sun'] as const
 export type NightKey = (typeof NIGHT_LABELS)[number]
+
+// ── Dinner labels (same days as nights) ──────────────────────────────────────
+
+export const DINNER_LABELS = NIGHT_LABELS

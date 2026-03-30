@@ -1,12 +1,17 @@
 // ── Status enums ──────────────────────────────────────────────────────────────
 
-export type ApplicationStatus =
+export type NegotiationStatus =
   | 'to_review'
   | 'contract_sent'
   | 'counter_offer'
   | 'accepted'
   | 'rejected'
   | 'withdrawn'
+
+/** @deprecated Use NegotiationStatus — kept for backward compat */
+export type ApplicationStatus = NegotiationStatus
+
+export type ParticipationStatus = 'pending' | 'selected' | 'not_selected'
 
 export type OfferDirection = 'to_athlete' | 'to_organizer'
 
@@ -45,6 +50,10 @@ export interface Edition {
   startDate: string
   endDate: string
   totalBudget: number
+  dinnerCostPp: number
+  stadiumMealCost: number
+  transportAirportHotelCost: number
+  transportHotelStadiumCost: number
   createdAt: string
   updatedAt: string
 }
@@ -74,6 +83,7 @@ export interface Athlete {
   id: string
   userId: string | null
   managerId: string | null
+  editionId: string | null
   firstName: string
   lastName: string
   dateOfBirth: string | null
@@ -89,6 +99,9 @@ export interface Athlete {
   eapCity: string | null
   athleteEmail: string | null
   athletePhone: string | null
+  negotiationStatus: NegotiationStatus
+  iRunClean: IRunCleanStatus
+  dopingFree: DopingFreeStatus
   createdAt: string
   updatedAt: string
 }
@@ -99,7 +112,8 @@ export interface Application {
   eventId: string
   editionId: string
   assignedSelector: string | null
-  status: ApplicationStatus
+  status: NegotiationStatus // legacy — kept in DB
+  participationStatus: ParticipationStatus
   personalBest: string | null
   personalBestVal: number | null
   seasonBest: string | null
@@ -123,8 +137,8 @@ export interface Application {
   departureFlight: string | null
   departureTo: string | null
   departureTime: string | null
-  iRunClean: IRunCleanStatus
-  dopingFree: DopingFreeStatus
+  iRunClean: IRunCleanStatus // legacy — now on athlete
+  dopingFree: DopingFreeStatus // legacy — now on athlete
   participantNotes: string | null
   additionalNotes: string | null
   internalNotes: string | null
@@ -150,20 +164,32 @@ export interface HotelNightDays {
 
 export interface ContractOffer {
   id: string
-  applicationId: string
+  applicationId: string // legacy
+  athleteId: string | null
   version: number
   direction: OfferDirection
   bonus: number
   otherCompensation: number
+  otherCompensationDesc: string | null
   transport: number
-  localTransport: boolean
+  localTransport: boolean // legacy
+  transportAirportHotel: boolean
+  transportHotelStadium: boolean
+  hotelId: string | null
   hotelNightTue: boolean
   hotelNightWed: boolean
   hotelNightThu: boolean
   hotelNightFri: boolean
   hotelNightSat: boolean
   hotelNightSun: boolean
-  catering: number
+  dinnerTue: boolean
+  dinnerWed: boolean
+  dinnerThu: boolean
+  dinnerFri: boolean
+  dinnerSat: boolean
+  dinnerSun: boolean
+  stadiumMeals: boolean
+  catering: number // legacy
   notes: string | null
   totalCost: number
   sentBy: string | null
@@ -202,6 +228,19 @@ export interface Interaction {
   createdAt: string
 }
 
+export interface WaPerformance {
+  id: string
+  athleteId: string
+  eventId: string
+  personalBest: string | null
+  personalBestVal: number | null
+  seasonBest: string | null
+  seasonBestVal: number | null
+  worldRanking: number | null
+  updatedAt: string
+  createdAt: string
+}
+
 // ── Scoring ───────────────────────────────────────────────────────────────────
 
 export type Recommendation =
@@ -230,4 +269,5 @@ export interface ApplicationWithDetails extends Application {
   event: Event
   contracts: ContractOffer[]
   interactions: Interaction[]
+  waPerformance?: WaPerformance | null
 }
