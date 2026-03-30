@@ -242,6 +242,7 @@ auth.post('/verify-magic-link', zValidator('json', magicLinkVerifySchema), async
 
   return c.json({
     token: sessionToken,
+    redirectUrl: link.redirectUrl ?? null,
     user: {
       id: user.id,
       role: user.role,

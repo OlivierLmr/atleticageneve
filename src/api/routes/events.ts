@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
 import { zValidator } from '@hono/zod-validator'
-import { eq } from 'drizzle-orm'
+import { eq, and } from 'drizzle-orm'
 import * as schema from '../db/schema'
 import { eventConfigSchema } from '@shared/validation'
 import { requireAuth } from '../middleware/auth'
@@ -8,11 +8,19 @@ import type { Env } from '../index'
 
 const events = new Hono<Env>()
 
-// ── GET /events — list all events for current edition ─────────────────────────
+// ── GET /events — list all events for current edition (optional gender filter) ─
 
 events.get('/', async (c) => {
   const db = c.get('db')
-  const results = await db.select().from(schema.event)
+  const gender = c.req.query('gender')
+
+  let query = db.select().from(schema.event)
+  if (gender && (gender === 'M' || gender === 'F')) {
+    const results = await db.select().from(schema.event).where(eq(schema.event.gender, gender))
+    return c.json(results)
+  }
+
+  const results = await query
   return c.json(results)
 })
 
@@ -28,6 +36,39 @@ events.get('/:id', async (c) => {
   }
 
   return c.json(results[0])
+})
+
+// ── GET /events/:id/confirmed-athletes — athletes accepted + selected ─────────
+
+events.get('/:id/confirmed-athletes', async (c) => {
+  const db = c.get('db')
+  const eventId = c.req.param('id')
+
+  // Find applications for this event where participation_status = 'selected'
+  // AND athlete.negotiation_status = 'accepted'
+  const apps = await db
+    .select({
+      application: schema.application,
+      athlete: schema.athlete,
+    })
+    .from(schema.application)
+    .innerJoin(schema.athlete, eq(schema.application.athleteId, schema.athlete.id))
+    .where(and(
+      eq(schema.application.eventId, eventId),
+      eq(schema.application.participationStatus, 'selected'),
+      eq(schema.athlete.negotiationStatus, 'accepted'),
+    ))
+
+  const results = apps.map(r => ({
+    athleteId: r.athlete.id,
+    firstName: r.athlete.firstName,
+    lastName: r.athlete.lastName,
+    nationality: r.athlete.nationality,
+    gender: r.athlete.gender,
+    participationStatus: r.application.participationStatus,
+  }))
+
+  return c.json(results)
 })
 
 // ── POST /events — create a new event (committee only) ────────────────────────

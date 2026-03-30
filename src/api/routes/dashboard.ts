@@ -1,5 +1,5 @@
 import { Hono } from 'hono'
-import { eq, sql } from 'drizzle-orm'
+import { eq } from 'drizzle-orm'
 import * as schema from '../db/schema'
 import { requireAuth } from '../middleware/auth'
 import type { Env } from '../index'
@@ -20,125 +20,113 @@ dashboard.get('/', async (c) => {
   }
   const edition = editions[0]
 
-  // Get all applications
+  // Get all data
   const applications = await db.select().from(schema.application)
-
-  // Get all events
-  const events = await db
-    .select()
-    .from(schema.event)
-    .where(eq(schema.event.editionId, edition.id))
-
-  // Get all athletes
+  const events = await db.select().from(schema.event).where(eq(schema.event.editionId, edition.id))
   const athletes = await db.select().from(schema.athlete)
-
-  // Get all contract offers
   const contracts = await db.select().from(schema.contractOffer)
+  const collaborators = await db.select().from(schema.user).where(eq(schema.user.role, 'collaborator'))
 
-  // Get all collaborators
-  const collaborators = await db
-    .select()
-    .from(schema.user)
-    .where(eq(schema.user.role, 'collaborator'))
+  // ── Top-level KPIs (athlete-level, deduplicated) ─────────────────────
+  const editionAthletes = athletes.filter(a => a.editionId === edition.id)
 
-  // ── Top-level KPIs ─────────────────────────────────────────────────────
-
-  const totalApplications = applications.length
-  const confirmed = applications.filter((a) => a.status === 'accepted').length
-  const inNegotiation = applications.filter((a) =>
-    ['contract_sent', 'counter_offer'].includes(a.status)
+  const totalAthletes = editionAthletes.length
+  const confirmed = editionAthletes.filter((a) => a.negotiationStatus === 'accepted').length
+  const inNegotiation = editionAthletes.filter((a) =>
+    ['contract_sent', 'counter_offer'].includes(a.negotiationStatus)
   ).length
-  const toReview = applications.filter((a) => a.status === 'to_review').length
-  const rejected = applications.filter((a) => a.status === 'rejected').length
-  const withdrawn = applications.filter((a) => a.status === 'withdrawn').length
+  const toReview = editionAthletes.filter((a) => a.negotiationStatus === 'to_review').length
+  const rejected = editionAthletes.filter((a) => a.negotiationStatus === 'rejected').length
+  const withdrawn = editionAthletes.filter((a) => a.negotiationStatus === 'withdrawn').length
 
-  // Budget: sum estTotal for accepted + in-negotiation applications
-  const budgetCommitted = applications
-    .filter((a) => a.status === 'accepted')
-    .reduce((sum, a) => sum + (a.estTotal ?? 0), 0)
+  // Budget: sum totalCost of latest contracts for accepted athletes
+  const latestContracts = new Map<string, typeof contracts[0]>()
+  for (const co of contracts) {
+    if (!co.athleteId) continue
+    const existing = latestContracts.get(co.athleteId)
+    if (!existing || co.version > existing.version) {
+      latestContracts.set(co.athleteId, co)
+    }
+  }
 
-  const budgetInNegotiation = applications
-    .filter((a) => ['contract_sent', 'counter_offer'].includes(a.status))
-    .reduce((sum, a) => sum + (a.estTotal ?? 0), 0)
+  const budgetCommitted = editionAthletes
+    .filter(a => a.negotiationStatus === 'accepted')
+    .reduce((sum, a) => {
+      const co = latestContracts.get(a.id)
+      return sum + (co?.totalCost ?? 0)
+    }, 0)
+
+  const budgetInNegotiation = editionAthletes
+    .filter(a => ['contract_sent', 'counter_offer'].includes(a.negotiationStatus))
+    .reduce((sum, a) => {
+      const co = latestContracts.get(a.id)
+      return sum + (co?.totalCost ?? 0)
+    }, 0)
 
   const totalBudget = edition.totalBudget
   const budgetRemaining = totalBudget - budgetCommitted
 
-  // ── Event fill rates ───────────────────────────────────────────────────
+  // ── Event fill rates (based on participationStatus) ──────────────────
 
   const eventStats = events.map((evt) => {
     const eventApps = applications.filter((a) => a.eventId === evt.id)
     const eventAthletes = eventApps.map((a) => athletes.find((ath) => ath.id === a.athleteId))
 
-    const confirmedCount = eventApps.filter((a) => a.status === 'accepted').length
-    const negotiatingCount = eventApps.filter((a) =>
-      ['contract_sent', 'counter_offer'].includes(a.status)
-    ).length
-    const reviewCount = eventApps.filter((a) => a.status === 'to_review').length
+    const selectedCount = eventApps.filter((a) => a.participationStatus === 'selected').length
+    const pendingCount = eventApps.filter((a) => a.participationStatus === 'pending').length
+    const notSelectedCount = eventApps.filter((a) => a.participationStatus === 'not_selected').length
 
     // Swiss quota tracking
-    const swissConfirmed = eventApps
-      .filter((a) => a.status === 'accepted')
+    const swissSelected = eventApps
+      .filter((a) => a.participationStatus === 'selected')
       .filter((a) => {
         const ath = eventAthletes.find((at) => at?.id === a.athleteId)
         return ath?.isSwiss
       }).length
 
     // EAP quota tracking
-    const eapConfirmed = eventApps
-      .filter((a) => a.status === 'accepted')
+    const eapSelected = eventApps
+      .filter((a) => a.participationStatus === 'selected')
       .filter((a) => {
         const ath = eventAthletes.find((at) => at?.id === a.athleteId)
         return ath?.isEap
       }).length
-
-    const eventBudget = eventApps
-      .filter((a) => a.status === 'accepted')
-      .reduce((sum, a) => sum + (a.estTotal ?? 0), 0)
 
     return {
       eventId: evt.id,
       eventName: evt.name,
       gender: evt.gender,
       maxSlots: evt.maxSlots,
-      confirmed: confirmedCount,
-      negotiating: negotiatingCount,
-      toReview: reviewCount,
+      selected: selectedCount,
+      pending: pendingCount,
+      notSelected: notSelectedCount,
       total: eventApps.length,
-      fillRate: evt.maxSlots > 0 ? confirmedCount / evt.maxSlots : 0,
+      fillRate: evt.maxSlots > 0 ? selectedCount / evt.maxSlots : 0,
       swissQuota: evt.swissQuota,
-      swissConfirmed,
+      swissSelected,
       eapQuota: evt.eapQuota,
-      eapConfirmed,
-      budget: eventBudget,
+      eapSelected,
     }
   })
 
-  // ── Selector workload ──────────────────────────────────────────────────
+  // ── Selector workload ────────────────────────────────────────────────
 
   const selectorStats = collaborators.map((collab) => {
-    const assigned = applications.filter((a) => a.assignedSelector === collab.id)
+    const assignedApps = applications.filter((a) => a.assignedSelector === collab.id)
+    const assignedAthleteIds = [...new Set(assignedApps.map(a => a.athleteId))]
+    const assignedAthletes = assignedAthleteIds.map(id => athletes.find(a => a.id === id)).filter(Boolean)
+
     return {
       selectorId: collab.id,
       name: `${collab.firstName} ${collab.lastName}`,
-      total: assigned.length,
-      toReview: assigned.filter((a) => a.status === 'to_review').length,
-      inNegotiation: assigned.filter((a) =>
-        ['contract_sent', 'counter_offer'].includes(a.status)
+      total: assignedAthletes.length,
+      toReview: assignedAthletes.filter((a) => a!.negotiationStatus === 'to_review').length,
+      inNegotiation: assignedAthletes.filter((a) =>
+        ['contract_sent', 'counter_offer'].includes(a!.negotiationStatus)
       ).length,
-      confirmed: assigned.filter((a) => a.status === 'accepted').length,
+      confirmed: assignedAthletes.filter((a) => a!.negotiationStatus === 'accepted').length,
     }
   })
-
-  // ── Cost breakdown ─────────────────────────────────────────────────────
-
-  const acceptedApps = applications.filter((a) => a.status === 'accepted')
-  const costBreakdown = {
-    travel: acceptedApps.reduce((sum, a) => sum + (a.estTravel ?? 0), 0),
-    accommodation: acceptedApps.reduce((sum, a) => sum + (a.estAccommodation ?? 0), 0),
-    appearance: acceptedApps.reduce((sum, a) => sum + (a.estAppearance ?? 0), 0),
-    total: budgetCommitted,
-  }
 
   return c.json({
     edition: {
@@ -149,7 +137,8 @@ dashboard.get('/', async (c) => {
       totalBudget,
     },
     kpi: {
-      totalApplications,
+      totalAthletes,
+      totalApplications: applications.length,
       confirmed,
       inNegotiation,
       toReview,
@@ -161,7 +150,6 @@ dashboard.get('/', async (c) => {
     },
     events: eventStats,
     selectors: selectorStats,
-    costBreakdown,
   })
 })
 

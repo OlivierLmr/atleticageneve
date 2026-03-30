@@ -1,18 +1,19 @@
 import { Hono } from 'hono'
 import { eq, or, desc } from 'drizzle-orm'
 import * as schema from '../db/schema'
-import { contractOfferSchema, statusChangeSchema } from '@shared/validation'
-import { VALID_TRANSITIONS, HOTEL_COST_PER_NIGHT } from '@shared/constants'
+import { contractOfferSchema } from '@shared/validation'
+import { NEGOTIATION_TRANSITIONS } from '@shared/constants'
+import { calculateTotalCost } from './contracts'
 import { requireAuth } from '../middleware/auth'
-import { sendEmail, sendStatusChangeEmail } from '../services/email'
+import { sendEmail } from '../services/email'
 import type { Env } from '../index'
-import type { ApplicationStatus } from '@shared/types'
+import type { NegotiationStatus } from '@shared/types'
 
 const portal = new Hono<Env>()
 
 // ── Athlete portal ───────────────────────────────────────────────────────────
 
-// GET /portal/athlete — get current athlete's applications
+// GET /portal/athlete — get current athlete's data (grouped by athlete)
 portal.get('/athlete', requireAuth('athlete', 'manager'), async (c) => {
   const db = c.get('db')
   const user = c.get('user')!
@@ -24,7 +25,7 @@ portal.get('/athlete', requireAuth('athlete', 'manager'), async (c) => {
     .where(or(eq(schema.athlete.userId, user.id), eq(schema.athlete.managerId, user.id)))
 
   if (athletes.length === 0) {
-    return c.json({ applications: [] })
+    return c.json({ athletes: [] })
   }
 
   const results = []
@@ -34,6 +35,7 @@ portal.get('/athlete', requireAuth('athlete', 'manager'), async (c) => {
       .from(schema.application)
       .where(eq(schema.application.athleteId, ath.id))
 
+    const applications = []
     for (const app of appRows) {
       const eventRows = await db
         .select()
@@ -41,48 +43,49 @@ portal.get('/athlete', requireAuth('athlete', 'manager'), async (c) => {
         .where(eq(schema.event.id, app.eventId))
         .limit(1)
 
-      const contracts = await db
-        .select()
-        .from(schema.contractOffer)
-        .where(eq(schema.contractOffer.applicationId, app.id))
-        .orderBy(schema.contractOffer.version)
-
-      results.push({
+      applications.push({
         ...app,
-        athlete: ath,
         event: eventRows[0] ?? null,
-        contracts,
       })
     }
+
+    // Contracts at athlete level
+    const contracts = await db
+      .select()
+      .from(schema.contractOffer)
+      .where(eq(schema.contractOffer.athleteId, ath.id))
+      .orderBy(schema.contractOffer.version)
+
+    // Strip cost info from contracts for athletes/managers
+    const sanitizedContracts = contracts.map(co => ({
+      ...co,
+      totalCost: undefined, // hidden from athlete/manager
+    }))
+
+    results.push({
+      ...ath,
+      applications,
+      contracts: sanitizedContracts,
+      latestContract: sanitizedContracts.length > 0 ? sanitizedContracts[sanitizedContracts.length - 1] : null,
+    })
   }
 
-  return c.json({ applications: results })
+  return c.json({ athletes: results })
 })
 
-// POST /portal/athlete/:appId/respond — accept, reject, or counter-offer
-portal.post('/athlete/:appId/respond', requireAuth('athlete', 'manager'), async (c) => {
+// POST /portal/athlete/:athleteId/respond — accept, reject, or counter-offer
+portal.post('/athlete/:athleteId/respond', requireAuth('athlete', 'manager'), async (c) => {
   const db = c.get('db')
   const user = c.get('user')!
-  const appId = c.req.param('appId')!
+  const athleteId = c.req.param('athleteId')!
   const body = await c.req.json()
   const action = body.action as string // 'accept' | 'reject' | 'counter_offer' | 'withdraw'
 
-  // Get the application
-  const appRows = await db
-    .select()
-    .from(schema.application)
-    .where(eq(schema.application.id, appId))
-    .limit(1)
-
-  if (appRows.length === 0) {
-    return c.json({ error: 'Application not found' }, 404)
-  }
-  const app = appRows[0]
-
+  // Get the athlete
   const athRows = await db
     .select()
     .from(schema.athlete)
-    .where(eq(schema.athlete.id, app.athleteId))
+    .where(eq(schema.athlete.id, athleteId))
     .limit(1)
 
   if (athRows.length === 0) {
@@ -92,13 +95,13 @@ portal.post('/athlete/:appId/respond', requireAuth('athlete', 'manager'), async 
 
   // Verify athlete belongs to this user (either directly or via manager)
   if (ath.userId !== user.id && ath.managerId !== user.id) {
-    return c.json({ error: 'Not authorized to act on this application' }, 403)
+    return c.json({ error: 'Not authorized to act on this athlete' }, 403)
   }
 
-  const currentStatus = app.status as ApplicationStatus
+  const currentStatus = ath.negotiationStatus as NegotiationStatus
 
   // Map action to target status
-  const actionMap: Record<string, ApplicationStatus> = {
+  const actionMap: Record<string, NegotiationStatus> = {
     accept: 'accepted',
     reject: 'rejected',
     withdraw: 'withdrawn',
@@ -111,7 +114,7 @@ portal.post('/athlete/:appId/respond', requireAuth('athlete', 'manager'), async 
   }
 
   // Validate transition
-  const allowed = VALID_TRANSITIONS[currentStatus]
+  const allowed = NEGOTIATION_TRANSITIONS[currentStatus]
   if (!allowed?.includes(targetStatus)) {
     return c.json({
       error: `Cannot ${action} from "${currentStatus}" status`,
@@ -133,35 +136,59 @@ portal.post('/athlete/:appId/respond', requireAuth('athlete', 'manager'), async 
     const existing = await db
       .select({ version: schema.contractOffer.version })
       .from(schema.contractOffer)
-      .where(eq(schema.contractOffer.applicationId, appId))
+      .where(eq(schema.contractOffer.athleteId, athleteId))
       .orderBy(desc(schema.contractOffer.version))
       .limit(1)
 
     const nextVersion = existing.length > 0 ? existing[0].version + 1 : 1
 
-    const nights = [
-      offer.hotelNightTue, offer.hotelNightWed, offer.hotelNightThu,
-      offer.hotelNightFri, offer.hotelNightSat, offer.hotelNightSun,
-    ].filter(Boolean).length
+    // Get edition costs for total calculation
+    const editions = await db.select().from(schema.edition).limit(1)
+    const edition = editions[0]
 
-    const totalCost = offer.bonus + offer.otherCompensation + offer.transport +
-      offer.catering + nights * HOTEL_COST_PER_NIGHT
+    let hotelCostPerNight = 0
+    if (offer.hotelId) {
+      const hotels = await db.select().from(schema.hotel).where(eq(schema.hotel.id, offer.hotelId)).limit(1)
+      if (hotels.length > 0) hotelCostPerNight = hotels[0].costPerNight
+    }
+
+    const totalCost = calculateTotalCost(offer, {
+      hotelCostPerNight,
+      dinnerCostPp: edition.dinnerCostPp,
+      stadiumMealCost: edition.stadiumMealCost,
+      transportAirportHotelCost: edition.transportAirportHotelCost,
+      transportHotelStadiumCost: edition.transportHotelStadiumCost,
+    })
+
+    // Get first application for backward compat
+    const apps = await db.select().from(schema.application).where(eq(schema.application.athleteId, athleteId)).limit(1)
+    const appId = apps.length > 0 ? apps[0].id : athleteId
 
     await db.insert(schema.contractOffer).values({
       applicationId: appId,
+      athleteId,
       version: nextVersion,
       direction: 'to_organizer',
       bonus: offer.bonus,
       otherCompensation: offer.otherCompensation,
+      otherCompensationDesc: offer.otherCompensationDesc ?? null,
       transport: offer.transport,
-      localTransport: offer.localTransport,
+      transportAirportHotel: offer.transportAirportHotel,
+      transportHotelStadium: offer.transportHotelStadium,
+      hotelId: offer.hotelId ?? null,
       hotelNightTue: offer.hotelNightTue,
       hotelNightWed: offer.hotelNightWed,
       hotelNightThu: offer.hotelNightThu,
       hotelNightFri: offer.hotelNightFri,
       hotelNightSat: offer.hotelNightSat,
       hotelNightSun: offer.hotelNightSun,
-      catering: offer.catering,
+      dinnerTue: offer.dinnerTue,
+      dinnerWed: offer.dinnerWed,
+      dinnerThu: offer.dinnerThu,
+      dinnerFri: offer.dinnerFri,
+      dinnerSat: offer.dinnerSat,
+      dinnerSun: offer.dinnerSun,
+      stadiumMeals: offer.stadiumMeals,
       notes: offer.notes ?? null,
       totalCost,
       sentBy: user.id,
@@ -169,35 +196,42 @@ portal.post('/athlete/:appId/respond', requireAuth('athlete', 'manager'), async 
     })
 
     // Log interaction
-    await db.insert(schema.interaction).values({
-      applicationId: appId,
-      type: 'counter_offer',
-      content: `Counter-offer v${nextVersion} submitted — CHF ${totalCost.toLocaleString()}`,
-      authorId: user.id,
-      authorName: `${user.firstName} ${user.lastName}`,
-    })
+    if (apps.length > 0) {
+      await db.insert(schema.interaction).values({
+        applicationId: apps[0].id,
+        type: 'counter_offer',
+        content: `Counter-offer v${nextVersion} submitted — CHF ${totalCost.toLocaleString()}`,
+        authorId: user.id,
+        authorName: `${user.firstName} ${user.lastName}`,
+      })
+    }
   }
 
-  // Update status
-  const updates: Record<string, unknown> = { status: targetStatus, updatedAt: now }
-  if (['accepted', 'rejected', 'withdrawn'].includes(targetStatus)) {
-    updates.decidedAt = now
-  }
-
+  // Update athlete negotiation status
   await db
-    .update(schema.application)
-    .set(updates)
-    .where(eq(schema.application.id, appId))
+    .update(schema.athlete)
+    .set({ negotiationStatus: targetStatus, updatedAt: now })
+    .where(eq(schema.athlete.id, athleteId))
 
-  // Log status change interaction (unless counter_offer already logged)
-  if (action !== 'counter_offer') {
-    await db.insert(schema.interaction).values({
-      applicationId: appId,
-      type: 'status_change',
-      content: `Application ${action}ed by ${user.firstName} ${user.lastName}`,
-      authorId: user.id,
-      authorName: `${user.firstName} ${user.lastName}`,
-    })
+  // Also update legacy application.status on all applications
+  const allApps = await db.select().from(schema.application).where(eq(schema.application.athleteId, athleteId))
+  for (const app of allApps) {
+    const updates: Record<string, unknown> = { status: targetStatus, updatedAt: now }
+    if (['accepted', 'rejected', 'withdrawn'].includes(targetStatus)) {
+      updates.decidedAt = now
+    }
+    await db.update(schema.application).set(updates).where(eq(schema.application.id, app.id))
+
+    // Log status change interaction (unless counter_offer already logged)
+    if (action !== 'counter_offer') {
+      await db.insert(schema.interaction).values({
+        applicationId: app.id,
+        type: 'status_change',
+        content: `Application ${action}ed by ${user.firstName} ${user.lastName}`,
+        authorId: user.id,
+        authorName: `${user.firstName} ${user.lastName}`,
+      })
+    }
   }
 
   // Notify collaborators via email stub
@@ -207,7 +241,7 @@ portal.post('/athlete/:appId/respond', requireAuth('athlete', 'manager'), async 
     body: `${ath.firstName} ${ath.lastName} has ${action}ed the offer.\nNew status: ${targetStatus}`,
   })
 
-  return c.json({ id: appId, status: targetStatus, previousStatus: currentStatus })
+  return c.json({ athleteId, status: targetStatus, previousStatus: currentStatus })
 })
 
 // ── Manager portal ───────────────────────────────────────────────────────────
@@ -217,18 +251,19 @@ portal.get('/manager', requireAuth('manager'), async (c) => {
   const db = c.get('db')
   const user = c.get('user')!
 
-  const athletes = await db
+  const athleteRows = await db
     .select()
     .from(schema.athlete)
     .where(eq(schema.athlete.managerId, user.id))
 
   const results = []
-  for (const ath of athletes) {
+  for (const ath of athleteRows) {
     const appRows = await db
       .select()
       .from(schema.application)
       .where(eq(schema.application.athleteId, ath.id))
 
+    const applications = []
     for (const app of appRows) {
       const eventRows = await db
         .select()
@@ -236,33 +271,38 @@ portal.get('/manager', requireAuth('manager'), async (c) => {
         .where(eq(schema.event.id, app.eventId))
         .limit(1)
 
-      const contracts = await db
-        .select()
-        .from(schema.contractOffer)
-        .where(eq(schema.contractOffer.applicationId, app.id))
-        .orderBy(schema.contractOffer.version)
-
-      results.push({
+      applications.push({
         ...app,
-        athlete: ath,
         event: eventRows[0] ?? null,
-        contracts,
-        latestContract: contracts.length > 0 ? contracts[contracts.length - 1] : null,
       })
     }
+
+    // Contracts at athlete level
+    const contracts = await db
+      .select()
+      .from(schema.contractOffer)
+      .where(eq(schema.contractOffer.athleteId, ath.id))
+      .orderBy(schema.contractOffer.version)
+
+    results.push({
+      ...ath,
+      applications,
+      contracts,
+      latestContract: contracts.length > 0 ? contracts[contracts.length - 1] : null,
+    })
   }
 
-  // KPI summary
-  const total = results.length
-  const toReview = results.filter((r) => r.status === 'to_review').length
-  const inNegotiation = results.filter((r) =>
-    ['contract_sent', 'counter_offer'].includes(r.status)
+  // KPI summary — at athlete level
+  const total = athleteRows.length
+  const toReview = athleteRows.filter((a) => a.negotiationStatus === 'to_review').length
+  const inNegotiation = athleteRows.filter((a) =>
+    ['contract_sent', 'counter_offer'].includes(a.negotiationStatus)
   ).length
-  const confirmed = results.filter((r) => r.status === 'accepted').length
-  const rejected = results.filter((r) => r.status === 'rejected').length
+  const confirmed = athleteRows.filter((a) => a.negotiationStatus === 'accepted').length
+  const rejected = athleteRows.filter((a) => a.negotiationStatus === 'rejected').length
 
   return c.json({
-    applications: results,
+    athletes: results,
     kpi: { total, toReview, inNegotiation, confirmed, rejected },
   })
 })

@@ -2,8 +2,7 @@ import { Hono } from 'hono'
 import { zValidator } from '@hono/zod-validator'
 import { eq } from 'drizzle-orm'
 import * as schema from '../db/schema'
-import { athleteRegistrationSchema, batchAthleteRegistrationSchema } from '@shared/validation'
-import { parsePerf, computeScore } from '@shared/scoring'
+import { athleteRegistrationSchema, batchAthleteRegistrationSchema, athleteUpdateSchema } from '@shared/validation'
 import { requireAuth } from '../middleware/auth'
 import { sendEmail, sendMagicLinkEmail } from '../services/email'
 import { generateToken, magicLinkExpiresAt } from '../services/auth'
@@ -11,7 +10,7 @@ import type { Env } from '../index'
 
 const athletes = new Hono<Env>()
 
-// ── POST /athletes — register a single athlete + create application ───────────
+// ── POST /athletes — register a single athlete + create applications ─────────
 
 athletes.post('/', zValidator('json', athleteRegistrationSchema), async (c) => {
   const data = c.req.valid('json')
@@ -24,10 +23,13 @@ athletes.post('/', zValidator('json', athleteRegistrationSchema), async (c) => {
   }
   const edition = editions[0]
 
-  // Verify event exists
-  const events = await db.select().from(schema.event).where(eq(schema.event.id, data.eventId)).limit(1)
-  if (events.length === 0) {
-    return c.json({ error: 'Event not found' }, 400)
+  // Verify all events exist
+  const allEvents = await db.select().from(schema.event)
+  const eventMap = new Map(allEvents.map(e => [e.id, e]))
+  for (const eventId of data.eventIds) {
+    if (!eventMap.has(eventId)) {
+      return c.json({ error: `Event not found: ${eventId}` }, 400)
+    }
   }
 
   // Create athlete record
@@ -35,6 +37,7 @@ athletes.post('/', zValidator('json', athleteRegistrationSchema), async (c) => {
   await db.insert(schema.athlete).values({
     id: athleteId,
     managerId: data.managerId ?? null,
+    editionId: edition.id,
     firstName: data.firstName,
     lastName: data.lastName,
     dateOfBirth: data.dateOfBirth ?? null,
@@ -46,60 +49,42 @@ athletes.post('/', zValidator('json', athleteRegistrationSchema), async (c) => {
     distanceFromGva: data.distanceFromGva,
     waProfileUrl: data.waProfileUrl ?? null,
     swiLicence: data.swiLicence ?? null,
-    athleteEmail: data.athleteEmail ?? null,
+    athleteEmail: data.athleteEmail,
     athletePhone: data.athletePhone ?? null,
+    iRunClean: data.iRunClean ? 'yes' : 'unknown',
+    dopingFree: data.dopingFree ? 'yes' : 'unknown',
+    negotiationStatus: 'to_review',
   })
 
-  // Parse performance values
-  const pbVal = parsePerf(data.personalBest)
-  const sbVal = parsePerf(data.seasonBest)
+  // Create one application per event
+  const applicationIds: string[] = []
+  for (const eventId of data.eventIds) {
+    const applicationId = crypto.randomUUID()
+    applicationIds.push(applicationId)
 
-  // Compute score
-  const evt = events[0]
-  const scoreResult = computeScore({
-    eventId: data.eventId,
-    personalBest: data.personalBest,
-    seasonBest: data.seasonBest,
-    swissMinima: String(evt.swissMinima),
-    worldRanking: data.worldRanking ?? 100,
-    estimatedCostTotal: 0, // will be estimated later
-    isEap: data.isEap,
-  })
+    await db.insert(schema.application).values({
+      id: applicationId,
+      athleteId,
+      eventId,
+      editionId: edition.id,
+      status: 'to_review',
+      participationStatus: 'pending',
+      participantNotes: data.participantNotes ?? null,
+      additionalNotes: data.additionalNotes ?? null,
+    })
 
-  // Create application
-  const applicationId = crypto.randomUUID()
-  await db.insert(schema.application).values({
-    id: applicationId,
-    athleteId,
-    eventId: data.eventId,
-    editionId: edition.id,
-    status: 'to_review',
-    personalBest: data.personalBest,
-    personalBestVal: pbVal,
-    seasonBest: data.seasonBest,
-    seasonBestVal: sbVal,
-    worldRanking: data.worldRanking ?? null,
-    perfUpdatedAt: new Date().toISOString(),
-    score: scoreResult.finalScore,
-    recommendation: scoreResult.recommendation,
-    iRunClean: data.iRunClean,
-    dopingFree: data.dopingFree,
-    participantNotes: data.participantNotes ?? null,
-    additionalNotes: data.additionalNotes ?? null,
-  })
-
-  // Log interaction
-  await db.insert(schema.interaction).values({
-    applicationId,
-    type: 'status_change',
-    content: 'Application submitted',
-    authorName: `${data.firstName} ${data.lastName}`,
-  })
+    // Log interaction
+    await db.insert(schema.interaction).values({
+      applicationId,
+      type: 'status_change',
+      content: 'Application submitted',
+      authorName: `${data.firstName} ${data.lastName}`,
+    })
+  }
 
   // If email provided, create a user record so the athlete can log in later
   let magicLinkSent = false
   if (data.athleteEmail) {
-    // Check if a user with this email already exists
     const existingUsers = await db
       .select()
       .from(schema.user)
@@ -142,9 +127,7 @@ athletes.post('/', zValidator('json', athleteRegistrationSchema), async (c) => {
 
   return c.json({
     athleteId,
-    applicationId,
-    score: scoreResult.finalScore,
-    recommendation: scoreResult.recommendation,
+    applicationIds,
     magicLinkSent,
   }, 201)
 })
@@ -163,70 +146,64 @@ athletes.post('/batch', requireAuth('manager'), zValidator('json', batchAthleteR
   }
   const edition = editions[0]
 
-  const results: Array<{ athleteId: string; applicationId: string; firstName: string; lastName: string; eventId: string }> = []
+  // Preload events
+  const allEvents = await db.select().from(schema.event)
+  const eventMap = new Map(allEvents.map(e => [e.id, e]))
+
+  const results: Array<{ athleteId: string; applicationIds: string[]; firstName: string; lastName: string; eventIds: string[] }> = []
 
   for (const data of athleteList) {
-    // Verify event exists
-    const events = await db.select().from(schema.event).where(eq(schema.event.id, data.eventId)).limit(1)
-    if (events.length === 0) continue
+    // Verify all events exist
+    const validEventIds = data.eventIds.filter(id => eventMap.has(id))
+    if (validEventIds.length === 0) continue
 
     const athleteId = crypto.randomUUID()
     await db.insert(schema.athlete).values({
       id: athleteId,
       managerId: user.id,
+      editionId: edition.id,
       firstName: data.firstName,
       lastName: data.lastName,
-      dateOfBirth: data.dateOfBirth ?? null,
+      dateOfBirth: data.dateOfBirth,
       nationality: data.nationality,
       gender: data.gender,
-      federation: data.federation ?? null,
       isEap: data.isEap,
-      isSwiss: data.isSwiss,
-      distanceFromGva: data.distanceFromGva,
       waProfileUrl: data.waProfileUrl ?? null,
-      swiLicence: data.swiLicence ?? null,
-      athleteEmail: data.athleteEmail ?? null,
-      athletePhone: data.athletePhone ?? null,
+      negotiationStatus: 'to_review',
     })
 
-    const pbVal = parsePerf(data.personalBest)
-    const sbVal = parsePerf(data.seasonBest)
+    // Create one application per event
+    const applicationIds: string[] = []
+    for (const eventId of validEventIds) {
+      const applicationId = crypto.randomUUID()
+      applicationIds.push(applicationId)
 
-    const applicationId = crypto.randomUUID()
-    await db.insert(schema.application).values({
-      id: applicationId,
-      athleteId,
-      eventId: data.eventId,
-      editionId: edition.id,
-      status: 'to_review',
-      personalBest: data.personalBest,
-      personalBestVal: pbVal,
-      seasonBest: data.seasonBest,
-      seasonBestVal: sbVal,
-      worldRanking: data.worldRanking ?? null,
-      perfUpdatedAt: new Date().toISOString(),
-      iRunClean: data.iRunClean,
-      dopingFree: data.dopingFree,
-      participantNotes: data.participantNotes ?? null,
-      additionalNotes: data.additionalNotes ?? null,
-    })
+      await db.insert(schema.application).values({
+        id: applicationId,
+        athleteId,
+        eventId,
+        editionId: edition.id,
+        status: 'to_review',
+        participationStatus: 'pending',
+      })
 
-    await db.insert(schema.interaction).values({
-      applicationId,
-      type: 'status_change',
-      content: `Application submitted by manager ${user.firstName} ${user.lastName}`,
-      authorId: user.id,
-      authorName: `${user.firstName} ${user.lastName}`,
-    })
+      await db.insert(schema.interaction).values({
+        applicationId,
+        type: 'status_change',
+        content: `Application submitted by manager ${user.firstName} ${user.lastName}`,
+        authorId: user.id,
+        authorName: `${user.firstName} ${user.lastName}`,
+      })
+    }
 
-    results.push({ athleteId, applicationId, firstName: data.firstName, lastName: data.lastName, eventId: data.eventId })
+    results.push({ athleteId, applicationIds, firstName: data.firstName, lastName: data.lastName, eventIds: validEventIds })
   }
 
   // Email stub to manager
   sendEmail({
     to: user.email ?? 'manager@unknown',
     subject: `Batch registration complete — ${results.length} athletes`,
-    body: `You have registered ${results.length} athletes:\n${results.map(r => `- ${r.firstName} ${r.lastName} (${r.eventId})`).join('\n')}`,
+    body: `You have registered ${results.length} athletes:\n${results.map(r => `- ${r.firstName} ${r.lastName} (${r.eventIds.join(', ')})`).join('\n')}`,
   })
 
   return c.json({ registered: results }, 201)
@@ -244,6 +221,37 @@ athletes.get('/:id', async (c) => {
   }
 
   return c.json(results[0])
+})
+
+// ── PATCH /athletes/:id — update athlete personal data ────────────────────────
+
+athletes.patch('/:id', requireAuth('athlete', 'manager', 'collaborator', 'committee'), zValidator('json', athleteUpdateSchema), async (c) => {
+  const db = c.get('db')
+  const user = c.get('user')!
+  const id = c.req.param('id')
+  const data = c.req.valid('json')
+
+  // Verify athlete exists
+  const athRows = await db.select().from(schema.athlete).where(eq(schema.athlete.id, id)).limit(1)
+  if (athRows.length === 0) {
+    return c.json({ error: 'Athlete not found' }, 404)
+  }
+  const ath = athRows[0]
+
+  // Access control: owner, their manager, or collaborator/committee
+  const isOwner = ath.userId === user.id
+  const isManager = ath.managerId === user.id
+  const isStaff = ['collaborator', 'committee'].includes(user.role)
+  if (!isOwner && !isManager && !isStaff) {
+    return c.json({ error: 'Not authorized to update this athlete' }, 403)
+  }
+
+  await db
+    .update(schema.athlete)
+    .set({ ...data, updatedAt: new Date().toISOString() })
+    .where(eq(schema.athlete.id, id))
+
+  return c.json({ id, updated: Object.keys(data) })
 })
 
 export default athletes

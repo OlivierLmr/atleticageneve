@@ -1,13 +1,13 @@
 import { Hono } from 'hono'
 import { eq, and, sql } from 'drizzle-orm'
 import * as schema from '../db/schema'
-import { statusChangeSchema } from '@shared/validation'
-import { VALID_TRANSITIONS } from '@shared/constants'
-import { computeScore, parsePerf } from '@shared/scoring'
+import { negotiationStatusChangeSchema, participationStatusChangeSchema } from '@shared/validation'
+import { NEGOTIATION_TRANSITIONS, PARTICIPATION_TRANSITIONS } from '@shared/constants'
+import { computeScore } from '@shared/scoring'
 import { requireAuth } from '../middleware/auth'
 import { sendStatusChangeEmail } from '../services/email'
 import type { Env } from '../index'
-import type { ApplicationStatus } from '@shared/types'
+import type { NegotiationStatus, ParticipationStatus } from '@shared/types'
 
 const applications = new Hono<Env>()
 
@@ -41,10 +41,15 @@ applications.get('/', async (c) => {
     .where(conditions.length > 0 ? and(...conditions) : undefined)
     .orderBy(sql`${schema.application.score} DESC NULLS LAST`)
 
+  // Left join WA performance
+  const waPerfs = await db.select().from(schema.waPerformance)
+  const waPerfMap = new Map(waPerfs.map(wp => [`${wp.athleteId}-${wp.eventId}`, wp]))
+
   let results = rows.map((r) => ({
     ...r.application,
     athlete: r.athlete,
     event: r.event,
+    waPerformance: waPerfMap.get(`${r.application.athleteId}-${r.application.eventId}`) ?? null,
   }))
 
   // Filter by managerId (athlete.managerId)
@@ -89,11 +94,11 @@ applications.get('/:id', async (c) => {
 
   const row = rows[0]
 
-  // Fetch contracts
+  // Fetch contracts (athlete-level)
   const contracts = await db
     .select()
     .from(schema.contractOffer)
-    .where(eq(schema.contractOffer.applicationId, id))
+    .where(eq(schema.contractOffer.athleteId, row.application.athleteId))
     .orderBy(schema.contractOffer.version)
 
   // Fetch interactions
@@ -103,16 +108,27 @@ applications.get('/:id', async (c) => {
     .where(eq(schema.interaction.applicationId, id))
     .orderBy(sql`${schema.interaction.createdAt} DESC`)
 
+  // Fetch WA performance
+  const waPerfs = await db
+    .select()
+    .from(schema.waPerformance)
+    .where(and(
+      eq(schema.waPerformance.athleteId, row.application.athleteId),
+      eq(schema.waPerformance.eventId, row.application.eventId),
+    ))
+    .limit(1)
+
   return c.json({
     ...row.application,
     athlete: row.athlete,
     event: row.event,
     contracts,
     interactions,
+    waPerformance: waPerfs[0] ?? null,
   })
 })
 
-// ── PATCH /applications/:id/status — transition application status ───────────
+// ── PATCH /applications/:id/status — transition negotiation status (athlete-level) ──
 
 applications.patch('/:id/status', async (c) => {
   const db = c.get('db')
@@ -121,13 +137,13 @@ applications.patch('/:id/status', async (c) => {
 
   // Parse body
   const body = await c.req.json()
-  const parsed = statusChangeSchema.safeParse(body)
+  const parsed = negotiationStatusChangeSchema.safeParse(body)
   if (!parsed.success) {
     return c.json({ error: 'Invalid status', details: parsed.error.flatten() }, 400)
   }
-  const newStatus = parsed.data.status as ApplicationStatus
+  const newStatus = parsed.data.status as NegotiationStatus
 
-  // Get current application
+  // Get application to find athlete
   const apps = await db
     .select()
     .from(schema.application)
@@ -139,10 +155,17 @@ applications.patch('/:id/status', async (c) => {
   }
 
   const app = apps[0]
-  const currentStatus = app.status as ApplicationStatus
+
+  // Get athlete for negotiation status
+  const athRows = await db.select().from(schema.athlete).where(eq(schema.athlete.id, app.athleteId)).limit(1)
+  if (athRows.length === 0) {
+    return c.json({ error: 'Athlete not found' }, 404)
+  }
+  const ath = athRows[0]
+  const currentStatus = ath.negotiationStatus as NegotiationStatus
 
   // Validate transition
-  const allowed = VALID_TRANSITIONS[currentStatus]
+  const allowed = NEGOTIATION_TRANSITIONS[currentStatus]
   if (!allowed || !allowed.includes(newStatus)) {
     return c.json({
       error: `Cannot transition from "${currentStatus}" to "${newStatus}"`,
@@ -150,19 +173,21 @@ applications.patch('/:id/status', async (c) => {
     }, 400)
   }
 
-  // Update status
+  // Update athlete negotiation status
   const now = new Date().toISOString()
-  const updates: Record<string, unknown> = {
-    status: newStatus,
-    updatedAt: now,
-  }
-  if (['accepted', 'rejected', 'withdrawn'].includes(newStatus)) {
-    updates.decidedAt = now
-  }
+  await db
+    .update(schema.athlete)
+    .set({ negotiationStatus: newStatus, updatedAt: now })
+    .where(eq(schema.athlete.id, ath.id))
 
+  // Also update legacy application.status for backward compat
   await db
     .update(schema.application)
-    .set(updates)
+    .set({
+      status: newStatus,
+      updatedAt: now,
+      ...((['accepted', 'rejected', 'withdrawn'].includes(newStatus)) ? { decidedAt: now } : {}),
+    })
     .where(eq(schema.application.id, id))
 
   // Log interaction
@@ -174,43 +199,85 @@ applications.patch('/:id/status', async (c) => {
     authorName: `${user.firstName} ${user.lastName}`,
   })
 
-  // Send email notification
-  const athletes = await db
-    .select()
-    .from(schema.athlete)
-    .where(eq(schema.athlete.id, app.athleteId))
-    .limit(1)
-
-  if (athletes.length > 0) {
-    const ath = athletes[0]
-    const email = ath.athleteEmail || ath.managerId ? undefined : undefined
-    // Try to notify athlete or their manager
-    if (ath.athleteEmail) {
+  // Send email notifications
+  if (ath.athleteEmail) {
+    sendStatusChangeEmail(
+      ath.athleteEmail,
+      `${ath.firstName} ${ath.lastName}`,
+      newStatus,
+      'http://localhost:5173/athlete/portal'
+    )
+  }
+  if (ath.managerId) {
+    const managers = await db
+      .select()
+      .from(schema.user)
+      .where(eq(schema.user.id, ath.managerId))
+      .limit(1)
+    if (managers.length > 0 && managers[0].email) {
       sendStatusChangeEmail(
-        ath.athleteEmail,
+        managers[0].email,
         `${ath.firstName} ${ath.lastName}`,
         newStatus,
-        'http://localhost:5173/athlete/portal'
+        'http://localhost:5173/manager/portal'
       )
-    }
-    if (ath.managerId) {
-      const managers = await db
-        .select()
-        .from(schema.user)
-        .where(eq(schema.user.id, ath.managerId))
-        .limit(1)
-      if (managers.length > 0 && managers[0].email) {
-        sendStatusChangeEmail(
-          managers[0].email,
-          `${ath.firstName} ${ath.lastName}`,
-          newStatus,
-          'http://localhost:5173/manager/portal'
-        )
-      }
     }
   }
 
-  return c.json({ id, status: newStatus, previousStatus: currentStatus })
+  return c.json({ id, athleteId: ath.id, status: newStatus, previousStatus: currentStatus })
+})
+
+// ── PATCH /applications/:id/participation-status — toggle participation ──────
+
+applications.patch('/:id/participation-status', async (c) => {
+  const db = c.get('db')
+  const user = c.get('user')!
+  const id = c.req.param('id')
+
+  const body = await c.req.json()
+  const parsed = participationStatusChangeSchema.safeParse(body)
+  if (!parsed.success) {
+    return c.json({ error: 'Invalid participation status', details: parsed.error.flatten() }, 400)
+  }
+  const newStatus = parsed.data.participationStatus as ParticipationStatus
+
+  // Get application
+  const apps = await db
+    .select()
+    .from(schema.application)
+    .where(eq(schema.application.id, id))
+    .limit(1)
+
+  if (apps.length === 0) {
+    return c.json({ error: 'Application not found' }, 404)
+  }
+
+  const currentStatus = apps[0].participationStatus as ParticipationStatus
+
+  // Validate transition
+  const allowed = PARTICIPATION_TRANSITIONS[currentStatus]
+  if (!allowed || !allowed.includes(newStatus)) {
+    return c.json({
+      error: `Cannot transition participation from "${currentStatus}" to "${newStatus}"`,
+      allowedTransitions: allowed,
+    }, 400)
+  }
+
+  await db
+    .update(schema.application)
+    .set({ participationStatus: newStatus, updatedAt: new Date().toISOString() })
+    .where(eq(schema.application.id, id))
+
+  // Log interaction
+  await db.insert(schema.interaction).values({
+    applicationId: id,
+    type: 'status_change',
+    content: `Participation status changed to "${newStatus}"`,
+    authorId: user.id,
+    authorName: `${user.firstName} ${user.lastName}`,
+  })
+
+  return c.json({ id, participationStatus: newStatus, previousStatus: currentStatus })
 })
 
 // ── POST /applications/:id/score — re-compute score ──────────────────────────
@@ -219,7 +286,7 @@ applications.post('/:id/score', async (c) => {
   const db = c.get('db')
   const id = c.req.param('id')
 
-  // Get application with event
+  // Get application with athlete and event
   const rows = await db
     .select({
       application: schema.application,
@@ -238,12 +305,33 @@ applications.post('/:id/score', async (c) => {
 
   const { application: app, athlete: ath, event: evt } = rows[0]
 
+  // Read PB/SB from wa_performance instead of application
+  const waPerfs = await db
+    .select()
+    .from(schema.waPerformance)
+    .where(and(
+      eq(schema.waPerformance.athleteId, app.athleteId),
+      eq(schema.waPerformance.eventId, app.eventId),
+    ))
+    .limit(1)
+
+  const waPerf = waPerfs[0]
+  if (!waPerf || !waPerf.personalBestVal) {
+    // No WA data — score pending
+    await db
+      .update(schema.application)
+      .set({ score: null, recommendation: 'Pending', updatedAt: new Date().toISOString() })
+      .where(eq(schema.application.id, id))
+
+    return c.json({ id, score: null, recommendation: 'Pending' })
+  }
+
   const scoreResult = computeScore({
     eventId: app.eventId,
-    personalBest: app.personalBest ?? '0',
-    seasonBest: app.seasonBest ?? '0',
+    personalBest: waPerf.personalBest ?? '0',
+    seasonBest: waPerf.seasonBest ?? '0',
     swissMinima: String(evt.swissMinima),
-    worldRanking: app.worldRanking ?? 100,
+    worldRanking: waPerf.worldRanking ?? 100,
     estimatedCostTotal: app.estTotal ?? 0,
     isEap: ath.isEap,
   })

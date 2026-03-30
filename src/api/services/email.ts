@@ -53,7 +53,8 @@ export function sendStatusChangeEmail(
   athleteName: string,
   status: string,
   portalUrl: string,
-  lang: 'en' | 'fr' = 'en'
+  lang: 'en' | 'fr' = 'en',
+  magicLinkUrl?: string,
 ): void {
   const statusLabels: Record<string, Record<string, string>> = {
     en: {
@@ -78,9 +79,18 @@ export function sendStatusChangeEmail(
   const subject = lang === 'fr'
     ? `Mise à jour candidature — ${athleteName}`
     : `Application update — ${athleteName}`
+
+  const linkLine = magicLinkUrl
+    ? (lang === 'fr'
+      ? `\nAccédez directement à votre portail : ${magicLinkUrl}`
+      : `\nAccess your portal directly: ${magicLinkUrl}`)
+    : (lang === 'fr'
+      ? `\nConsultez le portail : ${portalUrl}`
+      : `\nView the portal: ${portalUrl}`)
+
   const body = lang === 'fr'
-    ? `Bonjour,\n\nLa candidature de ${athleteName} a été mise à jour.\nNouveau statut : ${label}\n\nConsultez le portail : ${portalUrl}\n\nAtletica Genève`
-    : `Hello,\n\nThe application for ${athleteName} has been updated.\nNew status: ${label}\n\nView the portal: ${portalUrl}\n\nAtletica Geneve`
+    ? `Bonjour,\n\nLa candidature de ${athleteName} a été mise à jour.\nNouveau statut : ${label}${linkLine}\n\nAtletica Genève`
+    : `Hello,\n\nThe application for ${athleteName} has been updated.\nNew status: ${label}${linkLine}\n\nAtletica Geneve`
 
   sendEmail({ to: email, subject, body, lang })
 }
