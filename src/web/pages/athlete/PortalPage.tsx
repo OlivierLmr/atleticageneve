@@ -5,16 +5,16 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from '@web/lib/api'
 import { useAuth } from '@web/lib/auth'
 import { LanguageSwitcher } from '@web/App'
-import { HOTEL_COST_PER_NIGHT, NIGHT_LABELS } from '@shared/constants'
-import type { Application, Athlete, Event, ContractOffer, ApplicationStatus } from '@shared/types'
+import { NIGHT_LABELS } from '@shared/constants'
+import type { Application, Athlete, Event, ContractOffer, NegotiationStatus } from '@shared/types'
 
-interface PortalApplication extends Application {
-  athlete: Athlete
-  event: Event
+interface PortalAthlete extends Athlete {
+  applications: (Application & { event: Event | null })[]
   contracts: ContractOffer[]
+  latestContract: ContractOffer | null
 }
 
-const STATUS_COLORS: Record<ApplicationStatus, string> = {
+const STATUS_COLORS: Record<NegotiationStatus, string> = {
   to_review: 'bg-yellow-100 text-yellow-800',
   contract_sent: 'bg-blue-100 text-blue-800',
   counter_offer: 'bg-purple-100 text-purple-800',
@@ -27,20 +27,20 @@ export default function AthletePortalPage() {
   const { t } = useTranslation()
   const { user, logout } = useAuth()
   const queryClient = useQueryClient()
-  const [activeApp, setActiveApp] = useState<string | null>(null)
+  const [activeAthleteId, setActiveAthleteId] = useState<string | null>(null)
   const [showCounter, setShowCounter] = useState(false)
 
-  const { data, isLoading } = useQuery<{ applications: PortalApplication[] }>({
+  const { data, isLoading } = useQuery<{ athletes: PortalAthlete[] }>({
     queryKey: ['athlete-portal'],
     queryFn: () => api.get('/api/v1/portal/athlete'),
   })
 
-  const applications = data?.applications ?? []
-  const selected = applications.find((a) => a.id === activeApp) ?? applications[0]
+  const athletes = data?.athletes ?? []
+  const selected = athletes.find((a) => a.id === activeAthleteId) ?? athletes[0]
 
   const respondMutation = useMutation({
-    mutationFn: (params: { appId: string; action: string; offer?: unknown }) =>
-      api.post(`/api/v1/portal/athlete/${params.appId}/respond`, {
+    mutationFn: (params: { athleteId: string; action: string; offer?: unknown }) =>
+      api.post(`/api/v1/portal/athlete/${params.athleteId}/respond`, {
         action: params.action,
         offer: params.offer,
       }),
@@ -59,7 +59,7 @@ export default function AthletePortalPage() {
   }
 
   const latestOffer = selected?.contracts?.filter((c) => c.direction === 'to_athlete').slice(-1)[0]
-  const canRespond = selected?.status === 'contract_sent'
+  const canRespond = selected?.negotiationStatus === 'contract_sent'
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -87,7 +87,7 @@ export default function AthletePortalPage() {
       </div>
 
       <div className="max-w-5xl mx-auto px-6 py-6">
-        {applications.length === 0 ? (
+        {athletes.length === 0 ? (
           <div className="bg-white rounded-lg border p-8 text-center">
             <p className="text-gray-400 text-sm mb-4">No applications found for your account.</p>
             <Link to="/athlete/register" className="text-sm text-blue-600 underline">
@@ -96,26 +96,26 @@ export default function AthletePortalPage() {
           </div>
         ) : (
           <div className="grid grid-cols-3 gap-6">
-            {/* Left: application list */}
+            {/* Left: athlete list */}
             <div className="space-y-2">
-              {applications.map((app) => (
+              {athletes.map((ath) => (
                 <button
-                  key={app.id}
-                  onClick={() => { setActiveApp(app.id); setShowCounter(false) }}
+                  key={ath.id}
+                  onClick={() => { setActiveAthleteId(ath.id); setShowCounter(false) }}
                   className={`w-full text-left p-3 rounded-lg border text-sm transition-colors ${
-                    selected?.id === app.id
+                    selected?.id === ath.id
                       ? 'border-gray-900 bg-white'
                       : 'border-gray-200 bg-white hover:border-gray-400'
                   }`}
                 >
                   <div className="flex justify-between items-start mb-1">
-                    <span className="font-medium">{app.event.name}</span>
-                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${STATUS_COLORS[app.status as ApplicationStatus]}`}>
-                      {t(`status.${app.status}`)}
+                    <span className="font-medium">{ath.firstName} {ath.lastName}</span>
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${STATUS_COLORS[ath.negotiationStatus]}`}>
+                      {t(`status.${ath.negotiationStatus}`)}
                     </span>
                   </div>
                   <p className="text-xs text-gray-400">
-                    PB: {app.personalBest} · SB: {app.seasonBest}
+                    {ath.applications.map(a => a.event?.name).filter(Boolean).join(', ') || 'No events'}
                   </p>
                 </button>
               ))}
@@ -124,40 +124,25 @@ export default function AthletePortalPage() {
             {/* Center + Right: detail */}
             {selected && (
               <div className="col-span-2 space-y-4">
-                {/* Application overview */}
+                {/* Athlete overview */}
                 <div className="bg-white rounded-lg border p-4">
                   <div className="flex justify-between items-start mb-3">
                     <div>
-                      <h2 className="font-semibold">{selected.event.name}</h2>
-                      <p className="text-xs text-gray-400">
-                        {selected.athlete.firstName} {selected.athlete.lastName} · {selected.athlete.nationality}
-                      </p>
+                      <h2 className="font-semibold">{selected.firstName} {selected.lastName}</h2>
+                      <p className="text-xs text-gray-400">{selected.nationality}</p>
                     </div>
-                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_COLORS[selected.status as ApplicationStatus]}`}>
-                      {t(`status.${selected.status}`)}
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_COLORS[selected.negotiationStatus]}`}>
+                      {t(`status.${selected.negotiationStatus}`)}
                     </span>
                   </div>
-                  <div className="grid grid-cols-4 gap-3 text-xs">
-                    <div>
-                      <span className="text-gray-400">{t('athlete.personalBest')}</span>
-                      <p className="font-mono font-medium">{selected.personalBest ?? '—'}</p>
-                    </div>
-                    <div>
-                      <span className="text-gray-400">{t('athlete.seasonBest')}</span>
-                      <p className="font-mono font-medium">{selected.seasonBest ?? '—'}</p>
-                    </div>
-                    <div>
-                      <span className="text-gray-400">{t('athlete.worldRanking')}</span>
-                      <p className="font-mono font-medium">{selected.worldRanking ? `#${selected.worldRanking}` : '—'}</p>
-                    </div>
-                    <div>
-                      <span className="text-gray-400">{t('selection.scoring')}</span>
-                      <p className="font-mono font-medium">{selected.score != null ? (selected.score * 100).toFixed(0) : '—'}</p>
-                    </div>
+                  {/* Events list */}
+                  <div className="text-xs text-gray-600">
+                    <span className="text-gray-400">{t('athlete.event')}(s):</span>{' '}
+                    {selected.applications.map(a => a.event?.name).filter(Boolean).join(', ') || '—'}
                   </div>
                 </div>
 
-                {/* Latest offer */}
+                {/* Latest offer — hide totalCost for athletes */}
                 {latestOffer ? (
                   <div className="bg-white rounded-lg border p-4">
                     <h3 className="font-semibold text-sm mb-3">{t('contract.offerReceived')} (v{latestOffer.version})</h3>
@@ -171,6 +156,10 @@ export default function AthletePortalPage() {
                         <span>CHF {latestOffer.transport.toLocaleString()}</span>
                       </div>
                       <div className="flex justify-between">
+                        <span className="text-gray-500">{t('contract.otherCompensation')}</span>
+                        <span>CHF {latestOffer.otherCompensation.toLocaleString()}</span>
+                      </div>
+                      <div className="flex justify-between">
                         <span className="text-gray-500">{t('contract.hotelNights')}</span>
                         <span>
                           {[
@@ -179,15 +168,10 @@ export default function AthletePortalPage() {
                           ].filter(Boolean).length} nights
                         </span>
                       </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-500">{t('contract.catering')}</span>
-                        <span>CHF {latestOffer.catering.toLocaleString()}</span>
-                      </div>
                     </div>
-                    <div className="flex justify-between items-center py-2 border-t">
-                      <span className="font-semibold text-sm">{t('contract.totalCost')}</span>
-                      <span className="text-lg font-bold">CHF {latestOffer.totalCost.toLocaleString()}</span>
-                    </div>
+                    {latestOffer.otherCompensationDesc && (
+                      <p className="text-xs text-gray-500 mb-2">{latestOffer.otherCompensationDesc}</p>
+                    )}
                     {latestOffer.notes && (
                       <p className="text-xs text-gray-500 italic mt-2">{latestOffer.notes}</p>
                     )}
@@ -196,7 +180,7 @@ export default function AthletePortalPage() {
                     {canRespond && (
                       <div className="flex gap-2 mt-4">
                         <button
-                          onClick={() => respondMutation.mutate({ appId: selected.id, action: 'accept' })}
+                          onClick={() => respondMutation.mutate({ athleteId: selected.id, action: 'accept' })}
                           disabled={respondMutation.isPending}
                           className="flex-1 py-2 text-sm bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50"
                         >
@@ -210,7 +194,7 @@ export default function AthletePortalPage() {
                           {t('contract.counterOffer')}
                         </button>
                         <button
-                          onClick={() => respondMutation.mutate({ appId: selected.id, action: 'reject' })}
+                          onClick={() => respondMutation.mutate({ athleteId: selected.id, action: 'reject' })}
                           disabled={respondMutation.isPending}
                           className="px-4 py-2 text-sm border border-red-200 text-red-600 rounded hover:bg-red-50 disabled:opacity-50"
                         >
@@ -234,7 +218,7 @@ export default function AthletePortalPage() {
                   <CounterOfferForm
                     latestOffer={latestOffer}
                     t={t}
-                    onSubmit={(offer) => respondMutation.mutate({ appId: selected.id, action: 'counter_offer', offer })}
+                    onSubmit={(offer) => respondMutation.mutate({ athleteId: selected.id, action: 'counter_offer', offer })}
                     onCancel={() => setShowCounter(false)}
                     isPending={respondMutation.isPending}
                   />
@@ -253,7 +237,7 @@ export default function AthletePortalPage() {
                             <span className="font-medium">
                               v{c.version} — {c.direction === 'to_athlete' ? 'From organizer' : 'Your counter-offer'}
                             </span>
-                            <span>CHF {c.totalCost.toLocaleString()}</span>
+                            <span className="text-gray-500">{new Date(c.sentAt).toLocaleDateString()}</span>
                           </div>
                         </div>
                       ))}
@@ -262,12 +246,12 @@ export default function AthletePortalPage() {
                 )}
 
                 {/* Withdraw button */}
-                {['to_review', 'contract_sent', 'counter_offer', 'accepted'].includes(selected.status) && (
+                {['to_review', 'contract_sent', 'counter_offer', 'accepted'].includes(selected.negotiationStatus) && (
                   <div className="text-right">
                     <button
                       onClick={() => {
-                        if (confirm('Are you sure you want to withdraw this application?')) {
-                          respondMutation.mutate({ appId: selected.id, action: 'withdraw' })
+                        if (confirm('Are you sure you want to withdraw?')) {
+                          respondMutation.mutate({ athleteId: selected.id, action: 'withdraw' })
                         }
                       }}
                       className="text-xs text-gray-400 hover:text-red-600"
@@ -303,24 +287,26 @@ function CounterOfferForm({
   const [form, setForm] = useState({
     bonus: latestOffer.bonus,
     otherCompensation: latestOffer.otherCompensation,
+    otherCompensationDesc: latestOffer.otherCompensationDesc ?? '',
     transport: latestOffer.transport,
-    localTransport: latestOffer.localTransport,
+    transportAirportHotel: latestOffer.transportAirportHotel,
+    transportHotelStadium: latestOffer.transportHotelStadium,
     hotelNightTue: latestOffer.hotelNightTue,
     hotelNightWed: latestOffer.hotelNightWed,
     hotelNightThu: latestOffer.hotelNightThu,
     hotelNightFri: latestOffer.hotelNightFri,
     hotelNightSat: latestOffer.hotelNightSat,
     hotelNightSun: latestOffer.hotelNightSun,
-    catering: latestOffer.catering,
+    dinnerTue: latestOffer.dinnerTue,
+    dinnerWed: latestOffer.dinnerWed,
+    dinnerThu: latestOffer.dinnerThu,
+    dinnerFri: latestOffer.dinnerFri,
+    dinnerSat: latestOffer.dinnerSat,
+    dinnerSun: latestOffer.dinnerSun,
+    stadiumMeals: latestOffer.stadiumMeals,
+    hotelId: latestOffer.hotelId,
     notes: '',
   })
-
-  const nights = [
-    form.hotelNightTue, form.hotelNightWed, form.hotelNightThu,
-    form.hotelNightFri, form.hotelNightSat, form.hotelNightSun,
-  ].filter(Boolean).length
-
-  const total = form.bonus + form.otherCompensation + form.transport + form.catering + nights * HOTEL_COST_PER_NIGHT
 
   const inputCls = 'w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-gray-900'
   const labelCls = 'block text-xs font-medium text-gray-500 mb-1'
@@ -364,11 +350,6 @@ function CounterOfferForm({
           <label className={labelCls}>{t('contract.notesToOrganizer')}</label>
           <textarea className={inputCls} rows={2} value={form.notes}
             onChange={(e) => setForm((p) => ({ ...p, notes: e.target.value }))} />
-        </div>
-
-        <div className="flex justify-between items-center py-2 border-t">
-          <span className="text-sm font-semibold">{t('contract.totalCost')}</span>
-          <span className="text-lg font-bold">CHF {total.toLocaleString()}</span>
         </div>
 
         <div className="flex gap-2">

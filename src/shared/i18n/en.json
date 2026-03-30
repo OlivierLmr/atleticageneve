@@ -114,8 +114,13 @@
     "otherCompensation": "Other compensation",
     "transport": "Transport reimbursement",
     "localTransport": "Local transport (shuttles)",
+    "transportAirportHotel": "Airport to hotel",
+    "transportHotelStadium": "Hotel to stadium",
     "hotelNights": "Hotel nights",
+    "dinners": "Dinners",
+    "stadiumMeals": "Stadium meals",
     "catering": "Catering",
+    "otherCompensationDesc": "Compensation description",
     "totalCost": "Total cost",
     "sendOffer": "Send offer",
     "acceptOffer": "Accept offer",
@@ -155,6 +160,11 @@
     "specialRequests": "Special requests",
     "additionalNotes": "Additional notes",
     "invitationLetter": "Invitation letter requested"
+  },
+  "participation": {
+    "pending": "Pending",
+    "selected": "Selected",
+    "not_selected": "Not selected"
   },
   "selection": {
     "title": "Candidate Selection",

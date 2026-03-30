@@ -11,22 +11,19 @@ interface AthleteRow {
   key: string
   lastName: string
   firstName: string
-  email: string
   nationality: string
   dateOfBirth: string
-  federation: string
+  gender: 'M' | 'F' | ''
   isEap: boolean
-  eventId: string
-  personalBest: string
-  seasonBest: string
   waProfileUrl: string
+  eventIds: string[]
 }
 
 const emptyRow = (): AthleteRow => ({
   key: crypto.randomUUID(),
-  lastName: '', firstName: '', email: '', nationality: '',
-  dateOfBirth: '', federation: '', isEap: false,
-  eventId: '', personalBest: '', seasonBest: '', waProfileUrl: '',
+  lastName: '', firstName: '', nationality: '',
+  dateOfBirth: '', gender: '', isEap: false,
+  waProfileUrl: '', eventIds: [],
 })
 
 export default function ManagerRegisterPage() {
@@ -37,14 +34,30 @@ export default function ManagerRegisterPage() {
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
   const [registeredCount, setRegisteredCount] = useState(0)
+  const [expandedRow, setExpandedRow] = useState<string | null>(null)
 
   const { data: events = [] } = useQuery<Event[]>({
     queryKey: ['events'],
     queryFn: () => api.get('/api/v1/events'),
   })
 
-  const updateRow = (key: string, field: string, value: string | boolean) => {
-    setRows(prev => prev.map(r => r.key === key ? { ...r, [field]: value } : r))
+  const updateRow = (key: string, field: string, value: string | boolean | string[]) => {
+    setRows(prev => prev.map(r => {
+      if (r.key !== key) return r
+      // When gender changes, clear eventIds since events are gender-specific
+      if (field === 'gender') return { ...r, gender: value as 'M' | 'F' | '', eventIds: [] }
+      return { ...r, [field]: value }
+    }))
+  }
+
+  const toggleEvent = (key: string, eventId: string) => {
+    setRows(prev => prev.map(r => {
+      if (r.key !== key) return r
+      const ids = r.eventIds.includes(eventId)
+        ? r.eventIds.filter(id => id !== eventId)
+        : [...r.eventIds, eventId]
+      return { ...r, eventIds: ids }
+    }))
   }
 
   const addRow = () => setRows(prev => [...prev, emptyRow()])
@@ -52,9 +65,10 @@ export default function ManagerRegisterPage() {
   const removeRow = (key: string) => {
     if (rows.length <= 1) return
     setRows(prev => prev.filter(r => r.key !== key))
+    if (expandedRow === key) setExpandedRow(null)
   }
 
-  const validRows = rows.filter(r => r.firstName && r.lastName && r.eventId && r.personalBest && r.seasonBest)
+  const validRows = rows.filter(r => r.firstName && r.lastName && r.gender && r.eventIds.length > 0)
 
   const handleSubmit = async () => {
     if (validRows.length === 0) return
@@ -65,14 +79,10 @@ export default function ManagerRegisterPage() {
         firstName: r.firstName,
         lastName: r.lastName,
         nationality: r.nationality || 'UNK',
-        gender: 'M' as const, // TODO: add gender column to batch form
-        eventId: r.eventId,
-        personalBest: r.personalBest,
-        seasonBest: r.seasonBest,
+        gender: r.gender as 'M' | 'F',
+        eventIds: r.eventIds,
         isEap: r.isEap,
         isSwiss: r.nationality === 'SUI',
-        athleteEmail: r.email || undefined,
-        federation: r.federation || undefined,
         waProfileUrl: r.waProfileUrl || undefined,
         dateOfBirth: r.dateOfBirth || undefined,
       }))
@@ -109,7 +119,7 @@ export default function ManagerRegisterPage() {
 
   return (
     <div className="min-h-screen bg-gray-50 px-4 py-8">
-      <div className="max-w-6xl mx-auto">
+      <div className="max-w-5xl mx-auto">
         <div className="flex items-center justify-between mb-6">
           <div>
             <h1 className="text-lg font-bold">{t('manager.batchRegister')}</h1>
@@ -124,48 +134,80 @@ export default function ManagerRegisterPage() {
               <tr className="border-b bg-gray-50">
                 <th className="px-2 py-2 text-left font-medium">{t('athlete.lastName')} *</th>
                 <th className="px-2 py-2 text-left font-medium">{t('athlete.firstName')} *</th>
-                <th className="px-2 py-2 text-left font-medium">{t('auth.email')}</th>
+                <th className="px-2 py-2 text-left font-medium">{t('athlete.dateOfBirth')}</th>
                 <th className="px-2 py-2 text-left font-medium w-16">NAT</th>
-                <th className="px-2 py-2 text-left font-medium">{t('athlete.federation')}</th>
+                <th className="px-2 py-2 text-left font-medium">{t('athlete.gender')} *</th>
                 <th className="px-2 py-2 text-left font-medium w-10">EAP</th>
-                <th className="px-2 py-2 text-left font-medium">{t('athlete.event')} *</th>
-                <th className="px-2 py-2 text-left font-medium">PB *</th>
-                <th className="px-2 py-2 text-left font-medium">SB *</th>
+                <th className="px-2 py-2 text-left font-medium">{t('athlete.waProfile')}</th>
+                <th className="px-2 py-2 text-left font-medium">{t('athlete.event')}(s) *</th>
                 <th className="px-2 py-2 w-8"></th>
               </tr>
             </thead>
             <tbody>
-              {rows.map((row) => (
-                <tr key={row.key} className="border-b">
-                  <td className="px-1 py-1"><input className={inputCls} value={row.lastName} onChange={e => updateRow(row.key, 'lastName', e.target.value)} /></td>
-                  <td className="px-1 py-1"><input className={inputCls} value={row.firstName} onChange={e => updateRow(row.key, 'firstName', e.target.value)} /></td>
-                  <td className="px-1 py-1"><input className={inputCls} value={row.email} onChange={e => updateRow(row.key, 'email', e.target.value)} /></td>
-                  <td className="px-1 py-1"><input className={inputCls} value={row.nationality} onChange={e => updateRow(row.key, 'nationality', e.target.value.toUpperCase())} maxLength={3} /></td>
-                  <td className="px-1 py-1"><input className={inputCls} value={row.federation} onChange={e => updateRow(row.key, 'federation', e.target.value)} /></td>
-                  <td className="px-1 py-1 text-center">
-                    <input type="checkbox" checked={row.isEap} onChange={e => updateRow(row.key, 'isEap', e.target.checked)} />
-                  </td>
-                  <td className="px-1 py-1">
-                    <select className={inputCls} value={row.eventId} onChange={e => updateRow(row.key, 'eventId', e.target.value)}>
-                      <option value="">—</option>
-                      {events.filter(e => e.id !== 'all').map(e => (
-                        <option key={e.id} value={e.id}>{e.name}</option>
-                      ))}
-                    </select>
-                  </td>
-                  <td className="px-1 py-1"><input className={inputCls} value={row.personalBest} onChange={e => updateRow(row.key, 'personalBest', e.target.value)} placeholder="9.80" /></td>
-                  <td className="px-1 py-1"><input className={inputCls} value={row.seasonBest} onChange={e => updateRow(row.key, 'seasonBest', e.target.value)} placeholder="9.95" /></td>
-                  <td className="px-1 py-1">
-                    <button
-                      onClick={() => removeRow(row.key)}
-                      disabled={rows.length <= 1}
-                      className="text-gray-400 hover:text-red-500 disabled:opacity-30 disabled:cursor-not-allowed"
-                    >
-                      &#x2715;
-                    </button>
-                  </td>
-                </tr>
-              ))}
+              {rows.map((row) => {
+                const filteredEvents = events.filter(e => e.id !== 'all' && (!row.gender || e.gender === row.gender))
+                return (
+                  <tr key={row.key} className="border-b align-top">
+                    <td className="px-1 py-1"><input className={inputCls} value={row.lastName} onChange={e => updateRow(row.key, 'lastName', e.target.value)} /></td>
+                    <td className="px-1 py-1"><input className={inputCls} value={row.firstName} onChange={e => updateRow(row.key, 'firstName', e.target.value)} /></td>
+                    <td className="px-1 py-1"><input type="date" className={inputCls} value={row.dateOfBirth} onChange={e => updateRow(row.key, 'dateOfBirth', e.target.value)} /></td>
+                    <td className="px-1 py-1"><input className={inputCls} value={row.nationality} onChange={e => updateRow(row.key, 'nationality', e.target.value.toUpperCase())} maxLength={3} /></td>
+                    <td className="px-1 py-1">
+                      <select className={inputCls} value={row.gender} onChange={e => updateRow(row.key, 'gender', e.target.value)}>
+                        <option value="">—</option>
+                        <option value="M">{t('athlete.male')}</option>
+                        <option value="F">{t('athlete.female')}</option>
+                      </select>
+                    </td>
+                    <td className="px-1 py-1 text-center">
+                      <input type="checkbox" checked={row.isEap} onChange={e => updateRow(row.key, 'isEap', e.target.checked)} />
+                    </td>
+                    <td className="px-1 py-1"><input className={inputCls} value={row.waProfileUrl} onChange={e => updateRow(row.key, 'waProfileUrl', e.target.value)} placeholder="worldathletics.org/..." /></td>
+                    <td className="px-1 py-1">
+                      {!row.gender ? (
+                        <span className="text-gray-400 text-xs">{t('athlete.gender')}...</span>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => setExpandedRow(expandedRow === row.key ? null : row.key)}
+                          className={`${inputCls} text-left ${row.eventIds.length > 0 ? 'text-gray-900' : 'text-gray-400'}`}
+                        >
+                          {row.eventIds.length > 0
+                            ? `${row.eventIds.length} ${t('athlete.event')}(s)`
+                            : `— ${t('athlete.event')}(s)`}
+                        </button>
+                      )}
+                      {expandedRow === row.key && row.gender && (
+                        <div className="absolute z-10 mt-1 bg-white border rounded shadow-lg p-2 max-h-48 overflow-y-auto">
+                          {filteredEvents.map(e => (
+                            <label key={e.id} className="flex items-center gap-2 p-1 hover:bg-gray-50 cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={row.eventIds.includes(e.id)}
+                                onChange={() => toggleEvent(row.key, e.id)}
+                                className="accent-gray-900"
+                              />
+                              <span className="text-xs">{e.name}</span>
+                            </label>
+                          ))}
+                          {filteredEvents.length === 0 && (
+                            <p className="text-xs text-gray-400 p-1">No events</p>
+                          )}
+                        </div>
+                      )}
+                    </td>
+                    <td className="px-1 py-1">
+                      <button
+                        onClick={() => removeRow(row.key)}
+                        disabled={rows.length <= 1}
+                        className="text-gray-400 hover:text-red-500 disabled:opacity-30 disabled:cursor-not-allowed"
+                      >
+                        &#x2715;
+                      </button>
+                    </td>
+                  </tr>
+                )
+              })}
             </tbody>
           </table>
         </div>

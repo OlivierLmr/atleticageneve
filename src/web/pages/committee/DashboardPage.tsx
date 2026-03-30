@@ -10,16 +10,15 @@ interface EventStat {
   eventName: string
   gender: string
   maxSlots: number
-  confirmed: number
-  negotiating: number
-  toReview: number
+  selected: number
+  pending: number
+  notSelected: number
   total: number
   fillRate: number
   swissQuota: number
-  swissConfirmed: number
+  swissSelected: number
   eapQuota: number
-  eapConfirmed: number
-  budget: number
+  eapSelected: number
 }
 
 interface SelectorStat {
@@ -40,6 +39,7 @@ interface DashboardData {
     totalBudget: number
   }
   kpi: {
+    totalAthletes: number
     totalApplications: number
     confirmed: number
     inNegotiation: number
@@ -52,12 +52,6 @@ interface DashboardData {
   }
   events: EventStat[]
   selectors: SelectorStat[]
-  costBreakdown: {
-    travel: number
-    accommodation: number
-    appearance: number
-    total: number
-  }
 }
 
 export default function DashboardPage() {
@@ -77,7 +71,7 @@ export default function DashboardPage() {
     )
   }
 
-  const { kpi, events, selectors, costBreakdown, edition } = data
+  const { kpi, events, selectors, edition } = data
   const budgetUsedPct = edition.totalBudget > 0 ? (kpi.budgetCommitted / edition.totalBudget) * 100 : 0
 
   return (
@@ -124,7 +118,7 @@ export default function DashboardPage() {
             value={`CHF ${kpi.budgetRemaining.toLocaleString()}`}
             color={kpi.budgetRemaining > 0 ? 'text-green-600' : 'text-red-600'}
           />
-          <KpiCard label={t('dashboard.applicationPipeline')} value={kpi.totalApplications} color="text-gray-600" />
+          <KpiCard label="Athletes" value={kpi.totalAthletes} color="text-gray-600" />
         </div>
 
         <div className="grid grid-cols-3 gap-6">
@@ -138,12 +132,10 @@ export default function DashboardPage() {
                 <tr className="border-b bg-gray-50 text-xs text-gray-500">
                   <th className="px-3 py-2 text-left font-medium">{t('athlete.event')}</th>
                   <th className="px-3 py-2 text-center font-medium">{t('dashboard.fillRate')}</th>
-                  <th className="px-3 py-2 text-center font-medium">{t('dashboard.confirmed')}</th>
-                  <th className="px-3 py-2 text-center font-medium">Neg.</th>
-                  <th className="px-3 py-2 text-center font-medium">Rev.</th>
+                  <th className="px-3 py-2 text-center font-medium">Selected</th>
+                  <th className="px-3 py-2 text-center font-medium">Pending</th>
                   <th className="px-3 py-2 text-center font-medium">{t('dashboard.swissQuota')}</th>
                   <th className="px-3 py-2 text-center font-medium">{t('dashboard.eapQuota')}</th>
-                  <th className="px-3 py-2 text-right font-medium">Budget</th>
                 </tr>
               </thead>
               <tbody>
@@ -165,27 +157,21 @@ export default function DashboardPage() {
                           />
                         </div>
                         <span className="text-xs font-mono">
-                          {evt.confirmed}/{evt.maxSlots}
+                          {evt.selected}/{evt.maxSlots}
                         </span>
                       </div>
                     </td>
                     <td className="px-3 py-2 text-center font-mono text-xs text-green-600">
-                      {evt.confirmed}
-                    </td>
-                    <td className="px-3 py-2 text-center font-mono text-xs text-blue-600">
-                      {evt.negotiating}
+                      {evt.selected}
                     </td>
                     <td className="px-3 py-2 text-center font-mono text-xs text-yellow-600">
-                      {evt.toReview}
+                      {evt.pending}
                     </td>
                     <td className="px-3 py-2 text-center">
-                      <QuotaBadge filled={evt.swissConfirmed} quota={evt.swissQuota} />
+                      <QuotaBadge filled={evt.swissSelected} quota={evt.swissQuota} />
                     </td>
                     <td className="px-3 py-2 text-center">
-                      <QuotaBadge filled={evt.eapConfirmed} quota={evt.eapQuota} />
-                    </td>
-                    <td className="px-3 py-2 text-right font-mono text-xs">
-                      {evt.budget > 0 ? `CHF ${evt.budget.toLocaleString()}` : '—'}
+                      <QuotaBadge filled={evt.eapSelected} quota={evt.eapQuota} />
                     </td>
                   </tr>
                 ))}
@@ -195,20 +181,6 @@ export default function DashboardPage() {
 
           {/* Right column */}
           <div className="space-y-4">
-            {/* Cost breakdown */}
-            <div className="bg-white rounded-lg border p-4">
-              <h3 className="font-semibold text-sm mb-3">{t('dashboard.costBreakdown')}</h3>
-              <div className="space-y-2">
-                <CostRow label="Appearance fees" value={costBreakdown.appearance} total={costBreakdown.total} />
-                <CostRow label="Travel" value={costBreakdown.travel} total={costBreakdown.total} />
-                <CostRow label="Accommodation & Catering" value={costBreakdown.accommodation} total={costBreakdown.total} />
-                <div className="flex justify-between pt-2 border-t font-semibold text-sm">
-                  <span>{t('common.total')}</span>
-                  <span>CHF {costBreakdown.total.toLocaleString()}</span>
-                </div>
-              </div>
-            </div>
-
             {/* Selector workload */}
             <div className="bg-white rounded-lg border p-4">
               <h3 className="font-semibold text-sm mb-3">{t('dashboard.selectors')}</h3>
@@ -290,18 +262,5 @@ function QuotaBadge({ filled, quota }: { filled: number; quota: number }) {
     >
       {filled}/{quota}
     </span>
-  )
-}
-
-function CostRow({ label, value, total }: { label: string; value: number; total: number }) {
-  const pct = total > 0 ? (value / total) * 100 : 0
-  return (
-    <div className="flex items-center gap-2 text-xs">
-      <span className="text-gray-600 flex-1">{label}</span>
-      <div className="w-20 h-1.5 bg-gray-200 rounded-full overflow-hidden">
-        <div className="h-full bg-gray-500 rounded-full" style={{ width: `${pct}%` }} />
-      </div>
-      <span className="font-mono w-20 text-right">CHF {value.toLocaleString()}</span>
-    </div>
   )
 }

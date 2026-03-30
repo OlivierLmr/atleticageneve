@@ -5,14 +5,14 @@ import { useQuery } from '@tanstack/react-query'
 import { api } from '@web/lib/api'
 import { useAuth } from '@web/lib/auth'
 import { LanguageSwitcher } from '@web/App'
-import type { Application, Athlete, Event, ApplicationStatus, Recommendation } from '@shared/types'
+import type { Application, Athlete, Event, NegotiationStatus, Recommendation } from '@shared/types'
 
 interface ApplicationRow extends Application {
   athlete: Athlete
   event: Event
 }
 
-const STATUS_COLORS: Record<ApplicationStatus, string> = {
+const STATUS_COLORS: Record<NegotiationStatus, string> = {
   to_review: 'bg-yellow-100 text-yellow-800',
   contract_sent: 'bg-blue-100 text-blue-800',
   counter_offer: 'bg-purple-100 text-purple-800',
@@ -146,7 +146,7 @@ export default function CandidatesPage() {
             onChange={(e) => setStatusFilter(e.target.value)}
           >
             <option value="">{t('common.all')} statuses</option>
-            {(['to_review', 'contract_sent', 'counter_offer', 'accepted', 'rejected', 'withdrawn'] as ApplicationStatus[]).map(
+            {(['to_review', 'contract_sent', 'counter_offer', 'accepted', 'rejected', 'withdrawn'] as NegotiationStatus[]).map(
               (s) => (
                 <option key={s} value={s}>
                   {t(`status.${s}`)}
@@ -190,6 +190,7 @@ export default function CandidatesPage() {
                   <th className="px-3 py-2.5 text-left font-medium">#WR</th>
                   <th className="px-3 py-2.5 text-left font-medium">{t('selection.scoring')}</th>
                   <th className="px-3 py-2.5 text-left font-medium">{t('selection.recommendation')}</th>
+                  <th className="px-3 py-2.5 text-left font-medium">Negotiation</th>
                   <th className="px-3 py-2.5 text-left font-medium">Status</th>
                   <th className="px-3 py-2.5 text-left font-medium">{t('selection.estimatedCost')}</th>
                 </tr>
@@ -242,7 +243,16 @@ export default function CandidatesPage() {
                     <td className="px-3 py-2.5">
                       <span
                         className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${
-                          STATUS_COLORS[app.status as ApplicationStatus] ?? ''
+                          STATUS_COLORS[app.athlete.negotiationStatus as NegotiationStatus] ?? ''
+                        }`}
+                      >
+                        {t(`status.${app.athlete.negotiationStatus}`)}
+                      </span>
+                    </td>
+                    <td className="px-3 py-2.5">
+                      <span
+                        className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${
+                          STATUS_COLORS[app.status as NegotiationStatus] ?? ''
                         }`}
                       >
                         {t(`status.${app.status}`)}

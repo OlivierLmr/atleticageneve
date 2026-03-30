@@ -16,34 +16,45 @@ export default function AthleteRegisterPage() {
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
 
-  const { data: events = [] } = useQuery<Event[]>({
-    queryKey: ['events'],
-    queryFn: () => api.get('/api/v1/events'),
-  })
-
   // Form state
   const [form, setForm] = useState({
     firstName: '', lastName: '', gender: '' as 'M' | 'F' | '',
     dateOfBirth: '', phone: '', email: '', nationality: '',
     federation: '', isEap: false, swiLicence: '',
     // Competition
-    eventId: '', personalBest: '', seasonBest: '', worldRanking: '',
+    eventIds: [] as string[],
     waProfileUrl: '',
     // Compliance
-    iRunClean: 'unknown' as 'yes' | 'no' | 'in_progress' | 'unknown',
-    dopingFree: 'unknown' as 'yes' | 'no' | 'unknown',
+    iRunClean: false,
+    dopingFree: false,
     // Travel
     participantNotes: '', additionalNotes: '',
   })
 
-  const update = (field: string, value: string | boolean) => {
+  // Fetch events filtered by gender
+  const { data: events = [] } = useQuery<Event[]>({
+    queryKey: ['events', form.gender],
+    queryFn: () => api.get(`/api/v1/events${form.gender ? `?gender=${form.gender}` : ''}`),
+    enabled: true,
+  })
+
+  const update = (field: string, value: string | boolean | string[]) => {
     setForm(prev => ({ ...prev, [field]: value }))
+  }
+
+  const toggleEvent = (eventId: string) => {
+    setForm(prev => ({
+      ...prev,
+      eventIds: prev.eventIds.includes(eventId)
+        ? prev.eventIds.filter(id => id !== eventId)
+        : [...prev.eventIds, eventId],
+    }))
   }
 
   const stepIndex = STEPS.indexOf(step)
   const canNext = () => {
-    if (step === 'athlete') return form.firstName && form.lastName && form.gender && form.nationality
-    if (step === 'competition') return form.eventId && form.personalBest && form.seasonBest
+    if (step === 'athlete') return form.firstName && form.lastName && form.gender && form.nationality && form.email
+    if (step === 'competition') return form.eventIds.length > 0
     return true
   }
 
@@ -61,12 +72,9 @@ export default function AthleteRegisterPage() {
         isEap: form.isEap,
         isSwiss: form.nationality === 'SUI',
         swiLicence: form.swiLicence || undefined,
-        athleteEmail: form.email || undefined,
+        athleteEmail: form.email,
         athletePhone: form.phone || undefined,
-        eventId: form.eventId,
-        personalBest: form.personalBest,
-        seasonBest: form.seasonBest,
-        worldRanking: form.worldRanking ? parseInt(form.worldRanking) : undefined,
+        eventIds: form.eventIds,
         waProfileUrl: form.waProfileUrl || undefined,
         iRunClean: form.iRunClean,
         dopingFree: form.dopingFree,
@@ -90,11 +98,9 @@ export default function AthleteRegisterPage() {
             <div className="text-3xl mb-3">&#10003;</div>
             <p className="font-semibold text-sm mb-1">{t('athlete.registration')} — {form.firstName} {form.lastName}</p>
             <p className="text-xs text-gray-500 mb-2">Your application has been submitted successfully.</p>
-            {form.email && (
-              <p className="text-xs text-blue-600">
-                A login link has been sent to {form.email} — use it to track your application.
-              </p>
-            )}
+            <p className="text-xs text-blue-600">
+              A login link has been sent to {form.email} — use it to track your application.
+            </p>
           </div>
           <Link to="/" className="text-xs text-gray-400 underline mt-4 inline-block">{t('common.back')}</Link>
         </div>
@@ -134,14 +140,27 @@ export default function AthleteRegisterPage() {
                   <input className={inputCls} value={form.lastName} onChange={e => update('lastName', e.target.value)} required />
                 </div>
               </div>
+              <div>
+                <label className={labelCls}>{t('athlete.email')} *</label>
+                <input type="email" className={inputCls} value={form.email} onChange={e => update('email', e.target.value)} required />
+              </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className={labelCls}>{t('athlete.gender')} *</label>
-                  <select className={inputCls} value={form.gender} onChange={e => update('gender', e.target.value)}>
-                    <option value="">—</option>
-                    <option value="M">{t('athlete.male')}</option>
-                    <option value="F">{t('athlete.female')}</option>
-                  </select>
+                  <div className="flex gap-4 mt-1">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input type="radio" name="gender" value="M" checked={form.gender === 'M'}
+                        onChange={() => { update('gender', 'M'); update('eventIds', []) }}
+                        className="accent-gray-900" />
+                      <span className="text-sm">{t('athlete.male')}</span>
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input type="radio" name="gender" value="F" checked={form.gender === 'F'}
+                        onChange={() => { update('gender', 'F'); update('eventIds', []) }}
+                        className="accent-gray-900" />
+                      <span className="text-sm">{t('athlete.female')}</span>
+                    </label>
+                  </div>
                 </div>
                 <div>
                   <label className={labelCls}>{t('athlete.dateOfBirth')}</label>
@@ -154,19 +173,13 @@ export default function AthleteRegisterPage() {
                   <input className={inputCls} value={form.nationality} onChange={e => update('nationality', e.target.value.toUpperCase())} maxLength={3} placeholder="e.g. SUI" />
                 </div>
                 <div>
-                  <label className={labelCls}>{t('athlete.federation')}</label>
-                  <input className={inputCls} value={form.federation} onChange={e => update('federation', e.target.value)} />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className={labelCls}>{t('athlete.email')}</label>
-                  <input type="email" className={inputCls} value={form.email} onChange={e => update('email', e.target.value)} />
-                </div>
-                <div>
                   <label className={labelCls}>{t('athlete.phone')}</label>
                   <input type="tel" className={inputCls} value={form.phone} onChange={e => update('phone', e.target.value)} />
                 </div>
+              </div>
+              <div>
+                <label className={labelCls}>{t('athlete.federation')}</label>
+                <input className={inputCls} value={form.federation} onChange={e => update('federation', e.target.value)} />
               </div>
               <div className="flex items-center gap-2">
                 <input type="checkbox" id="eap" checked={form.isEap} onChange={e => update('isEap', e.target.checked)} />
@@ -183,57 +196,46 @@ export default function AthleteRegisterPage() {
 
           {step === 'competition' && (
             <>
-              <h2 className="font-semibold text-sm mb-2">{t('athlete.event')}</h2>
+              <h2 className="font-semibold text-sm mb-2">{t('athlete.waProfile')}</h2>
               <div>
-                <label className={labelCls}>{t('athlete.primaryEvent')} *</label>
-                <select className={inputCls} value={form.eventId} onChange={e => update('eventId', e.target.value)}>
-                  <option value="">—</option>
-                  {events.filter(e => e.id !== 'all').map(e => (
-                    <option key={e.id} value={e.id}>{e.name}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className={labelCls}>{t('athlete.personalBest')} *</label>
-                  <input className={inputCls} value={form.personalBest} onChange={e => update('personalBest', e.target.value)} placeholder="e.g. 9.80 or 3:26.73" />
-                </div>
-                <div>
-                  <label className={labelCls}>{t('athlete.seasonBest')} *</label>
-                  <input className={inputCls} value={form.seasonBest} onChange={e => update('seasonBest', e.target.value)} placeholder="e.g. 9.95 or 3:28.50" />
-                </div>
-              </div>
-              <div>
-                <label className={labelCls}>{t('athlete.worldRanking')}</label>
-                <input type="number" className={inputCls} value={form.worldRanking} onChange={e => update('worldRanking', e.target.value)} min={1} />
-              </div>
-              <div>
-                <label className={labelCls}>{t('athlete.waProfile')}</label>
+                <label className={labelCls}>{t('athlete.waProfile')} *</label>
                 <input className={inputCls} value={form.waProfileUrl} onChange={e => update('waProfileUrl', e.target.value)} placeholder="https://worldathletics.org/athletes/..." />
               </div>
+              <h2 className="font-semibold text-sm mt-4 mb-2">{t('athlete.event')}(s) *</h2>
+              {!form.gender ? (
+                <p className="text-xs text-gray-400">Please select a gender first.</p>
+              ) : (
+                <div className="space-y-2">
+                  {events.map(e => (
+                    <label key={e.id} className="flex items-center gap-3 p-2 rounded border cursor-pointer hover:bg-gray-50">
+                      <input
+                        type="checkbox"
+                        checked={form.eventIds.includes(e.id)}
+                        onChange={() => toggleEvent(e.id)}
+                        className="accent-gray-900"
+                      />
+                      <span className="text-sm">{e.name}</span>
+                    </label>
+                  ))}
+                  {events.length === 0 && (
+                    <p className="text-xs text-gray-400">No events available for this gender.</p>
+                  )}
+                </div>
+              )}
             </>
           )}
 
           {step === 'compliance' && (
             <>
               <h2 className="font-semibold text-sm mb-2">{t('compliance.title')}</h2>
-              <div>
-                <label className={labelCls}>{t('compliance.iRunClean')}</label>
-                <select className={inputCls} value={form.iRunClean} onChange={e => update('iRunClean', e.target.value)}>
-                  <option value="unknown">—</option>
-                  <option value="yes">{t('common.yes')}</option>
-                  <option value="no">{t('common.no')}</option>
-                  <option value="in_progress">In progress</option>
-                </select>
-              </div>
-              <div>
-                <label className={labelCls}>{t('compliance.dopingFree')}</label>
-                <select className={inputCls} value={form.dopingFree} onChange={e => update('dopingFree', e.target.value)}>
-                  <option value="unknown">—</option>
-                  <option value="yes">{t('common.yes')}</option>
-                  <option value="no">{t('common.no')}</option>
-                </select>
-              </div>
+              <label className="flex items-center gap-3 p-3 rounded border cursor-pointer hover:bg-gray-50">
+                <input type="checkbox" checked={form.iRunClean} onChange={e => update('iRunClean', e.target.checked)} className="accent-gray-900" />
+                <span className="text-sm">{t('compliance.iRunClean')}</span>
+              </label>
+              <label className="flex items-center gap-3 p-3 rounded border cursor-pointer hover:bg-gray-50">
+                <input type="checkbox" checked={form.dopingFree} onChange={e => update('dopingFree', e.target.checked)} className="accent-gray-900" />
+                <span className="text-sm">{t('compliance.dopingFree')}</span>
+              </label>
             </>
           )}
 

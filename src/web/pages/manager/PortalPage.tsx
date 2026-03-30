@@ -5,17 +5,16 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from '@web/lib/api'
 import { useAuth } from '@web/lib/auth'
 import { LanguageSwitcher } from '@web/App'
-import type { Application, Athlete, Event, ContractOffer, ApplicationStatus } from '@shared/types'
+import type { Application, Athlete, Event, ContractOffer, NegotiationStatus } from '@shared/types'
 
-interface ManagerApplication extends Application {
-  athlete: Athlete
-  event: Event
+interface ManagerAthlete extends Athlete {
+  applications: (Application & { event: Event | null })[]
   contracts: ContractOffer[]
   latestContract: ContractOffer | null
 }
 
 interface ManagerPortalData {
-  applications: ManagerApplication[]
+  athletes: ManagerAthlete[]
   kpi: {
     total: number
     toReview: number
@@ -25,7 +24,7 @@ interface ManagerPortalData {
   }
 }
 
-const STATUS_COLORS: Record<ApplicationStatus, string> = {
+const STATUS_COLORS: Record<NegotiationStatus, string> = {
   to_review: 'bg-yellow-100 text-yellow-800',
   contract_sent: 'bg-blue-100 text-blue-800',
   counter_offer: 'bg-purple-100 text-purple-800',
@@ -46,17 +45,17 @@ export default function ManagerPortalPage() {
   })
 
   const respondMutation = useMutation({
-    mutationFn: (params: { appId: string; action: string }) =>
-      api.post(`/api/v1/portal/athlete/${params.appId}/respond`, { action: params.action }),
+    mutationFn: (params: { athleteId: string; action: string }) =>
+      api.post(`/api/v1/portal/athlete/${params.athleteId}/respond`, { action: params.action }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['manager-portal'] }),
   })
 
-  const applications = data?.applications ?? []
+  const athletes = data?.athletes ?? []
   const kpi = data?.kpi ?? { total: 0, toReview: 0, inNegotiation: 0, confirmed: 0, rejected: 0 }
 
   const filtered = statusFilter
-    ? applications.filter((a) => a.status === statusFilter)
-    : applications
+    ? athletes.filter((a) => a.negotiationStatus === statusFilter)
+    : athletes
 
   if (isLoading) {
     return (
@@ -118,7 +117,7 @@ export default function ManagerPortalPage() {
         <div className="flex items-center gap-3 mb-4">
           <select className={selectCls} value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
             <option value="">{t('common.all')} statuses</option>
-            {(['to_review', 'contract_sent', 'counter_offer', 'accepted', 'rejected', 'withdrawn'] as ApplicationStatus[]).map((s) => (
+            {(['to_review', 'contract_sent', 'counter_offer', 'accepted', 'rejected', 'withdrawn'] as NegotiationStatus[]).map((s) => (
               <option key={s} value={s}>{t(`status.${s}`)}</option>
             ))}
           </select>
@@ -139,48 +138,42 @@ export default function ManagerPortalPage() {
               <thead>
                 <tr className="border-b bg-gray-50 text-xs text-gray-500">
                   <th className="px-3 py-2.5 text-left font-medium">Athlete</th>
-                  <th className="px-3 py-2.5 text-left font-medium">{t('athlete.event')}</th>
+                  <th className="px-3 py-2.5 text-left font-medium">{t('athlete.event')}(s)</th>
                   <th className="px-3 py-2.5 text-left font-medium">NAT</th>
-                  <th className="px-3 py-2.5 text-left font-medium">PB</th>
-                  <th className="px-3 py-2.5 text-left font-medium">SB</th>
                   <th className="px-3 py-2.5 text-left font-medium">Status</th>
-                  <th className="px-3 py-2.5 text-left font-medium">Offer</th>
                   <th className="px-3 py-2.5 text-left font-medium">{t('common.actions')}</th>
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((app) => (
-                  <tr key={app.id} className="border-b hover:bg-gray-50">
+                {filtered.map((ath) => (
+                  <tr key={ath.id} className="border-b hover:bg-gray-50">
                     <td className="px-3 py-2.5 font-medium">
-                      {app.athlete.lastName}, {app.athlete.firstName}
+                      <Link to={`/manager/athletes/${ath.id}`} className="hover:underline">
+                        {ath.lastName}, {ath.firstName}
+                      </Link>
                     </td>
-                    <td className="px-3 py-2.5 text-gray-600">{app.event.name}</td>
-                    <td className="px-3 py-2.5 text-xs">{app.athlete.nationality}</td>
-                    <td className="px-3 py-2.5 font-mono text-xs">{app.personalBest ?? '—'}</td>
-                    <td className="px-3 py-2.5 font-mono text-xs">{app.seasonBest ?? '—'}</td>
+                    <td className="px-3 py-2.5 text-gray-600 text-xs">
+                      {ath.applications.map(a => a.event?.name).filter(Boolean).join(', ') || '—'}
+                    </td>
+                    <td className="px-3 py-2.5 text-xs">{ath.nationality}</td>
                     <td className="px-3 py-2.5">
-                      <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${STATUS_COLORS[app.status as ApplicationStatus]}`}>
-                        {t(`status.${app.status}`)}
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${STATUS_COLORS[ath.negotiationStatus]}`}>
+                        {t(`status.${ath.negotiationStatus}`)}
                       </span>
-                    </td>
-                    <td className="px-3 py-2.5 font-mono text-xs">
-                      {app.latestContract
-                        ? `CHF ${app.latestContract.totalCost.toLocaleString()}`
-                        : '—'}
                     </td>
                     <td className="px-3 py-2.5">
                       <div className="flex gap-1">
-                        {app.status === 'contract_sent' && (
+                        {ath.negotiationStatus === 'contract_sent' && (
                           <>
                             <button
-                              onClick={() => respondMutation.mutate({ appId: app.id, action: 'accept' })}
+                              onClick={() => respondMutation.mutate({ athleteId: ath.id, action: 'accept' })}
                               disabled={respondMutation.isPending}
                               className="text-[10px] px-2 py-0.5 rounded bg-green-600 text-white hover:bg-green-700 disabled:opacity-50"
                             >
                               Accept
                             </button>
                             <button
-                              onClick={() => respondMutation.mutate({ appId: app.id, action: 'reject' })}
+                              onClick={() => respondMutation.mutate({ athleteId: ath.id, action: 'reject' })}
                               disabled={respondMutation.isPending}
                               className="text-[10px] px-2 py-0.5 rounded border border-red-200 text-red-600 hover:bg-red-50 disabled:opacity-50"
                             >
@@ -188,11 +181,11 @@ export default function ManagerPortalPage() {
                             </button>
                           </>
                         )}
-                        {['to_review', 'contract_sent', 'counter_offer', 'accepted'].includes(app.status) && (
+                        {['to_review', 'contract_sent', 'counter_offer', 'accepted'].includes(ath.negotiationStatus) && (
                           <button
                             onClick={() => {
-                              if (confirm(`Withdraw ${app.athlete.firstName} ${app.athlete.lastName}?`)) {
-                                respondMutation.mutate({ appId: app.id, action: 'withdraw' })
+                              if (confirm(`Withdraw ${ath.firstName} ${ath.lastName}?`)) {
+                                respondMutation.mutate({ athleteId: ath.id, action: 'withdraw' })
                               }
                             }}
                             disabled={respondMutation.isPending}

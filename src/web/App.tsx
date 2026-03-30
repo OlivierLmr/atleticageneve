@@ -319,6 +319,11 @@ export default function App() {
                 <ManagerPortalPage />
               </ProtectedRoute>
             } />
+            <Route path="/manager/athletes/:id" element={
+              <ProtectedRoute roles={['manager']}>
+                <AthletePortalPage />
+              </ProtectedRoute>
+            } />
 
             {/* Collaborator — requires collaborator role */}
             <Route path="/collaborator/candidates" element={

@@ -5,17 +5,18 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from '@web/lib/api'
 import { useAuth } from '@web/lib/auth'
 import { LanguageSwitcher } from '@web/App'
-import { VALID_TRANSITIONS, HOTEL_COST_PER_NIGHT, NIGHT_LABELS } from '@shared/constants'
+import { NEGOTIATION_TRANSITIONS, NIGHT_LABELS, DINNER_LABELS } from '@shared/constants'
 import type {
   ApplicationWithDetails,
-  ApplicationStatus,
+  NegotiationStatus,
   ContractOffer,
   Interaction,
+  Hotel,
 } from '@shared/types'
 
 // ── Status badge ─────────────────────────────────────────────────────────────
 
-const STATUS_COLORS: Record<ApplicationStatus, string> = {
+const STATUS_COLORS: Record<NegotiationStatus, string> = {
   to_review: 'bg-yellow-100 text-yellow-800',
   contract_sent: 'bg-blue-100 text-blue-800',
   counter_offer: 'bg-purple-100 text-purple-800',
@@ -31,40 +32,50 @@ function defaultContract(existing?: ContractOffer) {
     return {
       bonus: existing.bonus,
       otherCompensation: existing.otherCompensation,
+      otherCompensationDesc: existing.otherCompensationDesc ?? '',
       transport: existing.transport,
-      localTransport: existing.localTransport,
+      transportAirportHotel: existing.transportAirportHotel,
+      transportHotelStadium: existing.transportHotelStadium,
+      hotelId: existing.hotelId ?? '',
       hotelNightTue: existing.hotelNightTue,
       hotelNightWed: existing.hotelNightWed,
       hotelNightThu: existing.hotelNightThu,
       hotelNightFri: existing.hotelNightFri,
       hotelNightSat: existing.hotelNightSat,
       hotelNightSun: existing.hotelNightSun,
-      catering: existing.catering,
+      dinnerTue: existing.dinnerTue,
+      dinnerWed: existing.dinnerWed,
+      dinnerThu: existing.dinnerThu,
+      dinnerFri: existing.dinnerFri,
+      dinnerSat: existing.dinnerSat,
+      dinnerSun: existing.dinnerSun,
+      stadiumMeals: existing.stadiumMeals,
       notes: existing.notes ?? '',
     }
   }
   return {
     bonus: 0,
     otherCompensation: 0,
+    otherCompensationDesc: '',
     transport: 0,
-    localTransport: false,
+    transportAirportHotel: true,
+    transportHotelStadium: true,
+    hotelId: '',
     hotelNightTue: false,
     hotelNightWed: false,
     hotelNightThu: true,
     hotelNightFri: true,
     hotelNightSat: true,
     hotelNightSun: false,
-    catering: 0,
+    dinnerTue: false,
+    dinnerWed: false,
+    dinnerThu: true,
+    dinnerFri: true,
+    dinnerSat: true,
+    dinnerSun: false,
+    stadiumMeals: true,
     notes: '',
   }
-}
-
-function computeContractTotal(c: ReturnType<typeof defaultContract>): number {
-  const nights = [
-    c.hotelNightTue, c.hotelNightWed, c.hotelNightThu,
-    c.hotelNightFri, c.hotelNightSat, c.hotelNightSun,
-  ].filter(Boolean).length
-  return c.bonus + c.otherCompensation + c.transport + c.catering + nights * HOTEL_COST_PER_NIGHT
 }
 
 // ── Main page ────────────────────────────────────────────────────────────────
@@ -81,6 +92,11 @@ export default function AthletePage() {
     enabled: !!id,
   })
 
+  const { data: hotels = [] } = useQuery<Hotel[]>({
+    queryKey: ['hotels'],
+    queryFn: () => api.get('/api/v1/hotels'),
+  })
+
   // Contract form state
   const latestContract = app?.contracts?.length
     ? app.contracts[app.contracts.length - 1]
@@ -89,7 +105,7 @@ export default function AthletePage() {
   const [showContractForm, setShowContractForm] = useState(false)
 
   // Confirmation dialog
-  const [confirmAction, setConfirmAction] = useState<ApplicationStatus | null>(null)
+  const [confirmAction, setConfirmAction] = useState<NegotiationStatus | null>(null)
 
   // Note form
   const [noteType, setNoteType] = useState<'note' | 'call' | 'email'>('note')
@@ -111,14 +127,17 @@ export default function AthletePage() {
   // ── Mutations ────────────────────────────────────────────────────────────
 
   const statusMutation = useMutation({
-    mutationFn: (status: ApplicationStatus) =>
+    mutationFn: (status: NegotiationStatus) =>
       api.patch(`/api/v1/applications/${id}/status`, { status }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['application', id] }),
   })
 
   const contractMutation = useMutation({
     mutationFn: (data: ReturnType<typeof defaultContract>) =>
-      api.post(`/api/v1/applications/${id}/contracts`, data),
+      api.post(`/api/v1/athletes/${app?.athleteId}/contracts`, {
+        ...data,
+        hotelId: data.hotelId || undefined,
+      }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['application', id] })
       setShowContractForm(false)
@@ -155,9 +174,8 @@ export default function AthletePage() {
     )
   }
 
-  const currentStatus = app.status as ApplicationStatus
-  const allowedTransitions = VALID_TRANSITIONS[currentStatus] ?? []
-  const contractTotal = computeContractTotal(contract)
+  const currentStatus = (app.athlete.negotiationStatus ?? app.status) as NegotiationStatus
+  const allowedTransitions = NEGOTIATION_TRANSITIONS[currentStatus] ?? []
 
   const inputCls =
     'w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-gray-900'
@@ -219,15 +237,31 @@ export default function AthletePage() {
                   </span>
                 } />
                 <Row label={t('athlete.federation')} value={app.athlete.federation ?? '—'} />
-                <Row label={t('athlete.personalBest')} value={
-                  <span className="font-mono">{app.personalBest ?? '—'}</span>
-                } />
-                <Row label={t('athlete.seasonBest')} value={
-                  <span className="font-mono">{app.seasonBest ?? '—'}</span>
-                } />
-                <Row label={t('athlete.worldRanking')} value={
-                  app.worldRanking != null ? `#${app.worldRanking}` : '—'
-                } />
+                {app.waPerformance ? (
+                  <>
+                    <Row label={t('athlete.personalBest')} value={
+                      <span className="font-mono">{app.waPerformance.personalBest ?? '—'}</span>
+                    } />
+                    <Row label={t('athlete.seasonBest')} value={
+                      <span className="font-mono">{app.waPerformance.seasonBest ?? '—'}</span>
+                    } />
+                    <Row label={t('athlete.worldRanking')} value={
+                      app.waPerformance.worldRanking != null ? `#${app.waPerformance.worldRanking}` : '—'
+                    } />
+                  </>
+                ) : (
+                  <>
+                    <Row label={t('athlete.personalBest')} value={
+                      <span className="font-mono">{app.personalBest ?? '—'}</span>
+                    } />
+                    <Row label={t('athlete.seasonBest')} value={
+                      <span className="font-mono">{app.seasonBest ?? '—'}</span>
+                    } />
+                    <Row label={t('athlete.worldRanking')} value={
+                      app.worldRanking != null ? `#${app.worldRanking}` : '—'
+                    } />
+                  </>
+                )}
                 {app.athlete.waProfileUrl && (
                   <Row label={t('athlete.waProfile')} value={
                     <a href={app.athlete.waProfileUrl} target="_blank" rel="noreferrer" className="text-blue-600 underline text-xs">
@@ -276,15 +310,15 @@ export default function AthletePage() {
               </div>
             </div>
 
-            {/* Compliance */}
+            {/* Compliance — from athlete level */}
             <div className="bg-white rounded-lg border p-4">
               <h3 className="font-semibold text-sm mb-3">{t('compliance.title')}</h3>
               <div className="space-y-2 text-sm">
                 <Row label={t('compliance.iRunClean')} value={
-                  <ComplianceBadge status={app.iRunClean} />
+                  <ComplianceBadge status={app.athlete.iRunClean} />
                 } />
                 <Row label={t('compliance.dopingFree')} value={
-                  <ComplianceBadge status={app.dopingFree} />
+                  <ComplianceBadge status={app.athlete.dopingFree} />
                 } />
               </div>
             </div>
@@ -323,9 +357,9 @@ export default function AthletePage() {
                         if (status === 'contract_sent') {
                           setShowContractForm(true)
                         } else if (needsConfirm) {
-                          setConfirmAction(status as ApplicationStatus)
+                          setConfirmAction(status as NegotiationStatus)
                         } else {
-                          statusMutation.mutate(status as ApplicationStatus)
+                          statusMutation.mutate(status as NegotiationStatus)
                         }
                       }}
                       disabled={statusMutation.isPending}
@@ -433,19 +467,32 @@ export default function AthletePage() {
                       }
                     />
                   </div>
-                  <div>
-                    <label className={labelCls}>{t('contract.otherCompensation')} (CHF)</label>
-                    <input
-                      type="number"
-                      className={inputCls}
-                      value={contract.otherCompensation}
-                      onChange={(e) =>
-                        setContract((p) => ({
-                          ...p,
-                          otherCompensation: parseInt(e.target.value) || 0,
-                        }))
-                      }
-                    />
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className={labelCls}>{t('contract.otherCompensation')} (CHF)</label>
+                      <input
+                        type="number"
+                        className={inputCls}
+                        value={contract.otherCompensation}
+                        onChange={(e) =>
+                          setContract((p) => ({
+                            ...p,
+                            otherCompensation: parseInt(e.target.value) || 0,
+                          }))
+                        }
+                      />
+                    </div>
+                    <div>
+                      <label className={labelCls}>Description</label>
+                      <input
+                        className={inputCls}
+                        value={contract.otherCompensationDesc}
+                        onChange={(e) =>
+                          setContract((p) => ({ ...p, otherCompensationDesc: e.target.value }))
+                        }
+                        placeholder="e.g. pacemaker fee"
+                      />
+                    </div>
                   </div>
                   <div>
                     <label className={labelCls}>{t('contract.transport')} (CHF)</label>
@@ -458,25 +505,47 @@ export default function AthletePage() {
                       }
                     />
                   </div>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      id="localTransport"
-                      checked={contract.localTransport}
-                      onChange={(e) =>
-                        setContract((p) => ({ ...p, localTransport: e.target.checked }))
-                      }
-                    />
-                    <label htmlFor="localTransport" className="text-sm">
-                      {t('contract.localTransport')}
+                  <div className="flex items-center gap-4">
+                    <label className="flex items-center gap-2 text-sm cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={contract.transportAirportHotel}
+                        onChange={(e) =>
+                          setContract((p) => ({ ...p, transportAirportHotel: e.target.checked }))
+                        }
+                      />
+                      Airport &rarr; Hotel
                     </label>
+                    <label className="flex items-center gap-2 text-sm cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={contract.transportHotelStadium}
+                        onChange={(e) =>
+                          setContract((p) => ({ ...p, transportHotelStadium: e.target.checked }))
+                        }
+                      />
+                      Hotel &rarr; Stadium
+                    </label>
+                  </div>
+
+                  {/* Hotel */}
+                  <div>
+                    <label className={labelCls}>{t('logistics.hotel')}</label>
+                    <select
+                      className={inputCls}
+                      value={contract.hotelId}
+                      onChange={(e) => setContract((p) => ({ ...p, hotelId: e.target.value }))}
+                    >
+                      <option value="">— No hotel —</option>
+                      {hotels.map(h => (
+                        <option key={h.id} value={h.id}>{h.name} (CHF {h.costPerNight}/night)</option>
+                      ))}
+                    </select>
                   </div>
 
                   {/* Hotel nights */}
                   <div>
-                    <label className={labelCls}>
-                      {t('contract.hotelNights')} (CHF {HOTEL_COST_PER_NIGHT}/night)
-                    </label>
+                    <label className={labelCls}>{t('contract.hotelNights')}</label>
                     <div className="flex gap-2">
                       {NIGHT_LABELS.map((night) => {
                         const key = `hotelNight${night.charAt(0).toUpperCase() + night.slice(1)}` as keyof typeof contract
@@ -502,17 +571,45 @@ export default function AthletePage() {
                     </div>
                   </div>
 
+                  {/* Dinners */}
                   <div>
-                    <label className={labelCls}>{t('contract.catering')} (CHF)</label>
+                    <label className={labelCls}>Dinners</label>
+                    <div className="flex gap-2">
+                      {DINNER_LABELS.map((day) => {
+                        const key = `dinner${day.charAt(0).toUpperCase() + day.slice(1)}` as keyof typeof contract
+                        return (
+                          <label
+                            key={day}
+                            className={`flex flex-col items-center text-xs cursor-pointer px-2 py-1 rounded border ${
+                              contract[key] ? 'bg-gray-900 text-white border-gray-900' : 'border-gray-300'
+                            }`}
+                          >
+                            <input
+                              type="checkbox"
+                              className="sr-only"
+                              checked={contract[key] as boolean}
+                              onChange={(e) =>
+                                setContract((p) => ({ ...p, [key]: e.target.checked }))
+                              }
+                            />
+                            {t(`night.${day}`)}
+                          </label>
+                        )
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Stadium meals */}
+                  <label className="flex items-center gap-2 text-sm cursor-pointer">
                     <input
-                      type="number"
-                      className={inputCls}
-                      value={contract.catering}
+                      type="checkbox"
+                      checked={contract.stadiumMeals}
                       onChange={(e) =>
-                        setContract((p) => ({ ...p, catering: parseInt(e.target.value) || 0 }))
+                        setContract((p) => ({ ...p, stadiumMeals: e.target.checked }))
                       }
                     />
-                  </div>
+                    Stadium meals
+                  </label>
 
                   <div>
                     <label className={labelCls}>{t('contract.notesToAthlete')}</label>
@@ -522,14 +619,6 @@ export default function AthletePage() {
                       value={contract.notes}
                       onChange={(e) => setContract((p) => ({ ...p, notes: e.target.value }))}
                     />
-                  </div>
-
-                  {/* Live total */}
-                  <div className="flex items-center justify-between py-2 border-t">
-                    <span className="text-sm font-semibold">{t('contract.totalCost')}</span>
-                    <span className="text-lg font-bold">
-                      CHF {contractTotal.toLocaleString()}
-                    </span>
                   </div>
 
                   <div className="flex gap-2">
@@ -642,6 +731,11 @@ function ContractCard({ contract: c, t }: { contract: ContractOffer; t: (key: st
     c.hotelNightFri, c.hotelNightSat, c.hotelNightSun,
   ].filter(Boolean).length
 
+  const dinners = [
+    c.dinnerTue, c.dinnerWed, c.dinnerThu,
+    c.dinnerFri, c.dinnerSat, c.dinnerSun,
+  ].filter(Boolean).length
+
   return (
     <div className={`p-3 rounded border text-xs ${
       c.direction === 'to_athlete' ? 'border-blue-200 bg-blue-50' : 'border-purple-200 bg-purple-50'
@@ -656,7 +750,7 @@ function ContractCard({ contract: c, t }: { contract: ContractOffer; t: (key: st
         <span>{t('contract.bonus')}: CHF {c.bonus}</span>
         <span>{t('contract.transport')}: CHF {c.transport}</span>
         <span>{t('contract.hotelNights')}: {nights}</span>
-        <span>{t('contract.catering')}: CHF {c.catering}</span>
+        <span>Dinners: {dinners}</span>
       </div>
       <div className="mt-1 font-semibold text-gray-900">
         {t('contract.totalCost')}: CHF {c.totalCost.toLocaleString()}

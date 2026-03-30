@@ -114,8 +114,13 @@
     "otherCompensation": "Autre compensation",
     "transport": "Défraiement transport",
     "localTransport": "Transport local (navettes)",
+    "transportAirportHotel": "Aéroport vers hôtel",
+    "transportHotelStadium": "Hôtel vers stade",
     "hotelNights": "Nuitées d'hôtel",
+    "dinners": "Dîners",
+    "stadiumMeals": "Repas au stade",
     "catering": "Restauration",
+    "otherCompensationDesc": "Description de la compensation",
     "totalCost": "Coût total",
     "sendOffer": "Envoyer l'offre",
     "acceptOffer": "Accepter l'offre",
@@ -155,6 +160,11 @@
     "specialRequests": "Demandes spéciales",
     "additionalNotes": "Notes complémentaires",
     "invitationLetter": "Lettre d'invitation demandée"
+  },
+  "participation": {
+    "pending": "En attente",
+    "selected": "Sélectionné",
+    "not_selected": "Non sélectionné"
   },
   "selection": {
     "title": "Sélection des candidats",
