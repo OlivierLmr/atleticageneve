@@ -12,6 +12,7 @@ import contractRoutes from './routes/contracts'
 import portalRoutes from './routes/portal'
 import dashboardRoutes from './routes/dashboard'
 import hotelRoutes from './routes/hotels'
+import waPerformanceRoutes from './routes/wa-performance'
 import { getRecentEmails } from './services/email'
 
 export type Env = {
@@ -62,6 +63,7 @@ app.route('/api/v1/athletes', contractRoutes)
 app.route('/api/v1/portal', portalRoutes)
 app.route('/api/v1/dashboard', dashboardRoutes)
 app.route('/api/v1/hotels', hotelRoutes)
+app.route('/api/v1/wa-performance', waPerformanceRoutes)
 
 // DEV ONLY — email log viewer (remove in production)
 app.get('/api/v1/dev/emails', (c) => c.json(getRecentEmails()))
