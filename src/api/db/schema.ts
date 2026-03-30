@@ -14,6 +14,10 @@ export const edition = sqliteTable('edition', {
   startDate: text('start_date').notNull(),
   endDate: text('end_date').notNull(),
   totalBudget: integer('total_budget').notNull().default(250_000),
+  dinnerCostPp: integer('dinner_cost_pp').notNull().default(80),
+  stadiumMealCost: integer('stadium_meal_cost').notNull().default(30),
+  transportAirportHotelCost: integer('transport_airport_hotel_cost').notNull().default(50),
+  transportHotelStadiumCost: integer('transport_hotel_stadium_cost').notNull().default(30),
   createdAt: createdAt(),
   updatedAt: updatedAt(),
 })
@@ -68,6 +72,7 @@ export const athlete = sqliteTable('athlete', {
   id: id(),
   userId: text('user_id').references(() => user.id),
   managerId: text('manager_id').references(() => user.id),
+  editionId: text('edition_id').references(() => edition.id),
   firstName: text('first_name').notNull(),
   lastName: text('last_name').notNull(),
   dateOfBirth: text('date_of_birth'),
@@ -83,6 +88,9 @@ export const athlete = sqliteTable('athlete', {
   eapCity: text('eap_city'),
   athleteEmail: text('athlete_email'),
   athletePhone: text('athlete_phone'),
+  negotiationStatus: text('negotiation_status').notNull().default('to_review'),
+  iRunClean: text('i_run_clean').default('unknown'),
+  dopingFree: text('doping_free').default('unknown'),
   createdAt: createdAt(),
   updatedAt: updatedAt(),
 })
@@ -95,7 +103,8 @@ export const application = sqliteTable('application', {
   eventId: text('event_id').notNull().references(() => event.id),
   editionId: text('edition_id').notNull().references(() => edition.id),
   assignedSelector: text('assigned_selector').references(() => user.id),
-  status: text('status').notNull().default('to_review'),
+  status: text('status').notNull().default('to_review'), // legacy — kept for compat
+  participationStatus: text('participation_status').notNull().default('pending'),
   personalBest: text('personal_best'),
   personalBestVal: real('personal_best_val'),
   seasonBest: text('season_best'),
@@ -119,8 +128,8 @@ export const application = sqliteTable('application', {
   departureFlight: text('departure_flight'),
   departureTo: text('departure_to'),
   departureTime: text('departure_time'),
-  iRunClean: text('i_run_clean').default('unknown'),
-  dopingFree: text('doping_free').default('unknown'),
+  iRunClean: text('i_run_clean').default('unknown'), // legacy — now on athlete
+  dopingFree: text('doping_free').default('unknown'), // legacy — now on athlete
   participantNotes: text('participant_notes'),
   additionalNotes: text('additional_notes'),
   internalNotes: text('internal_notes'),
@@ -139,20 +148,32 @@ export const application = sqliteTable('application', {
 
 export const contractOffer = sqliteTable('contract_offer', {
   id: id(),
-  applicationId: text('application_id').notNull().references(() => application.id),
+  applicationId: text('application_id').notNull().references(() => application.id), // legacy
+  athleteId: text('athlete_id').references(() => athlete.id),
   version: integer('version').notNull().default(1),
   direction: text('direction').notNull(),
   bonus: integer('bonus').notNull().default(0),
   otherCompensation: integer('other_compensation').default(0),
+  otherCompensationDesc: text('other_compensation_desc'),
   transport: integer('transport').notNull().default(0),
-  localTransport: integer('local_transport', { mode: 'boolean' }).notNull().default(false),
+  localTransport: integer('local_transport', { mode: 'boolean' }).notNull().default(false), // legacy
+  transportAirportHotel: integer('transport_airport_hotel', { mode: 'boolean' }).notNull().default(false),
+  transportHotelStadium: integer('transport_hotel_stadium', { mode: 'boolean' }).notNull().default(false),
+  hotelId: text('hotel_id').references(() => hotel.id),
   hotelNightTue: integer('hotel_night_tue', { mode: 'boolean' }).notNull().default(false),
   hotelNightWed: integer('hotel_night_wed', { mode: 'boolean' }).notNull().default(false),
   hotelNightThu: integer('hotel_night_thu', { mode: 'boolean' }).notNull().default(false),
   hotelNightFri: integer('hotel_night_fri', { mode: 'boolean' }).notNull().default(false),
   hotelNightSat: integer('hotel_night_sat', { mode: 'boolean' }).notNull().default(false),
   hotelNightSun: integer('hotel_night_sun', { mode: 'boolean' }).notNull().default(false),
-  catering: integer('catering').notNull().default(0),
+  dinnerTue: integer('dinner_tue', { mode: 'boolean' }).notNull().default(false),
+  dinnerWed: integer('dinner_wed', { mode: 'boolean' }).notNull().default(false),
+  dinnerThu: integer('dinner_thu', { mode: 'boolean' }).notNull().default(false),
+  dinnerFri: integer('dinner_fri', { mode: 'boolean' }).notNull().default(false),
+  dinnerSat: integer('dinner_sat', { mode: 'boolean' }).notNull().default(false),
+  dinnerSun: integer('dinner_sun', { mode: 'boolean' }).notNull().default(false),
+  stadiumMeals: integer('stadium_meals', { mode: 'boolean' }).notNull().default(false),
+  catering: integer('catering').notNull().default(0), // legacy
   notes: text('notes'),
   totalCost: integer('total_cost').notNull().default(0),
   sentBy: text('sent_by').references(() => user.id),
@@ -224,5 +245,23 @@ export const magicLink = sqliteTable('magic_link', {
   token: text('token').notNull().unique(),
   expiresAt: text('expires_at').notNull(),
   used: integer('used', { mode: 'boolean' }).notNull().default(false),
+  redirectUrl: text('redirect_url'),
   createdAt: createdAt(),
 })
+
+// ── WA Performance ───────────────────────────────────────────────────────────
+
+export const waPerformance = sqliteTable('wa_performance', {
+  id: id(),
+  athleteId: text('athlete_id').notNull().references(() => athlete.id),
+  eventId: text('event_id').notNull().references(() => event.id),
+  personalBest: text('personal_best'),
+  personalBestVal: real('personal_best_val'),
+  seasonBest: text('season_best'),
+  seasonBestVal: real('season_best_val'),
+  worldRanking: integer('world_ranking'),
+  updatedAt: updatedAt(),
+  createdAt: createdAt(),
+}, (table) => [
+  uniqueIndex('idx_wa_perf_athlete_event').on(table.athleteId, table.eventId),
+])
