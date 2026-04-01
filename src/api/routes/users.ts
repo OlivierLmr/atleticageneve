@@ -13,7 +13,7 @@ users.get('/', async (c) => {
   const db = c.get('db')
   const roleParam = c.req.query('role')
 
-  const validRoles = ['collaborator', 'committee']
+  const validRoles = ['collaborator', 'committee', 'manager']
   const roles = roleParam
     ? roleParam.split(',').filter(r => validRoles.includes(r))
     : validRoles

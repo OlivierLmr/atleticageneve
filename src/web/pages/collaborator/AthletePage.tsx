@@ -6,6 +6,7 @@ import { api } from '@web/lib/api'
 import { useAuth } from '@web/lib/auth'
 import { LanguageSwitcher } from '@web/App'
 import { NEGOTIATION_TRANSITIONS, NIGHT_LABELS, DINNER_LABELS } from '@shared/constants'
+import { STATUS_COLORS } from '@web/lib/ui-constants'
 import type {
   NegotiationStatus,
   Agreement,
@@ -44,17 +45,6 @@ interface StaffUser {
   firstName: string
   lastName: string
   role: string
-}
-
-// ── Status badge ─────────────────────────────────────────────────────────────
-
-const STATUS_COLORS: Record<NegotiationStatus, string> = {
-  to_review: 'bg-yellow-100 text-yellow-800',
-  agreement_sent: 'bg-blue-100 text-blue-800',
-  counter_offer_sent: 'bg-purple-100 text-purple-800',
-  confirmed: 'bg-green-100 text-green-800',
-  rejected: 'bg-red-100 text-red-800',
-  withdrawn: 'bg-gray-100 text-gray-500',
 }
 
 // ── Agreement editor defaults ────────────────────────────────────────────────
@@ -133,6 +123,15 @@ export default function AthletePage() {
   const { data: staffUsers = [] } = useQuery<StaffUser[]>({
     queryKey: ['staff-users'],
     queryFn: () => api.get('/api/v1/users?role=collaborator,committee'),
+  })
+
+  const { data: edition } = useQuery<{
+    stadiumMealCost: number
+    transportAirportHotelCost: number
+    transportHotelStadiumCost: number
+  }>({
+    queryKey: ['edition-current'],
+    queryFn: () => api.get('/api/v1/editions/current'),
   })
 
   // Flatten hotel rooms for the dropdown
@@ -921,6 +920,33 @@ export default function AthletePage() {
                       onChange={(e) => setAgreement((p) => ({ ...p, notes: e.target.value }))}
                     />
                   </div>
+
+                  {/* Live total cost preview */}
+                  {(() => {
+                    const room = allRooms.find(r => r.id === agreement.hotelRoomId)
+                    const nights = [
+                      agreement.hotelNightTue, agreement.hotelNightWed, agreement.hotelNightThu,
+                      agreement.hotelNightFri, agreement.hotelNightSat, agreement.hotelNightSun,
+                    ].filter(Boolean).length
+                    const dinners = [
+                      agreement.dinnerTue, agreement.dinnerWed, agreement.dinnerThu,
+                      agreement.dinnerFri, agreement.dinnerSat, agreement.dinnerSun,
+                    ].filter(Boolean).length
+                    let total = agreement.appearanceFee + agreement.otherCompensation + agreement.transport
+                    total += nights * (room?.costPerNight ?? 0)
+                    total += dinners * (room?.dinnerCost ?? 0)
+                    if (agreement.stadiumMeals) total += edition?.stadiumMealCost ?? 0
+                    if (agreement.transportAirportHotel) total += edition?.transportAirportHotelCost ?? 0
+                    if (agreement.transportHotelStadium) total += edition?.transportHotelStadiumCost ?? 0
+                    return (
+                      <div className="bg-gray-50 rounded p-3 text-sm">
+                        <div className="flex justify-between font-semibold">
+                          <span>{t('contract.totalCost')}</span>
+                          <span>CHF {total.toLocaleString()}</span>
+                        </div>
+                      </div>
+                    )
+                  })()}
 
                   <div className="flex gap-2">
                     <button

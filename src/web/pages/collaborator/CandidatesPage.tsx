@@ -5,6 +5,7 @@ import { useQuery } from '@tanstack/react-query'
 import { api } from '@web/lib/api'
 import { useAuth } from '@web/lib/auth'
 import { LanguageSwitcher } from '@web/App'
+import { STATUS_COLORS } from '@web/lib/ui-constants'
 import type { Application, Athlete, Event, EventCatalog, NegotiationStatus, WaPerformance } from '@shared/types'
 
 // The applications list API returns event with nested catalog
@@ -12,15 +13,6 @@ interface ApplicationRow extends Application {
   athlete: Athlete
   event: Event & { catalog: EventCatalog }
   waPerformance: WaPerformance | null
-}
-
-const STATUS_COLORS: Record<NegotiationStatus, string> = {
-  to_review: 'bg-yellow-100 text-yellow-800',
-  agreement_sent: 'bg-blue-100 text-blue-800',
-  counter_offer_sent: 'bg-purple-100 text-purple-800',
-  confirmed: 'bg-green-100 text-green-800',
-  rejected: 'bg-red-100 text-red-800',
-  withdrawn: 'bg-gray-100 text-gray-500',
 }
 
 const REC_COLORS: Record<string, string> = {
@@ -43,14 +35,16 @@ export default function CandidatesPage() {
   const { user } = useAuth()
   const [eventFilter, setEventFilter] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
+  const [managerFilter, setManagerFilter] = useState('')
   const [search, setSearch] = useState('')
 
   const { data: applications = [], isLoading } = useQuery<ApplicationRow[]>({
-    queryKey: ['applications', eventFilter, statusFilter],
+    queryKey: ['applications', eventFilter, statusFilter, managerFilter],
     queryFn: () => {
       const params = new URLSearchParams()
       if (eventFilter) params.set('eventId', eventFilter)
       if (statusFilter) params.set('negotiationStatus', statusFilter)
+      if (managerFilter) params.set('managerId', managerFilter)
       const qs = params.toString()
       return api.get(`/api/v1/applications${qs ? `?${qs}` : ''}`)
     },
@@ -59,6 +53,11 @@ export default function CandidatesPage() {
   const { data: events = [] } = useQuery<EventListItem[]>({
     queryKey: ['events'],
     queryFn: () => api.get('/api/v1/events'),
+  })
+
+  const { data: managers = [] } = useQuery<{ id: string; firstName: string; lastName: string }[]>({
+    queryKey: ['managers'],
+    queryFn: () => api.get('/api/v1/users?role=manager'),
   })
 
   // Client-side name search
@@ -135,6 +134,19 @@ export default function CandidatesPage() {
                 </option>
               ))}
           </select>
+
+          {managers.length > 0 && (
+            <select
+              className={selectCls}
+              value={managerFilter}
+              onChange={(e) => setManagerFilter(e.target.value)}
+            >
+              <option value="">{t('common.all')} managers</option>
+              {managers.map((m) => (
+                <option key={m.id} value={m.id}>{m.firstName} {m.lastName}</option>
+              ))}
+            </select>
+          )}
 
           <select
             className={selectCls}
