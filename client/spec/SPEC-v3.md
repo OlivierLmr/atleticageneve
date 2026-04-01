@@ -6,6 +6,20 @@
 
 ---
 
+## Reviewer Notes — Points requiring confirmation
+
+The following items are design decisions made by the developer that were not explicitly specified by the client. Please confirm or adjust:
+
+1. **Scoring default weights**: PB=25% and SB=35% follow your choice of "option b" defaults. However, the Ranking (30%), Cost (10%), and EAP bonus (+5 percentage points) values are carried forward from the original implementation. Are these defaults acceptable, or would you like different values? (Remember: these are now configurable per edition, so they can be changed at any time — this only sets the initial defaults.)
+
+2. **Counter-offer locking for non-monetary booleans**: You confirmed that hotel nights can be requested ON (more nights than offered) and monetary fields are freely adjustable. For the remaining booleans — **dinners, stadium meals, and transport shuttles** — we applied the restrictive rule: the athlete can only keep or turn OFF what was offered, but cannot turn ON options that were OFF. Is this correct for all three, or should any of them follow the hotel nights rule (allow requesting more)?
+
+3. **`GET /events/:id/confirmed-athletes` endpoint**: We added a public endpoint that returns the list of confirmed athletes for a given event (useful for event pages or media). This was not explicitly requested. Should it be kept, removed, or restricted to authenticated users?
+
+4. **Archive/restore permission**: Soft-delete via `archivedAt` is implemented as requested. We restricted archive/restore to **Committee only**. Should collaborators also be able to archive athletes, or is Committee-only correct?
+
+---
+
 ## 1. Data Model
 
 ### 1.1 Edition
