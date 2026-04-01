@@ -186,7 +186,8 @@
     "eap": "EAP",
     "meetRecord": "Record du meeting",
     "assignedSelector": "Sélectionneur assigné",
-    "estimatedCost": "Coût estimé"
+    "estimatedCost": "Coût estimé",
+    "participation": "Sélection par épreuve"
   },
   "dashboard": {
     "title": "Tableau de bord du Comité",

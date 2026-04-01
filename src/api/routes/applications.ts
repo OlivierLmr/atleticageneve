@@ -127,6 +127,23 @@ applications.get('/:id', async (c) => {
     ))
     .limit(1)
 
+  // Fetch all applications for this athlete (sibling apps) with event+catalog
+  const siblingRows = await db
+    .select({
+      application: schema.application,
+      event: schema.event,
+      catalog: schema.eventCatalog,
+    })
+    .from(schema.application)
+    .innerJoin(schema.event, eq(schema.application.eventId, schema.event.id))
+    .innerJoin(schema.eventCatalog, eq(schema.event.catalogId, schema.eventCatalog.id))
+    .where(eq(schema.application.athleteId, row.application.athleteId))
+
+  const siblingApplications = siblingRows.map(s => ({
+    ...s.application,
+    event: { ...s.event, catalog: s.catalog },
+  }))
+
   return c.json({
     ...row.application,
     athlete: row.athlete,
@@ -137,6 +154,7 @@ applications.get('/:id', async (c) => {
     agreements,
     interactions,
     waPerformance: waPerfs[0] ?? null,
+    siblingApplications,
   })
 })
 

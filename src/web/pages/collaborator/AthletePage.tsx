@@ -19,6 +19,11 @@ import type {
   WaPerformance,
 } from '@shared/types'
 
+// Sibling application (same athlete, different event)
+interface SiblingApplication extends Application {
+  event: Event & { catalog: EventCatalog }
+}
+
 // The application detail API returns event with nested catalog
 interface ApplicationDetail extends Application {
   athlete: Athlete
@@ -26,6 +31,7 @@ interface ApplicationDetail extends Application {
   agreements: Agreement[]
   interactions: Interaction[]
   waPerformance?: WaPerformance | null
+  siblingApplications: SiblingApplication[]
 }
 
 // Hotels API returns hotels with rooms sub-items
@@ -181,6 +187,12 @@ export default function AthletePage() {
   const internalNotesMutation = useMutation({
     mutationFn: (notes: string) =>
       api.patch(`/api/v1/athletes/${app?.athleteId}`, { internalNotes: notes }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['application', id] }),
+  })
+
+  const participationMutation = useMutation({
+    mutationFn: ({ appId, status }: { appId: string; status: string }) =>
+      api.patch(`/api/v1/applications/${appId}/participation-status`, { participationStatus: status }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['application', id] }),
   })
 
@@ -432,6 +444,57 @@ export default function AthletePage() {
                     </button>
                   </div>
                 </div>
+              )}
+            </div>
+
+            {/* Participation status per event */}
+            <div className="bg-white rounded-lg border p-4">
+              <h3 className="font-semibold text-sm mb-3">{t('selection.participation')}</h3>
+              <div className="space-y-2">
+                {(app.siblingApplications ?? []).map((sib) => {
+                  const isCurrent = sib.id === id
+                  return (
+                    <div key={sib.id} className={`flex items-center justify-between text-sm p-2 rounded ${isCurrent ? 'bg-gray-50 border border-gray-200' : ''}`}>
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium text-xs">{sib.event.catalog.name}</span>
+                        {isCurrent && <span className="text-[10px] text-gray-400">(current)</span>}
+                      </div>
+                      <div className="flex gap-1">
+                        {(['pending', 'selected', 'not_selected'] as const).map((status) => (
+                          <button
+                            key={status}
+                            onClick={() => {
+                              if (sib.participationStatus !== status) {
+                                participationMutation.mutate({ appId: sib.id, status })
+                              }
+                            }}
+                            disabled={participationMutation.isPending || sib.participationStatus === status}
+                            className={`text-[10px] px-2 py-0.5 rounded font-medium border ${
+                              sib.participationStatus === status
+                                ? status === 'selected'
+                                  ? 'bg-green-600 text-white border-green-600'
+                                  : status === 'not_selected'
+                                  ? 'bg-red-100 text-red-700 border-red-200'
+                                  : 'bg-yellow-100 text-yellow-800 border-yellow-200'
+                                : 'border-gray-200 text-gray-400 hover:bg-gray-50'
+                            }`}
+                          >
+                            {status === 'not_selected' ? 'Not selected' : status.charAt(0).toUpperCase() + status.slice(1)}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+              {participationMutation.isError && (
+                <p className="text-xs text-red-600 mt-2">{(participationMutation.error as Error)?.message || t('common.error')}</p>
+              )}
+              {app.siblingApplications?.length > 0 && app.siblingApplications.every(s => s.participationStatus !== 'pending') && (
+                <p className="text-xs text-green-600 mt-2">All events decided — ready to send agreement</p>
+              )}
+              {app.siblingApplications?.length > 0 && app.siblingApplications.some(s => s.participationStatus === 'pending') && (
+                <p className="text-xs text-gray-400 mt-2">Decide all events before sending an agreement</p>
               )}
             </div>
 

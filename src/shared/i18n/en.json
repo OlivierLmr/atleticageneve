@@ -186,7 +186,8 @@
     "eap": "EAP",
     "meetRecord": "Meet record",
     "assignedSelector": "Assigned selector",
-    "estimatedCost": "Estimated cost"
+    "estimatedCost": "Estimated cost",
+    "participation": "Event Selection"
   },
   "dashboard": {
     "title": "Committee Dashboard",
