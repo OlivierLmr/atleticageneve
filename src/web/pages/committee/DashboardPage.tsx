@@ -48,6 +48,7 @@ interface DashboardData {
     startDate: string
     endDate: string
     totalBudget: number
+    currency: string
   }
   kpi: {
     totalAthletes: number
@@ -85,28 +86,51 @@ export default function DashboardPage() {
   }
 
   const { kpi, events, selectors, edition } = data
+  const cur = edition.currency || 'CHF'
   const budgetUsedPct = edition.totalBudget > 0 ? (kpi.budgetCommitted / edition.totalBudget) * 100 : 0
 
   return (
     <div>
       <div className="max-w-7xl mx-auto px-6 py-6 space-y-6">
+        {/* Edition header */}
+        <div className="flex items-baseline justify-between">
+          <div>
+            <h1 className="text-lg font-bold">{edition.name} {edition.year}</h1>
+            <p className="text-xs text-gray-400">
+              {edition.startDate} — {edition.endDate} · {cur} · {t('dashboard.totalBudget')}: {cur} {edition.totalBudget.toLocaleString()}
+            </p>
+          </div>
+        </div>
+
         {/* KPI cards */}
-        <div className="grid grid-cols-6 gap-4">
+        <div className="grid grid-cols-4 gap-4">
           <KpiCard label={t('dashboard.confirmed')} value={kpi.confirmed} color="text-green-600" />
           <KpiCard label={t('dashboard.inNegotiation')} value={kpi.inNegotiation} color="text-blue-600" />
           <KpiCard label={t('dashboard.toReview')} value={kpi.toReview} color="text-yellow-600" />
+          <KpiCard label="Athletes" value={kpi.totalAthletes} color="text-gray-600" />
+        </div>
+        <div className="grid grid-cols-4 gap-4">
           <KpiCard
             label={t('dashboard.budgetCommitted')}
-            value={`CHF ${kpi.budgetCommitted.toLocaleString()}`}
+            value={`${cur} ${kpi.budgetCommitted.toLocaleString()}`}
             sub={`${budgetUsedPct.toFixed(0)}%`}
             color="text-gray-900"
           />
           <KpiCard
+            label={t('dashboard.budgetInNegotiation')}
+            value={`${cur} ${kpi.budgetInNegotiation.toLocaleString()}`}
+            color="text-blue-600"
+          />
+          <KpiCard
             label={t('dashboard.budgetRemaining')}
-            value={`CHF ${kpi.budgetRemaining.toLocaleString()}`}
+            value={`${cur} ${kpi.budgetRemaining.toLocaleString()}`}
             color={kpi.budgetRemaining > 0 ? 'text-green-600' : 'text-red-600'}
           />
-          <KpiCard label="Athletes" value={kpi.totalAthletes} color="text-gray-600" />
+          <KpiCard
+            label={t('dashboard.totalPrizeMoney')}
+            value={`${cur} ${kpi.totalPrizeMoney.toLocaleString()}`}
+            color="text-purple-600"
+          />
         </div>
 
         <div className="grid grid-cols-3 gap-6">
