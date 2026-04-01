@@ -20,6 +20,7 @@ import EventCatalogPage from '@web/pages/committee/EventCatalogPage'
 import CountriesPage from '@web/pages/committee/CountriesPage'
 import EapCitiesPage from '@web/pages/committee/EapCitiesPage'
 import HotelRoomsPage from '@web/pages/committee/HotelRoomsPage'
+import EmailLogPage from '@web/pages/committee/EmailLogPage'
 import { api, ApiError } from '@web/lib/api'
 import type { ReactNode } from 'react'
 import type { UserRole } from '@shared/types'
@@ -78,6 +79,7 @@ const COMMITTEE_NAV = [
   { to: '/committee/countries', label: 'Countries' },
   { to: '/committee/eap-cities', label: 'EAP Cities' },
   { to: '/committee/hotel-rooms', label: 'Hotel Rooms' },
+  { to: '/committee/emails', label: 'Email Log' },
   { to: '/committee/candidates', label: 'Candidates' },
 ]
 
@@ -471,6 +473,7 @@ export default function App() {
               <Route path="countries" element={<CountriesPage />} />
               <Route path="eap-cities" element={<EapCitiesPage />} />
               <Route path="hotel-rooms" element={<HotelRoomsPage />} />
+              <Route path="emails" element={<EmailLogPage />} />
               <Route path="candidates" element={<CandidatesPage />} />
               <Route path="athletes/:id" element={<CollaboratorAthletePage />} />
             </Route>

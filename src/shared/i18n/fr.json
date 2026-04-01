@@ -205,6 +205,7 @@
     "quotas": "Quotas",
     "eapQuota": "Quota EAP",
     "swissQuota": "Quota suisse",
+    "hotelOccupancy": "Occupation hôtelière",
     "selectors": "Sélectionneurs",
     "costBreakdown": "Ventilation des coûts",
     "applicationPipeline": "Pipeline des candidatures"

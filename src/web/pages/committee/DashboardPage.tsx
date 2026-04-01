@@ -85,7 +85,7 @@ export default function DashboardPage() {
     )
   }
 
-  const { kpi, events, selectors, edition } = data
+  const { kpi, events, selectors, edition, hotelRooms } = data
   const cur = edition.currency || 'CHF'
   const budgetUsedPct = edition.totalBudget > 0 ? (kpi.budgetCommitted / edition.totalBudget) * 100 : 0
 
@@ -233,6 +233,35 @@ export default function DashboardPage() {
                 ))}
               </div>
             </div>
+
+            {/* Hotel room occupancy */}
+            {hotelRooms.length > 0 && (
+              <div className="bg-white rounded-lg border p-4">
+                <h3 className="font-semibold text-sm mb-3">{t('dashboard.hotelOccupancy')}</h3>
+                <div className="space-y-2">
+                  {hotelRooms.map((room) => (
+                    <div key={room.roomId} className="text-xs">
+                      <div className="flex justify-between mb-1">
+                        <span className="font-medium">{room.roomType}</span>
+                        <span className="font-mono">{room.confirmedCount}/{room.reservedRooms}</span>
+                      </div>
+                      <div className="w-full h-1.5 bg-gray-200 rounded-full overflow-hidden">
+                        <div
+                          className={`h-full rounded-full ${
+                            room.confirmedOccupancy >= 1 ? 'bg-red-500' :
+                            room.confirmedOccupancy >= 0.7 ? 'bg-yellow-500' : 'bg-green-500'
+                          }`}
+                          style={{ width: `${Math.min(100, room.confirmedOccupancy * 100)}%` }}
+                        />
+                      </div>
+                      {room.inNegotiationCount > 0 && (
+                        <span className="text-gray-400">+{room.inNegotiationCount} in neg.</span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
