@@ -127,13 +127,14 @@ export default function ManagerPortalPage() {
 
       <div className="max-w-6xl mx-auto px-6 py-6">
         {/* KPI cards */}
-        <div className="grid grid-cols-5 gap-4 mb-6">
+        <div className="grid grid-cols-6 gap-4 mb-6">
           {[
             { label: t('common.total'), value: kpi.total, color: 'text-gray-900' },
             { label: t('dashboard.toReview'), value: kpi.toReview, color: 'text-yellow-600' },
             { label: t('dashboard.inNegotiation'), value: kpi.inNegotiation, color: 'text-blue-600' },
             { label: t('dashboard.confirmed'), value: kpi.confirmed, color: 'text-green-600' },
             { label: t('status.rejected'), value: kpi.rejected, color: 'text-red-600' },
+            { label: t('status.withdrawn'), value: kpi.withdrawn, color: 'text-gray-500' },
           ].map(({ label, value, color }) => (
             <div key={label} className="bg-white rounded-lg border p-4">
               <p className="text-xs text-gray-400 mb-1">{label}</p>

@@ -3,8 +3,6 @@ import { BrowserRouter, Routes, Route, Link, Navigate, Outlet, useLocation } fro
 import { useTranslation } from 'react-i18next'
 import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query'
 import { AuthProvider, useAuth } from '@web/lib/auth'
-import LoginPage from '@web/pages/auth/LoginPage'
-import MagicLinkPage from '@web/pages/auth/MagicLinkPage'
 import VerifyMagicLinkPage from '@web/pages/auth/VerifyMagicLinkPage'
 import SignupPage from '@web/pages/signup/SignupPage'
 import AthleteRegisterPage from '@web/pages/athlete/RegisterPage'
@@ -366,47 +364,6 @@ function HomePage() {
         )}
       </div>
 
-      {/* DEV — email log */}
-      <DevEmailLog />
-    </div>
-  )
-}
-
-interface DevEmail {
-  id: string
-  to: string
-  subject: string
-  body: string
-  lang: string
-  sentAt: string
-}
-
-function DevEmailLog() {
-  const { data: emails = [] } = useQuery<DevEmail[]>({
-    queryKey: ['dev-emails'],
-    queryFn: () => api.get('/api/v1/emails?limit=20'),
-    refetchInterval: 5000,
-  })
-
-  if (emails.length === 0) return null
-
-  return (
-    <div className="mt-4 mb-12">
-      <p className="text-xs font-semibold uppercase tracking-wide text-orange-500 mb-2">
-        Dev — Emails sent
-      </p>
-      <div className="flex flex-col gap-2">
-        {emails.map((em) => (
-          <div key={em.id} className="border border-orange-200 bg-orange-50 rounded-md px-3 py-2">
-            <div className="flex justify-between text-[10px] text-orange-400 mb-1">
-              <span>To: {em.to}</span>
-              <span>{new Date(em.sentAt).toLocaleTimeString()}</span>
-            </div>
-            <p className="text-xs font-medium text-gray-900 mb-1">{em.subject}</p>
-            <pre className="text-[10px] text-gray-600 whitespace-pre-wrap font-mono">{em.body}</pre>
-          </div>
-        ))}
-      </div>
     </div>
   )
 }
@@ -422,8 +379,6 @@ export default function App() {
             <Route path="/" element={<HomePage />} />
 
             {/* Auth */}
-            <Route path="/auth/login" element={<LoginPage />} />
-            <Route path="/auth/magic-link" element={<MagicLinkPage />} />
             <Route path="/auth/verify" element={<VerifyMagicLinkPage />} />
 
             {/* Signup & Registration — public */}

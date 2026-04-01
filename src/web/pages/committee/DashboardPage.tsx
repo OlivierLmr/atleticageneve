@@ -103,11 +103,13 @@ export default function DashboardPage() {
         </div>
 
         {/* KPI cards */}
-        <div className="grid grid-cols-4 gap-4">
+        <div className="grid grid-cols-6 gap-4">
           <KpiCard label={t('dashboard.confirmed')} value={kpi.confirmed} color="text-green-600" />
           <KpiCard label={t('dashboard.inNegotiation')} value={kpi.inNegotiation} color="text-blue-600" />
           <KpiCard label={t('dashboard.toReview')} value={kpi.toReview} color="text-yellow-600" />
-          <KpiCard label="Athletes" value={kpi.totalAthletes} color="text-gray-600" />
+          <KpiCard label={t('status.rejected')} value={kpi.rejected} color="text-red-600" />
+          <KpiCard label={t('status.withdrawn')} value={kpi.withdrawn} color="text-gray-500" />
+          <KpiCard label={t('selection.candidates')} value={kpi.totalAthletes} color="text-gray-600" />
         </div>
         <div className="grid grid-cols-4 gap-4">
           <KpiCard

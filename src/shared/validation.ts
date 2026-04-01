@@ -52,9 +52,13 @@ export const batchAthleteSchema = z.object({
   nationality: z.string().min(2).max(3),
   gender: z.enum(['M', 'F']),
   isEap: z.boolean().default(false),
+  eapCity: z.string().optional(),
   waProfileUrl: z.string().url().optional().or(z.literal('')),
   eventIds: z.array(z.string().min(1)).min(1),
-})
+}).refine((data) => {
+  if (data.isEap && !data.eapCity) return false
+  return true
+}, { message: 'eapCity is required when isEap is true', path: ['eapCity'] })
 
 export const batchAthleteRegistrationSchema = z.object({
   athletes: z.array(batchAthleteSchema).min(1),

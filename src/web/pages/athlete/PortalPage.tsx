@@ -6,7 +6,7 @@ import { api } from '@web/lib/api'
 import { useAuth } from '@web/lib/auth'
 import { LanguageSwitcher } from '@web/App'
 import { NIGHT_LABELS, DINNER_LABELS } from '@shared/constants'
-import type { Application, Athlete, Event, Agreement, Interaction, NegotiationStatus, ParticipationStatus, WaPerformance } from '@shared/types'
+import type { Application, Athlete, Event, Agreement, Interaction, NegotiationStatus, ParticipationStatus, WaPerformance, Hotel, HotelRoom } from '@shared/types'
 
 interface PortalEvent extends Event {
   name: string
@@ -64,6 +64,15 @@ export default function AthletePortalPage() {
     queryKey: ['athlete-portal'],
     queryFn: () => api.get('/api/v1/portal/athlete'),
   })
+
+  const { data: hotels = [] } = useQuery<(Hotel & { rooms: HotelRoom[] })[]>({
+    queryKey: ['hotels'],
+    queryFn: () => api.get('/api/v1/hotels'),
+  })
+
+  const allHotelRooms: HotelRoomOption[] = hotels.flatMap(h =>
+    h.rooms.map(r => ({ id: r.id, hotelName: h.name, roomType: r.roomType, costPerNight: r.costPerNight }))
+  )
 
   const athletes = data?.athletes ?? []
   const selected = athletes.find((a) => a.id === activeAthleteId) ?? athletes[0]
@@ -281,6 +290,7 @@ export default function AthletePortalPage() {
                     onSubmit={(offer) => respondMutation.mutate({ athleteId: selected.id, action: 'counter_offer', offer })}
                     onCancel={() => setShowCounter(false)}
                     isPending={respondMutation.isPending}
+                    hotelRooms={allHotelRooms}
                   />
                 )}
 
@@ -348,18 +358,27 @@ export default function AthletePortalPage() {
 
 // ── Counter-offer form ───────────────────────────────────────────────────────
 
+interface HotelRoomOption {
+  id: string
+  hotelName: string
+  roomType: string
+  costPerNight: number
+}
+
 function CounterOfferForm({
   latestOffer,
   t,
   onSubmit,
   onCancel,
   isPending,
+  hotelRooms,
 }: {
   latestOffer: Agreement
   t: (key: string) => string
   onSubmit: (offer: Record<string, unknown>) => void
   onCancel: () => void
   isPending: boolean
+  hotelRooms: HotelRoomOption[]
 }) {
   const [form, setForm] = useState({
     appearanceFee: latestOffer.appearanceFee,
@@ -404,6 +423,32 @@ function CounterOfferForm({
               onChange={(e) => setForm((p) => ({ ...p, transport: parseInt(e.target.value) || 0 }))} />
           </div>
         </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className={labelCls}>{t('contract.otherCompensation')} (CHF)</label>
+            <input type="number" className={inputCls} value={form.otherCompensation}
+              onChange={(e) => setForm((p) => ({ ...p, otherCompensation: parseInt(e.target.value) || 0 }))} />
+          </div>
+          <div>
+            <label className={labelCls}>{t('contract.otherCompensationDesc')}</label>
+            <input className={inputCls} value={form.otherCompensationDesc}
+              onChange={(e) => setForm((p) => ({ ...p, otherCompensationDesc: e.target.value }))} />
+          </div>
+        </div>
+
+        {hotelRooms.length > 0 && (
+          <div>
+            <label className={labelCls}>{t('logistics.hotel')}</label>
+            <select className={inputCls} value={form.hotelRoomId}
+              onChange={(e) => setForm((p) => ({ ...p, hotelRoomId: e.target.value }))}>
+              <option value="">—</option>
+              {hotelRooms.map(r => (
+                <option key={r.id} value={r.id}>{r.hotelName} — {r.roomType} (CHF {r.costPerNight}/night)</option>
+              ))}
+            </select>
+          </div>
+        )}
 
         <div>
           <label className={labelCls}>{t('contract.hotelNights')}</label>

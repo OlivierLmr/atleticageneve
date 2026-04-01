@@ -455,6 +455,7 @@ export default function AthletePage() {
                   { key: 'waProfileUrl', label: t('athlete.waProfile'), type: 'text' },
                   { key: 'swiLicence', label: t('athlete.swissLicence'), type: 'text' },
                   { key: 'honours', label: 'Honours', type: 'text' },
+                  { key: 'distanceFromGva', label: 'Distance from GVA (km)', type: 'number' },
                   { key: 'isEap', label: t('athlete.eapMember'), type: 'checkbox' },
                   { key: 'isSwiss', label: 'Swiss', type: 'checkbox' },
                   { key: 'eapCity', label: 'EAP City', type: 'text' },
