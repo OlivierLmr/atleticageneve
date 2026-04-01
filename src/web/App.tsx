@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { BrowserRouter, Routes, Route, Link, Navigate, Outlet, useLocation } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query'
 import { AuthProvider, useAuth } from '@web/lib/auth'
 import LoginPage from '@web/pages/auth/LoginPage'
 import MagicLinkPage from '@web/pages/auth/MagicLinkPage'
@@ -20,7 +20,6 @@ import EventCatalogPage from '@web/pages/committee/EventCatalogPage'
 import CountriesPage from '@web/pages/committee/CountriesPage'
 import EapCitiesPage from '@web/pages/committee/EapCitiesPage'
 import HotelRoomsPage from '@web/pages/committee/HotelRoomsPage'
-import EmailLogPage from '@web/pages/committee/EmailLogPage'
 import { api } from '@web/lib/api'
 import type { ReactNode } from 'react'
 import type { UserRole } from '@shared/types'
@@ -79,7 +78,6 @@ const COMMITTEE_NAV = [
   { to: '/committee/countries', label: 'Countries' },
   { to: '/committee/eap-cities', label: 'EAP Cities' },
   { to: '/committee/hotel-rooms', label: 'Hotel Rooms' },
-  { to: '/committee/email-log', label: 'Email Log' },
   { to: '/committee/candidates', label: 'Candidates' },
 ]
 
@@ -366,6 +364,47 @@ function HomePage() {
         )}
       </div>
 
+      {/* DEV — email log */}
+      <DevEmailLog />
+    </div>
+  )
+}
+
+interface DevEmail {
+  id: string
+  to: string
+  subject: string
+  body: string
+  lang: string
+  sentAt: string
+}
+
+function DevEmailLog() {
+  const { data: emails = [] } = useQuery<DevEmail[]>({
+    queryKey: ['dev-emails'],
+    queryFn: () => api.get('/api/v1/emails?limit=20'),
+    refetchInterval: 5000,
+  })
+
+  if (emails.length === 0) return null
+
+  return (
+    <div className="mt-4 mb-12">
+      <p className="text-xs font-semibold uppercase tracking-wide text-orange-500 mb-2">
+        Dev — Emails sent
+      </p>
+      <div className="flex flex-col gap-2">
+        {emails.map((em) => (
+          <div key={em.id} className="border border-orange-200 bg-orange-50 rounded-md px-3 py-2">
+            <div className="flex justify-between text-[10px] text-orange-400 mb-1">
+              <span>To: {em.to}</span>
+              <span>{new Date(em.sentAt).toLocaleTimeString()}</span>
+            </div>
+            <p className="text-xs font-medium text-gray-900 mb-1">{em.subject}</p>
+            <pre className="text-[10px] text-gray-600 whitespace-pre-wrap font-mono">{em.body}</pre>
+          </div>
+        ))}
+      </div>
     </div>
   )
 }
@@ -432,7 +471,6 @@ export default function App() {
               <Route path="countries" element={<CountriesPage />} />
               <Route path="eap-cities" element={<EapCitiesPage />} />
               <Route path="hotel-rooms" element={<HotelRoomsPage />} />
-              <Route path="email-log" element={<EmailLogPage />} />
               <Route path="candidates" element={<CandidatesPage />} />
               <Route path="athletes/:id" element={<CollaboratorAthletePage />} />
             </Route>

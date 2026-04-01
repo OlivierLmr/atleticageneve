@@ -6,8 +6,8 @@ import type { Env } from '../index'
 
 const app = new Hono<Env>()
 
-// GET /emails — committee only, returns email log
-app.get('/', requireAuth('committee'), async (c) => {
+// GET /emails — public (dev email viewer on home page)
+app.get('/', async (c) => {
   const db = c.get('db')
   const limit = parseInt(c.req.query('limit') || '100', 10)
   const offset = parseInt(c.req.query('offset') || '0', 10)
