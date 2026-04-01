@@ -6,19 +6,24 @@ import { api } from '@web/lib/api'
 import { useAuth } from '@web/lib/auth'
 import { LanguageSwitcher } from '@web/App'
 import { NIGHT_LABELS } from '@shared/constants'
-import type { Application, Athlete, Event, ContractOffer, NegotiationStatus } from '@shared/types'
+import type { Application, Athlete, Event, Agreement, NegotiationStatus } from '@shared/types'
+
+interface PortalEvent extends Event {
+  name: string
+  discipline: string
+  gender: string
+}
 
 interface PortalAthlete extends Athlete {
-  applications: (Application & { event: Event | null })[]
-  contracts: ContractOffer[]
-  latestContract: ContractOffer | null
+  applications: (Application & { event: PortalEvent | null })[]
+  agreements: Agreement[]
 }
 
 const STATUS_COLORS: Record<NegotiationStatus, string> = {
   to_review: 'bg-yellow-100 text-yellow-800',
-  contract_sent: 'bg-blue-100 text-blue-800',
-  counter_offer: 'bg-purple-100 text-purple-800',
-  accepted: 'bg-green-100 text-green-800',
+  agreement_sent: 'bg-blue-100 text-blue-800',
+  counter_offer_sent: 'bg-purple-100 text-purple-800',
+  confirmed: 'bg-green-100 text-green-800',
   rejected: 'bg-red-100 text-red-800',
   withdrawn: 'bg-gray-100 text-gray-500',
 }
@@ -58,8 +63,8 @@ export default function AthletePortalPage() {
     )
   }
 
-  const latestOffer = selected?.contracts?.filter((c) => c.direction === 'to_athlete').slice(-1)[0]
-  const canRespond = selected?.negotiationStatus === 'contract_sent'
+  const latestOffer = selected?.agreements?.filter((c) => c.direction === 'to_athlete').slice(-1)[0]
+  const canRespond = selected?.negotiationStatus === 'agreement_sent'
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -149,7 +154,7 @@ export default function AthletePortalPage() {
                     <div className="grid grid-cols-2 gap-2 text-sm mb-3">
                       <div className="flex justify-between">
                         <span className="text-gray-500">{t('contract.bonus')}</span>
-                        <span>CHF {latestOffer.bonus.toLocaleString()}</span>
+                        <span>CHF {latestOffer.appearanceFee.toLocaleString()}</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-gray-500">{t('contract.transport')}</span>
@@ -224,12 +229,12 @@ export default function AthletePortalPage() {
                   />
                 )}
 
-                {/* Contract history */}
-                {selected.contracts.length > 1 && (
+                {/* Agreement history */}
+                {selected.agreements.length > 1 && (
                   <div className="bg-white rounded-lg border p-4">
                     <h3 className="font-semibold text-sm mb-3">Offer history</h3>
                     <div className="space-y-2">
-                      {selected.contracts.map((c) => (
+                      {selected.agreements.map((c) => (
                         <div key={c.id} className={`p-2 rounded text-xs border ${
                           c.direction === 'to_athlete' ? 'border-blue-200 bg-blue-50' : 'border-purple-200 bg-purple-50'
                         }`}>
@@ -246,7 +251,7 @@ export default function AthletePortalPage() {
                 )}
 
                 {/* Withdraw button */}
-                {['to_review', 'contract_sent', 'counter_offer', 'accepted'].includes(selected.negotiationStatus) && (
+                {['to_review', 'agreement_sent', 'counter_offer_sent', 'confirmed'].includes(selected.negotiationStatus) && (
                   <div className="text-right">
                     <button
                       onClick={() => {
@@ -278,14 +283,14 @@ function CounterOfferForm({
   onCancel,
   isPending,
 }: {
-  latestOffer: ContractOffer
+  latestOffer: Agreement
   t: (key: string) => string
   onSubmit: (offer: Record<string, unknown>) => void
   onCancel: () => void
   isPending: boolean
 }) {
   const [form, setForm] = useState({
-    bonus: latestOffer.bonus,
+    appearanceFee: latestOffer.appearanceFee,
     otherCompensation: latestOffer.otherCompensation,
     otherCompensationDesc: latestOffer.otherCompensationDesc ?? '',
     transport: latestOffer.transport,
@@ -304,7 +309,7 @@ function CounterOfferForm({
     dinnerSat: latestOffer.dinnerSat,
     dinnerSun: latestOffer.dinnerSun,
     stadiumMeals: latestOffer.stadiumMeals,
-    hotelId: latestOffer.hotelId,
+    hotelRoomId: latestOffer.hotelRoomId ?? '',
     notes: '',
   })
 
@@ -318,8 +323,8 @@ function CounterOfferForm({
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className={labelCls}>{t('contract.bonus')} (CHF)</label>
-            <input type="number" className={inputCls} value={form.bonus}
-              onChange={(e) => setForm((p) => ({ ...p, bonus: parseInt(e.target.value) || 0 }))} />
+            <input type="number" className={inputCls} value={form.appearanceFee}
+              onChange={(e) => setForm((p) => ({ ...p, appearanceFee: parseInt(e.target.value) || 0 }))} />
           </div>
           <div>
             <label className={labelCls}>{t('contract.transport')} (CHF)</label>

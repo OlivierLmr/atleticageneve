@@ -8,17 +8,28 @@ import { LanguageSwitcher } from '@web/App'
 interface EventStat {
   eventId: string
   eventName: string
+  discipline: string
   gender: string
   maxSlots: number
-  selected: number
-  pending: number
-  notSelected: number
-  total: number
-  fillRate: number
+  confirmedSelected: number
+  inNegotiationSelected: number
+  confirmedFillRate: number
+  negotiationFillRate: number
   swissQuota: number
   swissSelected: number
   eapQuota: number
   eapSelected: number
+}
+
+interface HotelRoomStat {
+  roomId: string
+  hotelId: string
+  roomType: string
+  reservedRooms: number
+  confirmedOccupancy: number
+  negotiationOccupancy: number
+  confirmedCount: number
+  inNegotiationCount: number
 }
 
 interface SelectorStat {
@@ -28,6 +39,8 @@ interface SelectorStat {
   toReview: number
   inNegotiation: number
   confirmed: number
+  rejected: number
+  withdrawn: number
 }
 
 interface DashboardData {
@@ -49,8 +62,10 @@ interface DashboardData {
     budgetCommitted: number
     budgetInNegotiation: number
     budgetRemaining: number
+    totalPrizeMoney: number
   }
   events: EventStat[]
+  hotelRooms: HotelRoomStat[]
   selectors: SelectorStat[]
 }
 
@@ -132,8 +147,8 @@ export default function DashboardPage() {
                 <tr className="border-b bg-gray-50 text-xs text-gray-500">
                   <th className="px-3 py-2 text-left font-medium">{t('athlete.event')}</th>
                   <th className="px-3 py-2 text-center font-medium">{t('dashboard.fillRate')}</th>
-                  <th className="px-3 py-2 text-center font-medium">Selected</th>
-                  <th className="px-3 py-2 text-center font-medium">Pending</th>
+                  <th className="px-3 py-2 text-center font-medium">Confirmed</th>
+                  <th className="px-3 py-2 text-center font-medium">In Neg.</th>
                   <th className="px-3 py-2 text-center font-medium">{t('dashboard.swissQuota')}</th>
                   <th className="px-3 py-2 text-center font-medium">{t('dashboard.eapQuota')}</th>
                 </tr>
@@ -147,25 +162,25 @@ export default function DashboardPage() {
                         <div className="w-16 h-1.5 bg-gray-200 rounded-full overflow-hidden">
                           <div
                             className={`h-full rounded-full ${
-                              evt.fillRate >= 1
+                              evt.confirmedFillRate >= 1
                                 ? 'bg-green-500'
-                                : evt.fillRate >= 0.5
+                                : evt.confirmedFillRate >= 0.5
                                 ? 'bg-blue-500'
                                 : 'bg-yellow-500'
                             }`}
-                            style={{ width: `${Math.min(100, evt.fillRate * 100)}%` }}
+                            style={{ width: `${Math.min(100, evt.confirmedFillRate * 100)}%` }}
                           />
                         </div>
                         <span className="text-xs font-mono">
-                          {evt.selected}/{evt.maxSlots}
+                          {evt.confirmedSelected}/{evt.maxSlots}
                         </span>
                       </div>
                     </td>
                     <td className="px-3 py-2 text-center font-mono text-xs text-green-600">
-                      {evt.selected}
+                      {evt.confirmedSelected}
                     </td>
-                    <td className="px-3 py-2 text-center font-mono text-xs text-yellow-600">
-                      {evt.pending}
+                    <td className="px-3 py-2 text-center font-mono text-xs text-blue-600">
+                      {evt.inNegotiationSelected}
                     </td>
                     <td className="px-3 py-2 text-center">
                       <QuotaBadge filled={evt.swissSelected} quota={evt.swissQuota} />

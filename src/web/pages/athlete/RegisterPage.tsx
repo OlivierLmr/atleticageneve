@@ -6,6 +6,14 @@ import { api } from '@web/lib/api'
 import { LanguageSwitcher } from '@web/App'
 import type { Event } from '@shared/types'
 
+// The events API returns Event joined with catalog data (name, discipline, gender, perfType)
+interface EventWithCatalog extends Event {
+  name: string
+  discipline: string
+  gender: string
+  perfType: string
+}
+
 const STEPS = ['athlete', 'competition', 'compliance', 'travel'] as const
 type Step = (typeof STEPS)[number]
 
@@ -32,7 +40,7 @@ export default function AthleteRegisterPage() {
   })
 
   // Fetch events filtered by gender
-  const { data: events = [] } = useQuery<Event[]>({
+  const { data: events = [] } = useQuery<EventWithCatalog[]>({
     queryKey: ['events', form.gender],
     queryFn: () => api.get(`/api/v1/events${form.gender ? `?gender=${form.gender}` : ''}`),
     enabled: true,

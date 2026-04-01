@@ -15,6 +15,12 @@ import ManagerPortalPage from '@web/pages/manager/PortalPage'
 import CandidatesPage from '@web/pages/collaborator/CandidatesPage'
 import CollaboratorAthletePage from '@web/pages/collaborator/AthletePage'
 import DashboardPage from '@web/pages/committee/DashboardPage'
+import EditionConfigPage from '@web/pages/committee/EditionConfigPage'
+import EventCatalogPage from '@web/pages/committee/EventCatalogPage'
+import CountriesPage from '@web/pages/committee/CountriesPage'
+import EapCitiesPage from '@web/pages/committee/EapCitiesPage'
+import HotelRoomsPage from '@web/pages/committee/HotelRoomsPage'
+import EmailLogPage from '@web/pages/committee/EmailLogPage'
 import { api } from '@web/lib/api'
 import type { ReactNode } from 'react'
 import type { UserRole } from '@shared/types'
@@ -87,7 +93,7 @@ function HomePage() {
 
   const { data: emails = [] } = useQuery<DevEmail[]>({
     queryKey: ['dev-emails'],
-    queryFn: () => api.get('/api/v1/dev/emails'),
+    queryFn: () => api.get('/api/v1/emails'),
     refetchInterval: 5000,
   })
 
@@ -341,6 +347,36 @@ export default function App() {
             <Route path="/committee/dashboard" element={
               <ProtectedRoute roles={['committee']}>
                 <DashboardPage />
+              </ProtectedRoute>
+            } />
+            <Route path="/committee/edition-config" element={
+              <ProtectedRoute roles={['committee']}>
+                <EditionConfigPage />
+              </ProtectedRoute>
+            } />
+            <Route path="/committee/event-catalog" element={
+              <ProtectedRoute roles={['committee']}>
+                <EventCatalogPage />
+              </ProtectedRoute>
+            } />
+            <Route path="/committee/countries" element={
+              <ProtectedRoute roles={['committee']}>
+                <CountriesPage />
+              </ProtectedRoute>
+            } />
+            <Route path="/committee/eap-cities" element={
+              <ProtectedRoute roles={['committee']}>
+                <EapCitiesPage />
+              </ProtectedRoute>
+            } />
+            <Route path="/committee/hotel-rooms" element={
+              <ProtectedRoute roles={['committee']}>
+                <HotelRoomsPage />
+              </ProtectedRoute>
+            } />
+            <Route path="/committee/email-log" element={
+              <ProtectedRoute roles={['committee']}>
+                <EmailLogPage />
               </ProtectedRoute>
             } />
           </Routes>

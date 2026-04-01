@@ -5,18 +5,20 @@ import { useQuery } from '@tanstack/react-query'
 import { api } from '@web/lib/api'
 import { useAuth } from '@web/lib/auth'
 import { LanguageSwitcher } from '@web/App'
-import type { Application, Athlete, Event, NegotiationStatus, Recommendation } from '@shared/types'
+import type { Application, Athlete, Event, EventCatalog, NegotiationStatus, WaPerformance } from '@shared/types'
 
+// The applications list API returns event with nested catalog
 interface ApplicationRow extends Application {
   athlete: Athlete
-  event: Event
+  event: Event & { catalog: EventCatalog }
+  waPerformance: WaPerformance | null
 }
 
 const STATUS_COLORS: Record<NegotiationStatus, string> = {
   to_review: 'bg-yellow-100 text-yellow-800',
-  contract_sent: 'bg-blue-100 text-blue-800',
-  counter_offer: 'bg-purple-100 text-purple-800',
-  accepted: 'bg-green-100 text-green-800',
+  agreement_sent: 'bg-blue-100 text-blue-800',
+  counter_offer_sent: 'bg-purple-100 text-purple-800',
+  confirmed: 'bg-green-100 text-green-800',
   rejected: 'bg-red-100 text-red-800',
   withdrawn: 'bg-gray-100 text-gray-500',
 }
@@ -26,6 +28,14 @@ const REC_COLORS: Record<string, string> = {
   'Recommended': 'bg-blue-100 text-blue-700',
   'Under Review': 'bg-yellow-100 text-yellow-800',
   'Not Recommended': 'bg-red-100 text-red-800',
+}
+
+// Events API returns flat name/discipline/gender from catalog join
+interface EventListItem extends Event {
+  name: string
+  discipline: string
+  gender: string
+  perfType: string
 }
 
 export default function CandidatesPage() {
@@ -40,13 +50,13 @@ export default function CandidatesPage() {
     queryFn: () => {
       const params = new URLSearchParams()
       if (eventFilter) params.set('eventId', eventFilter)
-      if (statusFilter) params.set('status', statusFilter)
+      if (statusFilter) params.set('negotiationStatus', statusFilter)
       const qs = params.toString()
       return api.get(`/api/v1/applications${qs ? `?${qs}` : ''}`)
     },
   })
 
-  const { data: events = [] } = useQuery<Event[]>({
+  const { data: events = [] } = useQuery<EventListItem[]>({
     queryKey: ['events'],
     queryFn: () => api.get('/api/v1/events'),
   })
@@ -60,14 +70,14 @@ export default function CandidatesPage() {
       )
     : applications
 
-  // Stats
+  // Stats — negotiationStatus is on athlete, participationStatus is on application
   const stats = {
     total: applications.length,
-    toReview: applications.filter((a) => a.status === 'to_review').length,
+    toReview: applications.filter((a) => a.athlete.negotiationStatus === 'to_review').length,
     inNegotiation: applications.filter((a) =>
-      ['contract_sent', 'counter_offer'].includes(a.status)
+      ['agreement_sent', 'counter_offer_sent'].includes(a.athlete.negotiationStatus)
     ).length,
-    confirmed: applications.filter((a) => a.status === 'accepted').length,
+    confirmed: applications.filter((a) => a.athlete.negotiationStatus === 'confirmed').length,
   }
 
   const selectCls =
@@ -146,7 +156,7 @@ export default function CandidatesPage() {
             onChange={(e) => setStatusFilter(e.target.value)}
           >
             <option value="">{t('common.all')} statuses</option>
-            {(['to_review', 'contract_sent', 'counter_offer', 'accepted', 'rejected', 'withdrawn'] as NegotiationStatus[]).map(
+            {(['to_review', 'agreement_sent', 'counter_offer_sent', 'confirmed', 'rejected', 'withdrawn'] as NegotiationStatus[]).map(
               (s) => (
                 <option key={s} value={s}>
                   {t(`status.${s}`)}
@@ -191,80 +201,89 @@ export default function CandidatesPage() {
                   <th className="px-3 py-2.5 text-left font-medium">{t('selection.scoring')}</th>
                   <th className="px-3 py-2.5 text-left font-medium">{t('selection.recommendation')}</th>
                   <th className="px-3 py-2.5 text-left font-medium">Negotiation</th>
-                  <th className="px-3 py-2.5 text-left font-medium">Status</th>
+                  <th className="px-3 py-2.5 text-left font-medium">Participation</th>
                   <th className="px-3 py-2.5 text-left font-medium">{t('selection.estimatedCost')}</th>
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((app) => (
-                  <tr key={app.id} className="border-b hover:bg-gray-50 transition-colors">
-                    <td className="px-3 py-2.5">
-                      <Link
-                        to={`/collaborator/athletes/${app.id}`}
-                        className="font-medium text-gray-900 hover:underline"
-                      >
-                        {app.athlete.lastName}, {app.athlete.firstName}
-                      </Link>
-                      {app.athlete.managerId && (
-                        <span className="ml-1 text-[10px] text-gray-400">MGR</span>
-                      )}
-                    </td>
-                    <td className="px-3 py-2.5 text-gray-600">{app.event.name}</td>
-                    <td className="px-3 py-2.5">
-                      <span className={`text-xs ${app.athlete.isSwiss ? 'text-red-600 font-semibold' : app.athlete.isEap ? 'text-blue-600 font-semibold' : 'text-gray-600'}`}>
-                        {app.athlete.nationality}
-                      </span>
-                    </td>
-                    <td className="px-3 py-2.5 font-mono text-xs">{app.personalBest ?? '—'}</td>
-                    <td className="px-3 py-2.5 font-mono text-xs">{app.seasonBest ?? '—'}</td>
-                    <td className="px-3 py-2.5 font-mono text-xs">{app.worldRanking ?? '—'}</td>
-                    <td className="px-3 py-2.5">
-                      {app.score != null ? (
-                        <span className="font-mono text-xs font-medium">
-                          {(app.score * 100).toFixed(0)}
+                {filtered.map((app) => {
+                  const pb = app.waPerformance?.personalBest ?? app.personalBest
+                  const sb = app.waPerformance?.seasonBest ?? app.seasonBest
+                  const wr = app.waPerformance?.worldRanking ?? app.worldRanking
+                  return (
+                    <tr key={app.id} className="border-b hover:bg-gray-50 transition-colors">
+                      <td className="px-3 py-2.5">
+                        <Link
+                          to={`/collaborator/athletes/${app.id}`}
+                          className="font-medium text-gray-900 hover:underline"
+                        >
+                          {app.athlete.lastName}, {app.athlete.firstName}
+                        </Link>
+                        {app.athlete.managerId && (
+                          <span className="ml-1 text-[10px] text-gray-400">MGR</span>
+                        )}
+                      </td>
+                      <td className="px-3 py-2.5 text-gray-600">{app.event.catalog.name}</td>
+                      <td className="px-3 py-2.5">
+                        <span className={`text-xs ${app.athlete.isSwiss ? 'text-red-600 font-semibold' : app.athlete.isEap ? 'text-blue-600 font-semibold' : 'text-gray-600'}`}>
+                          {app.athlete.nationality}
                         </span>
-                      ) : (
-                        '—'
-                      )}
-                    </td>
-                    <td className="px-3 py-2.5">
-                      {app.recommendation ? (
+                      </td>
+                      <td className="px-3 py-2.5 font-mono text-xs">{pb ?? '—'}</td>
+                      <td className="px-3 py-2.5 font-mono text-xs">{sb ?? '—'}</td>
+                      <td className="px-3 py-2.5 font-mono text-xs">{wr ?? '—'}</td>
+                      <td className="px-3 py-2.5">
+                        {app.score != null ? (
+                          <span className="font-mono text-xs font-medium">
+                            {(app.score * 100).toFixed(0)}
+                          </span>
+                        ) : (
+                          '—'
+                        )}
+                      </td>
+                      <td className="px-3 py-2.5">
+                        {app.recommendation ? (
+                          <span
+                            className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${
+                              REC_COLORS[app.recommendation] ?? 'bg-gray-100 text-gray-600'
+                            }`}
+                          >
+                            {app.recommendation}
+                          </span>
+                        ) : (
+                          '—'
+                        )}
+                      </td>
+                      <td className="px-3 py-2.5">
                         <span
                           className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${
-                            REC_COLORS[app.recommendation] ?? 'bg-gray-100 text-gray-600'
+                            STATUS_COLORS[app.athlete.negotiationStatus as NegotiationStatus] ?? ''
                           }`}
                         >
-                          {app.recommendation}
+                          {t(`status.${app.athlete.negotiationStatus}`)}
                         </span>
-                      ) : (
-                        '—'
-                      )}
-                    </td>
-                    <td className="px-3 py-2.5">
-                      <span
-                        className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${
-                          STATUS_COLORS[app.athlete.negotiationStatus as NegotiationStatus] ?? ''
-                        }`}
-                      >
-                        {t(`status.${app.athlete.negotiationStatus}`)}
-                      </span>
-                    </td>
-                    <td className="px-3 py-2.5">
-                      <span
-                        className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${
-                          STATUS_COLORS[app.status as NegotiationStatus] ?? ''
-                        }`}
-                      >
-                        {t(`status.${app.status}`)}
-                      </span>
-                    </td>
-                    <td className="px-3 py-2.5 font-mono text-xs">
-                      {app.estTotal > 0
-                        ? `CHF ${app.estTotal.toLocaleString()}`
-                        : '—'}
-                    </td>
-                  </tr>
-                ))}
+                      </td>
+                      <td className="px-3 py-2.5">
+                        <span
+                          className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${
+                            app.participationStatus === 'selected'
+                              ? 'bg-green-100 text-green-800'
+                              : app.participationStatus === 'not_selected'
+                              ? 'bg-red-100 text-red-800'
+                              : 'bg-yellow-100 text-yellow-800'
+                          }`}
+                        >
+                          {app.participationStatus}
+                        </span>
+                      </td>
+                      <td className="px-3 py-2.5 font-mono text-xs">
+                        {app.athlete.estTotal > 0
+                          ? `CHF ${app.athlete.estTotal.toLocaleString()}`
+                          : '—'}
+                      </td>
+                    </tr>
+                  )
+                })}
               </tbody>
             </table>
           </div>

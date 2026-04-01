@@ -1,0 +1,134 @@
+import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { api } from '@web/lib/api'
+import type { EventCatalog } from '@shared/types'
+
+export default function EventCatalogPage() {
+  const { t } = useTranslation()
+  const queryClient = useQueryClient()
+
+  const { data: items = [], isLoading } = useQuery<EventCatalog[]>({
+    queryKey: ['event-catalog'],
+    queryFn: () => api.get('/api/v1/event-catalog'),
+  })
+
+  const [name, setName] = useState('')
+  const [discipline, setDiscipline] = useState<'Course' | 'Concours'>('Course')
+  const [gender, setGender] = useState<'M' | 'F'>('M')
+
+  const addMutation = useMutation({
+    mutationFn: (data: { name: string; discipline: string; gender: string }) =>
+      api.post('/api/v1/event-catalog', data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['event-catalog'] })
+      setName('')
+    },
+  })
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => api.delete(`/api/v1/event-catalog/${id}`),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['event-catalog'] }),
+  })
+
+  const handleAdd = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!name.trim()) return
+    addMutation.mutate({ name: name.trim(), discipline, gender })
+  }
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 text-gray-400 text-sm">
+        {t('common.loading')}
+      </div>
+    )
+  }
+
+  return (
+    <div className="max-w-3xl mx-auto py-8 px-6">
+      <h1 className="text-lg font-bold mb-6">{t('admin.eventCatalog')}</h1>
+
+      {/* Add form */}
+      <form onSubmit={handleAdd} className="bg-white rounded-lg border p-4 mb-6 flex items-end gap-3">
+        <div className="flex-1">
+          <label className="block text-xs text-gray-500 mb-1">{t('admin.eventName')}</label>
+          <input
+            type="text"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-gray-900"
+            placeholder="100m"
+          />
+        </div>
+        <div>
+          <label className="block text-xs text-gray-500 mb-1">{t('admin.discipline')}</label>
+          <select
+            value={discipline}
+            onChange={(e) => setDiscipline(e.target.value as 'Course' | 'Concours')}
+            className="px-2 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-gray-900"
+          >
+            <option value="Course">Course</option>
+            <option value="Concours">Concours</option>
+          </select>
+        </div>
+        <div>
+          <label className="block text-xs text-gray-500 mb-1">{t('athlete.gender')}</label>
+          <select
+            value={gender}
+            onChange={(e) => setGender(e.target.value as 'M' | 'F')}
+            className="px-2 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-gray-900"
+          >
+            <option value="M">{t('athlete.male')}</option>
+            <option value="F">{t('athlete.female')}</option>
+          </select>
+        </div>
+        <button
+          type="submit"
+          disabled={addMutation.isPending}
+          className="bg-gray-900 text-white text-sm font-medium px-4 py-1.5 rounded hover:bg-gray-800 disabled:opacity-50"
+        >
+          {t('common.add')}
+        </button>
+      </form>
+
+      {/* Table */}
+      <div className="bg-white rounded-lg border">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b bg-gray-50 text-xs text-gray-500">
+              <th className="px-3 py-2 text-left font-medium">{t('admin.eventName')}</th>
+              <th className="px-3 py-2 text-left font-medium">{t('admin.discipline')}</th>
+              <th className="px-3 py-2 text-left font-medium">{t('athlete.gender')}</th>
+              <th className="px-3 py-2 text-right font-medium">{t('common.actions')}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {items.map((item) => (
+              <tr key={item.id} className="border-b hover:bg-gray-50">
+                <td className="px-3 py-2">{item.name}</td>
+                <td className="px-3 py-2">{item.discipline}</td>
+                <td className="px-3 py-2">{item.gender}</td>
+                <td className="px-3 py-2 text-right">
+                  <button
+                    onClick={() => deleteMutation.mutate(item.id)}
+                    className="text-xs text-red-600 hover:text-red-800"
+                  >
+                    {t('common.delete')}
+                  </button>
+                </td>
+              </tr>
+            ))}
+            {items.length === 0 && (
+              <tr>
+                <td colSpan={4} className="px-3 py-4 text-center text-gray-400 text-xs">
+                  {t('common.none')}
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
+}

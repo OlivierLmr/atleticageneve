@@ -7,36 +7,55 @@ import { useAuth } from '@web/lib/auth'
 import { LanguageSwitcher } from '@web/App'
 import { NEGOTIATION_TRANSITIONS, NIGHT_LABELS, DINNER_LABELS } from '@shared/constants'
 import type {
-  ApplicationWithDetails,
   NegotiationStatus,
-  ContractOffer,
+  Agreement,
   Interaction,
   Hotel,
+  HotelRoom,
+  Event,
+  EventCatalog,
+  Athlete,
+  Application,
+  WaPerformance,
 } from '@shared/types'
+
+// The application detail API returns event with nested catalog
+interface ApplicationDetail extends Application {
+  athlete: Athlete
+  event: Event & { catalog: EventCatalog }
+  agreements: Agreement[]
+  interactions: Interaction[]
+  waPerformance?: WaPerformance | null
+}
+
+// Hotels API returns hotels with rooms sub-items
+interface HotelWithRooms extends Hotel {
+  rooms: HotelRoom[]
+}
 
 // ── Status badge ─────────────────────────────────────────────────────────────
 
 const STATUS_COLORS: Record<NegotiationStatus, string> = {
   to_review: 'bg-yellow-100 text-yellow-800',
-  contract_sent: 'bg-blue-100 text-blue-800',
-  counter_offer: 'bg-purple-100 text-purple-800',
-  accepted: 'bg-green-100 text-green-800',
+  agreement_sent: 'bg-blue-100 text-blue-800',
+  counter_offer_sent: 'bg-purple-100 text-purple-800',
+  confirmed: 'bg-green-100 text-green-800',
   rejected: 'bg-red-100 text-red-800',
   withdrawn: 'bg-gray-100 text-gray-500',
 }
 
-// ── Contract editor defaults ─────────────────────────────────────────────────
+// ── Agreement editor defaults ────────────────────────────────────────────────
 
-function defaultContract(existing?: ContractOffer) {
+function defaultAgreement(existing?: Agreement) {
   if (existing) {
     return {
-      bonus: existing.bonus,
+      appearanceFee: existing.appearanceFee,
       otherCompensation: existing.otherCompensation,
       otherCompensationDesc: existing.otherCompensationDesc ?? '',
       transport: existing.transport,
       transportAirportHotel: existing.transportAirportHotel,
       transportHotelStadium: existing.transportHotelStadium,
-      hotelId: existing.hotelId ?? '',
+      hotelRoomId: existing.hotelRoomId ?? '',
       hotelNightTue: existing.hotelNightTue,
       hotelNightWed: existing.hotelNightWed,
       hotelNightThu: existing.hotelNightThu,
@@ -54,13 +73,13 @@ function defaultContract(existing?: ContractOffer) {
     }
   }
   return {
-    bonus: 0,
+    appearanceFee: 0,
     otherCompensation: 0,
     otherCompensationDesc: '',
     transport: 0,
     transportAirportHotel: true,
     transportHotelStadium: true,
-    hotelId: '',
+    hotelRoomId: '',
     hotelNightTue: false,
     hotelNightWed: false,
     hotelNightThu: true,
@@ -86,23 +105,26 @@ export default function AthletePage() {
   const { user, logout } = useAuth()
   const queryClient = useQueryClient()
 
-  const { data: app, isLoading } = useQuery<ApplicationWithDetails>({
+  const { data: app, isLoading } = useQuery<ApplicationDetail>({
     queryKey: ['application', id],
     queryFn: () => api.get(`/api/v1/applications/${id}`),
     enabled: !!id,
   })
 
-  const { data: hotels = [] } = useQuery<Hotel[]>({
+  const { data: hotels = [] } = useQuery<HotelWithRooms[]>({
     queryKey: ['hotels'],
     queryFn: () => api.get('/api/v1/hotels'),
   })
 
-  // Contract form state
-  const latestContract = app?.contracts?.length
-    ? app.contracts[app.contracts.length - 1]
+  // Flatten hotel rooms for the dropdown
+  const allRooms = hotels.flatMap(h => h.rooms.map(r => ({ ...r, hotelName: h.name })))
+
+  // Agreement form state
+  const latestAgreement = app?.agreements?.length
+    ? app.agreements[app.agreements.length - 1]
     : undefined
-  const [contract, setContract] = useState(() => defaultContract(latestContract))
-  const [showContractForm, setShowContractForm] = useState(false)
+  const [agreement, setAgreement] = useState(() => defaultAgreement(latestAgreement))
+  const [showAgreementForm, setShowAgreementForm] = useState(false)
 
   // Confirmation dialog
   const [confirmAction, setConfirmAction] = useState<NegotiationStatus | null>(null)
@@ -111,15 +133,15 @@ export default function AthletePage() {
   const [noteType, setNoteType] = useState<'note' | 'call' | 'email'>('note')
   const [noteContent, setNoteContent] = useState('')
 
-  // Internal notes
+  // Internal notes (on athlete)
   const [internalNotes, setInternalNotes] = useState('')
   const [notesInitialized, setNotesInitialized] = useState(false)
 
   // Initialize from fetched data
   if (app && !notesInitialized) {
-    setInternalNotes(app.internalNotes ?? '')
-    if (latestContract) {
-      setContract(defaultContract(latestContract))
+    setInternalNotes(app.athlete.internalNotes ?? '')
+    if (latestAgreement) {
+      setAgreement(defaultAgreement(latestAgreement))
     }
     setNotesInitialized(true)
   }
@@ -128,19 +150,19 @@ export default function AthletePage() {
 
   const statusMutation = useMutation({
     mutationFn: (status: NegotiationStatus) =>
-      api.patch(`/api/v1/applications/${id}/status`, { status }),
+      api.patch(`/api/v1/athletes/${app?.athleteId}/negotiation-status`, { status }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['application', id] }),
   })
 
-  const contractMutation = useMutation({
-    mutationFn: (data: ReturnType<typeof defaultContract>) =>
-      api.post(`/api/v1/athletes/${app?.athleteId}/contracts`, {
+  const agreementMutation = useMutation({
+    mutationFn: (data: ReturnType<typeof defaultAgreement>) =>
+      api.post(`/api/v1/athletes/${app?.athleteId}/agreements`, {
         ...data,
-        hotelId: data.hotelId || undefined,
+        hotelRoomId: data.hotelRoomId || undefined,
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['application', id] })
-      setShowContractForm(false)
+      setShowAgreementForm(false)
     },
   })
 
@@ -155,7 +177,7 @@ export default function AthletePage() {
 
   const internalNotesMutation = useMutation({
     mutationFn: (notes: string) =>
-      api.patch(`/api/v1/applications/${id}`, { internalNotes: notes }),
+      api.patch(`/api/v1/athletes/${app?.athleteId}`, { internalNotes: notes }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['application', id] }),
   })
 
@@ -174,7 +196,7 @@ export default function AthletePage() {
     )
   }
 
-  const currentStatus = (app.athlete.negotiationStatus ?? app.status) as NegotiationStatus
+  const currentStatus = app.athlete.negotiationStatus as NegotiationStatus
   const allowedTransitions = NEGOTIATION_TRANSITIONS[currentStatus] ?? []
 
   const inputCls =
@@ -228,7 +250,7 @@ export default function AthletePage() {
             <div className="bg-white rounded-lg border p-4">
               <h3 className="font-semibold text-sm mb-3">{t('common.details')}</h3>
               <div className="space-y-2 text-sm">
-                <Row label={t('athlete.event')} value={app.event.name} />
+                <Row label={t('athlete.event')} value={app.event.catalog.name} />
                 <Row label={t('athlete.nationality')} value={
                   <span className={app.athlete.isSwiss ? 'text-red-600 font-semibold' : app.athlete.isEap ? 'text-blue-600 font-semibold' : ''}>
                     {app.athlete.nationality}
@@ -306,7 +328,7 @@ export default function AthletePage() {
                 )}
               </div>
               <div className="text-xs text-gray-400">
-                {t('selection.estimatedCost')}: CHF {(app.estTotal ?? 0).toLocaleString()}
+                {t('selection.estimatedCost')}: CHF {(app.athlete.estTotal ?? 0).toLocaleString()}
               </div>
             </div>
 
@@ -323,7 +345,7 @@ export default function AthletePage() {
               </div>
             </div>
 
-            {/* Internal notes */}
+            {/* Internal notes (on athlete) */}
             <div className="bg-white rounded-lg border p-4">
               <h3 className="font-semibold text-sm mb-2">{t('common.notes')} (internal)</h3>
               <textarea
@@ -342,20 +364,20 @@ export default function AthletePage() {
             </div>
           </div>
 
-          {/* ── Center column: Contract ──────────────────────────────────── */}
+          {/* ── Center column: Agreement ──────────────────────────────────── */}
           <div className="space-y-4">
             {/* Status actions */}
             <div className="bg-white rounded-lg border p-4">
               <h3 className="font-semibold text-sm mb-3">{t('common.actions')}</h3>
               <div className="flex flex-wrap gap-2">
                 {allowedTransitions.map((status) => {
-                  const needsConfirm = ['accepted', 'rejected', 'withdrawn'].includes(status)
+                  const needsConfirm = ['confirmed', 'rejected', 'withdrawn'].includes(status)
                   return (
                     <button
                       key={status}
                       onClick={() => {
-                        if (status === 'contract_sent') {
-                          setShowContractForm(true)
+                        if (status === 'agreement_sent') {
+                          setShowAgreementForm(true)
                         } else if (needsConfirm) {
                           setConfirmAction(status as NegotiationStatus)
                         } else {
@@ -364,13 +386,13 @@ export default function AthletePage() {
                       }}
                       disabled={statusMutation.isPending}
                       className={`text-xs px-3 py-1.5 rounded font-medium border ${
-                        status === 'accepted'
+                        status === 'confirmed'
                           ? 'bg-green-600 text-white border-green-600 hover:bg-green-700'
                           : status === 'rejected'
                           ? 'bg-red-50 text-red-600 border-red-200 hover:bg-red-100'
                           : status === 'withdrawn'
                           ? 'bg-gray-50 text-gray-500 border-gray-200 hover:bg-gray-100'
-                          : status === 'contract_sent'
+                          : status === 'agreement_sent'
                           ? 'bg-blue-600 text-white border-blue-600 hover:bg-blue-700'
                           : 'bg-gray-100 text-gray-700 border-gray-200 hover:bg-gray-200'
                       }`}
@@ -403,7 +425,7 @@ export default function AthletePage() {
                         setConfirmAction(null)
                       }}
                       className={`text-xs px-3 py-1.5 rounded font-medium ${
-                        confirmAction === 'accepted'
+                        confirmAction === 'confirmed'
                           ? 'bg-green-600 text-white hover:bg-green-700'
                           : confirmAction === 'rejected'
                           ? 'bg-red-600 text-white hover:bg-red-700'
@@ -423,36 +445,36 @@ export default function AthletePage() {
               )}
             </div>
 
-            {/* Contract history */}
+            {/* Agreement history */}
             <div className="bg-white rounded-lg border p-4">
               <div className="flex items-center justify-between mb-3">
                 <h3 className="font-semibold text-sm">{t('contract.title')}</h3>
-                {!showContractForm && currentStatus !== 'accepted' && currentStatus !== 'rejected' && currentStatus !== 'withdrawn' && (
+                {!showAgreementForm && currentStatus !== 'confirmed' && currentStatus !== 'rejected' && currentStatus !== 'withdrawn' && (
                   <button
-                    onClick={() => setShowContractForm(true)}
+                    onClick={() => setShowAgreementForm(true)}
                     className="text-xs text-blue-600 hover:text-blue-800"
                   >
-                    {latestContract ? 'New version' : t('contract.sendOffer')}
+                    {latestAgreement ? 'New version' : t('contract.sendOffer')}
                   </button>
                 )}
               </div>
 
-              {app.contracts.length === 0 && !showContractForm ? (
+              {app.agreements.length === 0 && !showAgreementForm ? (
                 <p className="text-xs text-gray-400">{t('contract.noOfferYet')}</p>
               ) : (
                 <div className="space-y-3">
-                  {app.contracts.map((c) => (
-                    <ContractCard key={c.id} contract={c} t={t} />
+                  {app.agreements.map((c) => (
+                    <AgreementCard key={c.id} agreement={c} t={t} />
                   ))}
                 </div>
               )}
             </div>
 
-            {/* Contract form */}
-            {showContractForm && (
+            {/* Agreement form */}
+            {showAgreementForm && (
               <div className="bg-white rounded-lg border p-4">
                 <h3 className="font-semibold text-sm mb-3">
-                  {t('contract.sendOffer')} — v{(app.contracts.length || 0) + 1}
+                  {t('contract.sendOffer')} — v{(app.agreements.length || 0) + 1}
                 </h3>
 
                 <div className="space-y-3">
@@ -461,9 +483,9 @@ export default function AthletePage() {
                     <input
                       type="number"
                       className={inputCls}
-                      value={contract.bonus}
+                      value={agreement.appearanceFee}
                       onChange={(e) =>
-                        setContract((p) => ({ ...p, bonus: parseInt(e.target.value) || 0 }))
+                        setAgreement((p) => ({ ...p, appearanceFee: parseInt(e.target.value) || 0 }))
                       }
                     />
                   </div>
@@ -473,9 +495,9 @@ export default function AthletePage() {
                       <input
                         type="number"
                         className={inputCls}
-                        value={contract.otherCompensation}
+                        value={agreement.otherCompensation}
                         onChange={(e) =>
-                          setContract((p) => ({
+                          setAgreement((p) => ({
                             ...p,
                             otherCompensation: parseInt(e.target.value) || 0,
                           }))
@@ -486,9 +508,9 @@ export default function AthletePage() {
                       <label className={labelCls}>Description</label>
                       <input
                         className={inputCls}
-                        value={contract.otherCompensationDesc}
+                        value={agreement.otherCompensationDesc}
                         onChange={(e) =>
-                          setContract((p) => ({ ...p, otherCompensationDesc: e.target.value }))
+                          setAgreement((p) => ({ ...p, otherCompensationDesc: e.target.value }))
                         }
                         placeholder="e.g. pacemaker fee"
                       />
@@ -499,9 +521,9 @@ export default function AthletePage() {
                     <input
                       type="number"
                       className={inputCls}
-                      value={contract.transport}
+                      value={agreement.transport}
                       onChange={(e) =>
-                        setContract((p) => ({ ...p, transport: parseInt(e.target.value) || 0 }))
+                        setAgreement((p) => ({ ...p, transport: parseInt(e.target.value) || 0 }))
                       }
                     />
                   </div>
@@ -509,9 +531,9 @@ export default function AthletePage() {
                     <label className="flex items-center gap-2 text-sm cursor-pointer">
                       <input
                         type="checkbox"
-                        checked={contract.transportAirportHotel}
+                        checked={agreement.transportAirportHotel}
                         onChange={(e) =>
-                          setContract((p) => ({ ...p, transportAirportHotel: e.target.checked }))
+                          setAgreement((p) => ({ ...p, transportAirportHotel: e.target.checked }))
                         }
                       />
                       Airport &rarr; Hotel
@@ -519,26 +541,26 @@ export default function AthletePage() {
                     <label className="flex items-center gap-2 text-sm cursor-pointer">
                       <input
                         type="checkbox"
-                        checked={contract.transportHotelStadium}
+                        checked={agreement.transportHotelStadium}
                         onChange={(e) =>
-                          setContract((p) => ({ ...p, transportHotelStadium: e.target.checked }))
+                          setAgreement((p) => ({ ...p, transportHotelStadium: e.target.checked }))
                         }
                       />
                       Hotel &rarr; Stadium
                     </label>
                   </div>
 
-                  {/* Hotel */}
+                  {/* Hotel room */}
                   <div>
-                    <label className={labelCls}>{t('logistics.hotel')}</label>
+                    <label className={labelCls}>{t('logistics.hotel')} Room</label>
                     <select
                       className={inputCls}
-                      value={contract.hotelId}
-                      onChange={(e) => setContract((p) => ({ ...p, hotelId: e.target.value }))}
+                      value={agreement.hotelRoomId}
+                      onChange={(e) => setAgreement((p) => ({ ...p, hotelRoomId: e.target.value }))}
                     >
-                      <option value="">— No hotel —</option>
-                      {hotels.map(h => (
-                        <option key={h.id} value={h.id}>{h.name} (CHF {h.costPerNight}/night)</option>
+                      <option value="">— No hotel room —</option>
+                      {allRooms.map(r => (
+                        <option key={r.id} value={r.id}>{r.hotelName} — {r.roomType} (CHF {r.costPerNight}/night)</option>
                       ))}
                     </select>
                   </div>
@@ -548,20 +570,20 @@ export default function AthletePage() {
                     <label className={labelCls}>{t('contract.hotelNights')}</label>
                     <div className="flex gap-2">
                       {NIGHT_LABELS.map((night) => {
-                        const key = `hotelNight${night.charAt(0).toUpperCase() + night.slice(1)}` as keyof typeof contract
+                        const key = `hotelNight${night.charAt(0).toUpperCase() + night.slice(1)}` as keyof typeof agreement
                         return (
                           <label
                             key={night}
                             className={`flex flex-col items-center text-xs cursor-pointer px-2 py-1 rounded border ${
-                              contract[key] ? 'bg-gray-900 text-white border-gray-900' : 'border-gray-300'
+                              agreement[key] ? 'bg-gray-900 text-white border-gray-900' : 'border-gray-300'
                             }`}
                           >
                             <input
                               type="checkbox"
                               className="sr-only"
-                              checked={contract[key] as boolean}
+                              checked={agreement[key] as boolean}
                               onChange={(e) =>
-                                setContract((p) => ({ ...p, [key]: e.target.checked }))
+                                setAgreement((p) => ({ ...p, [key]: e.target.checked }))
                               }
                             />
                             {t(`night.${night}`)}
@@ -576,20 +598,20 @@ export default function AthletePage() {
                     <label className={labelCls}>Dinners</label>
                     <div className="flex gap-2">
                       {DINNER_LABELS.map((day) => {
-                        const key = `dinner${day.charAt(0).toUpperCase() + day.slice(1)}` as keyof typeof contract
+                        const key = `dinner${day.charAt(0).toUpperCase() + day.slice(1)}` as keyof typeof agreement
                         return (
                           <label
                             key={day}
                             className={`flex flex-col items-center text-xs cursor-pointer px-2 py-1 rounded border ${
-                              contract[key] ? 'bg-gray-900 text-white border-gray-900' : 'border-gray-300'
+                              agreement[key] ? 'bg-gray-900 text-white border-gray-900' : 'border-gray-300'
                             }`}
                           >
                             <input
                               type="checkbox"
                               className="sr-only"
-                              checked={contract[key] as boolean}
+                              checked={agreement[key] as boolean}
                               onChange={(e) =>
-                                setContract((p) => ({ ...p, [key]: e.target.checked }))
+                                setAgreement((p) => ({ ...p, [key]: e.target.checked }))
                               }
                             />
                             {t(`night.${day}`)}
@@ -603,9 +625,9 @@ export default function AthletePage() {
                   <label className="flex items-center gap-2 text-sm cursor-pointer">
                     <input
                       type="checkbox"
-                      checked={contract.stadiumMeals}
+                      checked={agreement.stadiumMeals}
                       onChange={(e) =>
-                        setContract((p) => ({ ...p, stadiumMeals: e.target.checked }))
+                        setAgreement((p) => ({ ...p, stadiumMeals: e.target.checked }))
                       }
                     />
                     Stadium meals
@@ -616,29 +638,29 @@ export default function AthletePage() {
                     <textarea
                       className={inputCls}
                       rows={2}
-                      value={contract.notes}
-                      onChange={(e) => setContract((p) => ({ ...p, notes: e.target.value }))}
+                      value={agreement.notes}
+                      onChange={(e) => setAgreement((p) => ({ ...p, notes: e.target.value }))}
                     />
                   </div>
 
                   <div className="flex gap-2">
                     <button
-                      onClick={() => contractMutation.mutate(contract)}
-                      disabled={contractMutation.isPending}
+                      onClick={() => agreementMutation.mutate(agreement)}
+                      disabled={agreementMutation.isPending}
                       className="flex-1 py-2 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
                     >
-                      {contractMutation.isPending
+                      {agreementMutation.isPending
                         ? t('common.loading')
                         : t('contract.sendOffer')}
                     </button>
                     <button
-                      onClick={() => setShowContractForm(false)}
+                      onClick={() => setShowAgreementForm(false)}
                       className="px-4 py-2 text-sm border rounded hover:bg-gray-50"
                     >
                       {t('common.cancel')}
                     </button>
                   </div>
-                  {contractMutation.isError && (
+                  {agreementMutation.isError && (
                     <p className="text-xs text-red-600">{t('common.error')}</p>
                   )}
                 </div>
@@ -725,7 +747,7 @@ function ComplianceBadge({ status }: { status: string }) {
   )
 }
 
-function ContractCard({ contract: c, t }: { contract: ContractOffer; t: (key: string) => string }) {
+function AgreementCard({ agreement: c, t }: { agreement: Agreement; t: (key: string) => string }) {
   const nights = [
     c.hotelNightTue, c.hotelNightWed, c.hotelNightThu,
     c.hotelNightFri, c.hotelNightSat, c.hotelNightSun,
@@ -747,7 +769,7 @@ function ContractCard({ contract: c, t }: { contract: ContractOffer; t: (key: st
         <span className="text-gray-500">{new Date(c.sentAt).toLocaleDateString()}</span>
       </div>
       <div className="grid grid-cols-2 gap-1 text-gray-600">
-        <span>{t('contract.bonus')}: CHF {c.bonus}</span>
+        <span>{t('contract.bonus')}: CHF {c.appearanceFee}</span>
         <span>{t('contract.transport')}: CHF {c.transport}</span>
         <span>{t('contract.hotelNights')}: {nights}</span>
         <span>Dinners: {dinners}</span>
@@ -763,7 +785,7 @@ function ContractCard({ contract: c, t }: { contract: ContractOffer; t: (key: st
 function InteractionCard({ interaction }: { interaction: Interaction }) {
   const typeIcons: Record<string, string> = {
     status_change: '\u25CF',
-    contract: '\u25A0',
+    agreement: '\u25A0',
     counter_offer: '\u25C6',
     note: '\u270E',
     call: '\u260E',
@@ -772,7 +794,7 @@ function InteractionCard({ interaction }: { interaction: Interaction }) {
 
   const typeColors: Record<string, string> = {
     status_change: 'text-blue-500',
-    contract: 'text-green-500',
+    agreement: 'text-green-500',
     counter_offer: 'text-purple-500',
     note: 'text-gray-500',
     call: 'text-orange-500',

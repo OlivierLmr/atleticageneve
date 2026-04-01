@@ -7,6 +7,14 @@ import { useAuth } from '@web/lib/auth'
 import { LanguageSwitcher } from '@web/App'
 import type { Event } from '@shared/types'
 
+// Events API returns Event joined with catalog data
+interface EventWithCatalog extends Event {
+  name: string
+  discipline: string
+  gender: string
+  perfType: string
+}
+
 interface AthleteRow {
   key: string
   lastName: string
@@ -36,7 +44,7 @@ export default function ManagerRegisterPage() {
   const [registeredCount, setRegisteredCount] = useState(0)
   const [expandedRow, setExpandedRow] = useState<string | null>(null)
 
-  const { data: events = [] } = useQuery<Event[]>({
+  const { data: events = [] } = useQuery<EventWithCatalog[]>({
     queryKey: ['events'],
     queryFn: () => api.get('/api/v1/events'),
   })

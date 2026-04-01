@@ -5,12 +5,17 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from '@web/lib/api'
 import { useAuth } from '@web/lib/auth'
 import { LanguageSwitcher } from '@web/App'
-import type { Application, Athlete, Event, ContractOffer, NegotiationStatus } from '@shared/types'
+import type { Application, Athlete, Event, Agreement, NegotiationStatus } from '@shared/types'
+
+interface PortalEvent extends Event {
+  name: string
+  discipline: string
+  gender: string
+}
 
 interface ManagerAthlete extends Athlete {
-  applications: (Application & { event: Event | null })[]
-  contracts: ContractOffer[]
-  latestContract: ContractOffer | null
+  applications: (Application & { event: PortalEvent | null })[]
+  agreements: Agreement[]
 }
 
 interface ManagerPortalData {
@@ -21,14 +26,15 @@ interface ManagerPortalData {
     inNegotiation: number
     confirmed: number
     rejected: number
+    withdrawn: number
   }
 }
 
 const STATUS_COLORS: Record<NegotiationStatus, string> = {
   to_review: 'bg-yellow-100 text-yellow-800',
-  contract_sent: 'bg-blue-100 text-blue-800',
-  counter_offer: 'bg-purple-100 text-purple-800',
-  accepted: 'bg-green-100 text-green-800',
+  agreement_sent: 'bg-blue-100 text-blue-800',
+  counter_offer_sent: 'bg-purple-100 text-purple-800',
+  confirmed: 'bg-green-100 text-green-800',
   rejected: 'bg-red-100 text-red-800',
   withdrawn: 'bg-gray-100 text-gray-500',
 }
@@ -51,7 +57,7 @@ export default function ManagerPortalPage() {
   })
 
   const athletes = data?.athletes ?? []
-  const kpi = data?.kpi ?? { total: 0, toReview: 0, inNegotiation: 0, confirmed: 0, rejected: 0 }
+  const kpi = data?.kpi ?? { total: 0, toReview: 0, inNegotiation: 0, confirmed: 0, rejected: 0, withdrawn: 0 }
 
   const filtered = statusFilter
     ? athletes.filter((a) => a.negotiationStatus === statusFilter)
@@ -117,7 +123,7 @@ export default function ManagerPortalPage() {
         <div className="flex items-center gap-3 mb-4">
           <select className={selectCls} value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
             <option value="">{t('common.all')} statuses</option>
-            {(['to_review', 'contract_sent', 'counter_offer', 'accepted', 'rejected', 'withdrawn'] as NegotiationStatus[]).map((s) => (
+            {(['to_review', 'agreement_sent', 'counter_offer_sent', 'confirmed', 'rejected', 'withdrawn'] as NegotiationStatus[]).map((s) => (
               <option key={s} value={s}>{t(`status.${s}`)}</option>
             ))}
           </select>
@@ -163,7 +169,7 @@ export default function ManagerPortalPage() {
                     </td>
                     <td className="px-3 py-2.5">
                       <div className="flex gap-1">
-                        {ath.negotiationStatus === 'contract_sent' && (
+                        {ath.negotiationStatus === 'agreement_sent' && (
                           <>
                             <button
                               onClick={() => respondMutation.mutate({ athleteId: ath.id, action: 'accept' })}
@@ -181,7 +187,7 @@ export default function ManagerPortalPage() {
                             </button>
                           </>
                         )}
-                        {['to_review', 'contract_sent', 'counter_offer', 'accepted'].includes(ath.negotiationStatus) && (
+                        {['agreement_sent', 'counter_offer_sent', 'confirmed'].includes(ath.negotiationStatus) && (
                           <button
                             onClick={() => {
                               if (confirm(`Withdraw ${ath.firstName} ${ath.lastName}?`)) {
