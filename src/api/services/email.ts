@@ -59,17 +59,17 @@ export function sendStatusChangeEmail(
   const statusLabels: Record<string, Record<string, string>> = {
     en: {
       to_review: 'Under review',
-      contract_sent: 'Offer sent',
-      counter_offer: 'Counter-offer received',
-      accepted: 'Confirmed',
+      agreement_sent: 'Agreement sent',
+      counter_offer_sent: 'Counter-offer received',
+      confirmed: 'Confirmed',
       rejected: 'Not selected',
       withdrawn: 'Withdrawn',
     },
     fr: {
       to_review: "En cours d'examen",
-      contract_sent: 'Offre envoyée',
-      counter_offer: 'Contre-proposition reçue',
-      accepted: 'Confirmé',
+      agreement_sent: 'Accord envoyé',
+      counter_offer_sent: 'Contre-proposition reçue',
+      confirmed: 'Confirmé',
       rejected: 'Non retenu',
       withdrawn: 'Retiré',
     },

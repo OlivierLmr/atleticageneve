@@ -1,9 +1,7 @@
 import { Hono } from 'hono'
-import { eq, or, desc } from 'drizzle-orm'
+import { eq, or, desc, max } from 'drizzle-orm'
 import * as schema from '../db/schema'
-import { contractOfferSchema } from '@shared/validation'
-import { NEGOTIATION_TRANSITIONS } from '@shared/constants'
-import { calculateTotalCost } from './contracts'
+import { agreementSchema } from '@shared/validation'
 import { requireAuth } from '../middleware/auth'
 import { sendEmail } from '../services/email'
 import type { Env } from '../index'
@@ -30,56 +28,66 @@ portal.get('/athlete', requireAuth('athlete', 'manager'), async (c) => {
 
   const results = []
   for (const ath of athletes) {
+    // Applications with event + catalog details
     const appRows = await db
-      .select()
+      .select({
+        application: schema.application,
+        event: schema.event,
+        catalog: schema.eventCatalog,
+      })
       .from(schema.application)
+      .innerJoin(schema.event, eq(schema.application.eventId, schema.event.id))
+      .innerJoin(schema.eventCatalog, eq(schema.event.catalogId, schema.eventCatalog.id))
       .where(eq(schema.application.athleteId, ath.id))
 
-    const applications = []
-    for (const app of appRows) {
-      const eventRows = await db
-        .select()
-        .from(schema.event)
-        .where(eq(schema.event.id, app.eventId))
-        .limit(1)
-
-      applications.push({
-        ...app,
-        event: eventRows[0] ?? null,
-      })
-    }
-
-    // Contracts at athlete level
-    const contracts = await db
-      .select()
-      .from(schema.contractOffer)
-      .where(eq(schema.contractOffer.athleteId, ath.id))
-      .orderBy(schema.contractOffer.version)
-
-    // Strip cost info from contracts for athletes/managers
-    const sanitizedContracts = contracts.map(co => ({
-      ...co,
-      totalCost: undefined, // hidden from athlete/manager
+    const applications = appRows.map(r => ({
+      ...r.application,
+      event: {
+        ...r.event,
+        name: r.catalog.name,
+        discipline: r.catalog.discipline,
+        gender: r.catalog.gender,
+      },
     }))
+
+    // Agreements at athlete level (from agreement table)
+    const agreements = await db
+      .select()
+      .from(schema.agreement)
+      .where(eq(schema.agreement.athleteId, ath.id))
+      .orderBy(schema.agreement.version)
+
+    // Strip totalCost from athlete/manager view
+    const sanitizedAgreements = agreements.map(a => ({
+      ...a,
+      totalCost: undefined,
+    }))
+
+    // Interactions
+    const interactions = await db
+      .select()
+      .from(schema.interaction)
+      .where(eq(schema.interaction.athleteId, ath.id))
+      .orderBy(desc(schema.interaction.createdAt))
 
     results.push({
       ...ath,
       applications,
-      contracts: sanitizedContracts,
-      latestContract: sanitizedContracts.length > 0 ? sanitizedContracts[sanitizedContracts.length - 1] : null,
+      agreements: sanitizedAgreements,
+      interactions,
     })
   }
 
   return c.json({ athletes: results })
 })
 
-// POST /portal/athlete/:athleteId/respond — accept, reject, or counter-offer
+// POST /portal/athlete/:athleteId/respond — accept, reject, withdraw, or counter-offer
 portal.post('/athlete/:athleteId/respond', requireAuth('athlete', 'manager'), async (c) => {
   const db = c.get('db')
   const user = c.get('user')!
   const athleteId = c.req.param('athleteId')!
   const body = await c.req.json()
-  const action = body.action as string // 'accept' | 'reject' | 'counter_offer' | 'withdraw'
+  const action = body.action as string
 
   // Get the athlete
   const athRows = await db
@@ -99,96 +107,160 @@ portal.post('/athlete/:athleteId/respond', requireAuth('athlete', 'manager'), as
   }
 
   const currentStatus = ath.negotiationStatus as NegotiationStatus
-
-  // Map action to target status
-  const actionMap: Record<string, NegotiationStatus> = {
-    accept: 'accepted',
-    reject: 'rejected',
-    withdraw: 'withdrawn',
-    counter_offer: 'counter_offer',
-  }
-
-  const targetStatus = actionMap[action]
-  if (!targetStatus) {
-    return c.json({ error: `Invalid action: ${action}` }, 400)
-  }
-
-  // Validate transition
-  const allowed = NEGOTIATION_TRANSITIONS[currentStatus]
-  if (!allowed?.includes(targetStatus)) {
-    return c.json({
-      error: `Cannot ${action} from "${currentStatus}" status`,
-      allowedTransitions: allowed,
-    }, 400)
-  }
-
   const now = new Date().toISOString()
 
-  // If counter-offer, create a contract offer from athlete
-  if (action === 'counter_offer') {
-    const parsed = contractOfferSchema.safeParse(body.offer)
+  // Action-specific logic
+  if (action === 'accept') {
+    if (currentStatus !== 'agreement_sent') {
+      return c.json({ error: 'Can only accept from agreement_sent status' }, 400)
+    }
+    await db
+      .update(schema.athlete)
+      .set({ negotiationStatus: 'confirmed', decidedAt: now, updatedAt: now })
+      .where(eq(schema.athlete.id, athleteId))
+
+    await db.insert(schema.interaction).values({
+      athleteId,
+      type: 'status_change',
+      content: `Agreement accepted by ${user.firstName} ${user.lastName}`,
+      authorId: user.id,
+      authorName: `${user.firstName} ${user.lastName}`,
+    })
+
+  } else if (action === 'reject') {
+    if (currentStatus !== 'agreement_sent') {
+      return c.json({ error: 'Can only reject from agreement_sent status' }, 400)
+    }
+    await db
+      .update(schema.athlete)
+      .set({ negotiationStatus: 'rejected', decidedAt: now, updatedAt: now })
+      .where(eq(schema.athlete.id, athleteId))
+
+    await db.insert(schema.interaction).values({
+      athleteId,
+      type: 'status_change',
+      content: `Agreement rejected by ${user.firstName} ${user.lastName}`,
+      authorId: user.id,
+      authorName: `${user.firstName} ${user.lastName}`,
+    })
+
+  } else if (action === 'withdraw') {
+    if (!['agreement_sent', 'counter_offer_sent', 'confirmed'].includes(currentStatus)) {
+      return c.json({ error: 'Can only withdraw from agreement_sent, counter_offer_sent, or confirmed status' }, 400)
+    }
+    await db
+      .update(schema.athlete)
+      .set({ negotiationStatus: 'withdrawn', decidedAt: now, updatedAt: now })
+      .where(eq(schema.athlete.id, athleteId))
+
+    await db.insert(schema.interaction).values({
+      athleteId,
+      type: 'status_change',
+      content: `Withdrawn by ${user.firstName} ${user.lastName}`,
+      authorId: user.id,
+      authorName: `${user.firstName} ${user.lastName}`,
+    })
+
+  } else if (action === 'counter_offer') {
+    if (currentStatus !== 'agreement_sent') {
+      return c.json({ error: 'Can only counter-offer from agreement_sent status' }, 400)
+    }
+
+    const parsed = agreementSchema.safeParse(body.offer)
     if (!parsed.success) {
       return c.json({ error: 'Invalid counter-offer data', details: parsed.error.flatten() }, 400)
     }
     const offer = parsed.data
 
-    // Get next version
-    const existing = await db
-      .select({ version: schema.contractOffer.version })
-      .from(schema.contractOffer)
-      .where(eq(schema.contractOffer.athleteId, athleteId))
-      .orderBy(desc(schema.contractOffer.version))
+    // Get the latest agreement (to_athlete direction) for constraint validation
+    const latestAgreements = await db
+      .select()
+      .from(schema.agreement)
+      .where(eq(schema.agreement.athleteId, athleteId))
+      .orderBy(desc(schema.agreement.version))
       .limit(1)
 
-    const nextVersion = existing.length > 0 ? existing[0].version + 1 : 1
+    if (latestAgreements.length > 0) {
+      const latest = latestAgreements[0]
 
-    // Get edition costs for total calculation
+      // Validate counter-offer constraints:
+      // dinners/stadiumMeals/transport booleans: can only keep or turn OFF (not turn ON)
+      const booleanFields = [
+        'transportAirportHotel', 'transportHotelStadium', 'stadiumMeals',
+        'dinnerTue', 'dinnerWed', 'dinnerThu', 'dinnerFri', 'dinnerSat', 'dinnerSun',
+      ] as const
+
+      for (const field of booleanFields) {
+        if (offer[field] === true && latest[field] === false) {
+          return c.json({ error: `Cannot turn ON ${field} in counter-offer — can only keep or turn off` }, 400)
+        }
+      }
+
+      // Hotel nights: can be turned ON (athlete can request more) — no restriction
+    }
+
+    // Get next version
+    const maxVersionResult = await db
+      .select({ maxVersion: max(schema.agreement.version) })
+      .from(schema.agreement)
+      .where(eq(schema.agreement.athleteId, athleteId))
+
+    const nextVersion = (maxVersionResult[0]?.maxVersion ?? 0) + 1
+
+    // Calculate totalCost
     const editions = await db.select().from(schema.edition).limit(1)
     const edition = editions[0]
 
     let hotelCostPerNight = 0
-    if (offer.hotelId) {
-      const hotels = await db.select().from(schema.hotel).where(eq(schema.hotel.id, offer.hotelId)).limit(1)
-      if (hotels.length > 0) hotelCostPerNight = hotels[0].costPerNight
+    let dinnerCost = 0
+    if (offer.hotelRoomId) {
+      const rooms = await db.select().from(schema.hotelRoom).where(eq(schema.hotelRoom.id, offer.hotelRoomId)).limit(1)
+      if (rooms.length > 0) {
+        hotelCostPerNight = rooms[0].costPerNight
+        dinnerCost = rooms[0].dinnerCost
+      }
     }
 
-    const totalCost = calculateTotalCost(offer, {
-      hotelCostPerNight,
-      dinnerCostPp: edition.dinnerCostPp,
-      stadiumMealCost: edition.stadiumMealCost,
-      transportAirportHotelCost: edition.transportAirportHotelCost,
-      transportHotelStadiumCost: edition.transportHotelStadiumCost,
-    })
+    // Count hotel nights
+    const nightFields = ['hotelNightTue', 'hotelNightWed', 'hotelNightThu', 'hotelNightFri', 'hotelNightSat', 'hotelNightSun'] as const
+    const nightCount = nightFields.filter(f => offer[f]).length
 
-    // Get first application for backward compat
-    const apps = await db.select().from(schema.application).where(eq(schema.application.athleteId, athleteId)).limit(1)
-    const appId = apps.length > 0 ? apps[0].id : athleteId
+    // Count dinners
+    const dinnerFields = ['dinnerTue', 'dinnerWed', 'dinnerThu', 'dinnerFri', 'dinnerSat', 'dinnerSun'] as const
+    const dinnerCount = dinnerFields.filter(f => offer[f]).length
 
-    await db.insert(schema.contractOffer).values({
-      applicationId: appId,
+    const hotelTotal = nightCount * hotelCostPerNight
+    const dinnerTotal = dinnerCount * dinnerCost
+    const stadiumMealTotal = offer.stadiumMeals ? (edition?.stadiumMealCost ?? 0) : 0
+    const transportAH = offer.transportAirportHotel ? (edition?.transportAirportHotelCost ?? 0) : 0
+    const transportHS = offer.transportHotelStadium ? (edition?.transportHotelStadiumCost ?? 0) : 0
+    const totalCost = (offer.appearanceFee ?? 0) + (offer.otherCompensation ?? 0) + (offer.transport ?? 0)
+      + hotelTotal + dinnerTotal + stadiumMealTotal + transportAH + transportHS
+
+    await db.insert(schema.agreement).values({
       athleteId,
       version: nextVersion,
       direction: 'to_organizer',
-      bonus: offer.bonus,
-      otherCompensation: offer.otherCompensation,
+      appearanceFee: offer.appearanceFee ?? 0,
+      otherCompensation: offer.otherCompensation ?? 0,
       otherCompensationDesc: offer.otherCompensationDesc ?? null,
-      transport: offer.transport,
-      transportAirportHotel: offer.transportAirportHotel,
-      transportHotelStadium: offer.transportHotelStadium,
-      hotelId: offer.hotelId ?? null,
-      hotelNightTue: offer.hotelNightTue,
-      hotelNightWed: offer.hotelNightWed,
-      hotelNightThu: offer.hotelNightThu,
-      hotelNightFri: offer.hotelNightFri,
-      hotelNightSat: offer.hotelNightSat,
-      hotelNightSun: offer.hotelNightSun,
-      dinnerTue: offer.dinnerTue,
-      dinnerWed: offer.dinnerWed,
-      dinnerThu: offer.dinnerThu,
-      dinnerFri: offer.dinnerFri,
-      dinnerSat: offer.dinnerSat,
-      dinnerSun: offer.dinnerSun,
-      stadiumMeals: offer.stadiumMeals,
+      transport: offer.transport ?? 0,
+      transportAirportHotel: offer.transportAirportHotel ?? false,
+      transportHotelStadium: offer.transportHotelStadium ?? false,
+      hotelRoomId: offer.hotelRoomId ?? null,
+      hotelNightTue: offer.hotelNightTue ?? false,
+      hotelNightWed: offer.hotelNightWed ?? false,
+      hotelNightThu: offer.hotelNightThu ?? false,
+      hotelNightFri: offer.hotelNightFri ?? false,
+      hotelNightSat: offer.hotelNightSat ?? false,
+      hotelNightSun: offer.hotelNightSun ?? false,
+      dinnerTue: offer.dinnerTue ?? false,
+      dinnerWed: offer.dinnerWed ?? false,
+      dinnerThu: offer.dinnerThu ?? false,
+      dinnerFri: offer.dinnerFri ?? false,
+      dinnerSat: offer.dinnerSat ?? false,
+      dinnerSun: offer.dinnerSun ?? false,
+      stadiumMeals: offer.stadiumMeals ?? false,
       notes: offer.notes ?? null,
       totalCost,
       sentBy: user.id,
@@ -196,57 +268,40 @@ portal.post('/athlete/:athleteId/respond', requireAuth('athlete', 'manager'), as
     })
 
     // Log interaction
-    if (apps.length > 0) {
-      await db.insert(schema.interaction).values({
-        applicationId: apps[0].id,
-        type: 'counter_offer',
-        content: `Counter-offer v${nextVersion} submitted — CHF ${totalCost.toLocaleString()}`,
-        authorId: user.id,
-        authorName: `${user.firstName} ${user.lastName}`,
-      })
-    }
+    await db.insert(schema.interaction).values({
+      athleteId,
+      type: 'counter_offer',
+      content: `Counter-offer v${nextVersion} submitted by ${user.firstName} ${user.lastName}`,
+      authorId: user.id,
+      authorName: `${user.firstName} ${user.lastName}`,
+    })
+
+    // Update negotiation status
+    await db
+      .update(schema.athlete)
+      .set({ negotiationStatus: 'counter_offer_sent', updatedAt: now })
+      .where(eq(schema.athlete.id, athleteId))
+
+  } else {
+    return c.json({ error: `Invalid action: ${action}` }, 400)
   }
 
-  // Update athlete negotiation status
-  await db
-    .update(schema.athlete)
-    .set({ negotiationStatus: targetStatus, updatedAt: now })
-    .where(eq(schema.athlete.id, athleteId))
+  // Notify collaborators via email
+  const updatedAth = await db.select().from(schema.athlete).where(eq(schema.athlete.id, athleteId)).limit(1)
+  const newStatus = updatedAth[0]?.negotiationStatus ?? action
 
-  // Also update legacy application.status on all applications
-  const allApps = await db.select().from(schema.application).where(eq(schema.application.athleteId, athleteId))
-  for (const app of allApps) {
-    const updates: Record<string, unknown> = { status: targetStatus, updatedAt: now }
-    if (['accepted', 'rejected', 'withdrawn'].includes(targetStatus)) {
-      updates.decidedAt = now
-    }
-    await db.update(schema.application).set(updates).where(eq(schema.application.id, app.id))
-
-    // Log status change interaction (unless counter_offer already logged)
-    if (action !== 'counter_offer') {
-      await db.insert(schema.interaction).values({
-        applicationId: app.id,
-        type: 'status_change',
-        content: `Application ${action}ed by ${user.firstName} ${user.lastName}`,
-        authorId: user.id,
-        authorName: `${user.firstName} ${user.lastName}`,
-      })
-    }
-  }
-
-  // Notify collaborators via email stub
   sendEmail({
     to: 'collaborators@atleticageneve.ch',
     subject: `Application update — ${ath.firstName} ${ath.lastName}`,
-    body: `${ath.firstName} ${ath.lastName} has ${action}ed the offer.\nNew status: ${targetStatus}`,
+    body: `${ath.firstName} ${ath.lastName} has ${action}ed the offer.\nNew status: ${newStatus}`,
   })
 
-  return c.json({ athleteId, status: targetStatus, previousStatus: currentStatus })
+  return c.json({ athleteId, status: newStatus, previousStatus: currentStatus })
 })
 
 // ── Manager portal ───────────────────────────────────────────────────────────
 
-// GET /portal/manager — get all athletes managed by current user
+// GET /portal/manager — get all athletes managed by current user with KPI summary
 portal.get('/manager', requireAuth('manager'), async (c) => {
   const db = c.get('db')
   const user = c.get('user')!
@@ -258,52 +313,55 @@ portal.get('/manager', requireAuth('manager'), async (c) => {
 
   const results = []
   for (const ath of athleteRows) {
+    // Applications with event + catalog details
     const appRows = await db
-      .select()
+      .select({
+        application: schema.application,
+        event: schema.event,
+        catalog: schema.eventCatalog,
+      })
       .from(schema.application)
+      .innerJoin(schema.event, eq(schema.application.eventId, schema.event.id))
+      .innerJoin(schema.eventCatalog, eq(schema.event.catalogId, schema.eventCatalog.id))
       .where(eq(schema.application.athleteId, ath.id))
 
-    const applications = []
-    for (const app of appRows) {
-      const eventRows = await db
-        .select()
-        .from(schema.event)
-        .where(eq(schema.event.id, app.eventId))
-        .limit(1)
+    const applications = appRows.map(r => ({
+      ...r.application,
+      event: {
+        ...r.event,
+        name: r.catalog.name,
+        discipline: r.catalog.discipline,
+        gender: r.catalog.gender,
+      },
+    }))
 
-      applications.push({
-        ...app,
-        event: eventRows[0] ?? null,
-      })
-    }
-
-    // Contracts at athlete level
-    const contracts = await db
+    // Agreements
+    const agreements = await db
       .select()
-      .from(schema.contractOffer)
-      .where(eq(schema.contractOffer.athleteId, ath.id))
-      .orderBy(schema.contractOffer.version)
+      .from(schema.agreement)
+      .where(eq(schema.agreement.athleteId, ath.id))
+      .orderBy(schema.agreement.version)
 
     results.push({
       ...ath,
       applications,
-      contracts,
-      latestContract: contracts.length > 0 ? contracts[contracts.length - 1] : null,
+      agreements,
     })
   }
 
   // KPI summary — at athlete level
   const total = athleteRows.length
-  const toReview = athleteRows.filter((a) => a.negotiationStatus === 'to_review').length
-  const inNegotiation = athleteRows.filter((a) =>
-    ['contract_sent', 'counter_offer'].includes(a.negotiationStatus)
+  const toReview = athleteRows.filter(a => a.negotiationStatus === 'to_review').length
+  const inNegotiation = athleteRows.filter(a =>
+    ['agreement_sent', 'counter_offer_sent'].includes(a.negotiationStatus)
   ).length
-  const confirmed = athleteRows.filter((a) => a.negotiationStatus === 'accepted').length
-  const rejected = athleteRows.filter((a) => a.negotiationStatus === 'rejected').length
+  const confirmed = athleteRows.filter(a => a.negotiationStatus === 'confirmed').length
+  const rejected = athleteRows.filter(a => a.negotiationStatus === 'rejected').length
+  const withdrawn = athleteRows.filter(a => a.negotiationStatus === 'withdrawn').length
 
   return c.json({
     athletes: results,
-    kpi: { total, toReview, inNegotiation, confirmed, rejected },
+    kpi: { total, toReview, inNegotiation, confirmed, rejected, withdrawn },
   })
 })
 
