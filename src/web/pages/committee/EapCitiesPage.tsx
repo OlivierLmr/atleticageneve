@@ -20,14 +20,19 @@ export default function EapCitiesPage() {
 
   const [name, setName] = useState('')
   const [countryCode, setCountryCode] = useState('')
+  const [editingId, setEditingId] = useState<string | null>(null)
+
+  const resetForm = () => { setName(''); setCountryCode(''); setEditingId(null) }
 
   const addMutation = useMutation({
     mutationFn: (data: { name: string; countryCode: string }) => api.post('/api/v1/eap-cities', data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['eap-cities'] })
-      setName('')
-      setCountryCode('')
-    },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['eap-cities'] }); resetForm() },
+  })
+
+  const updateMutation = useMutation({
+    mutationFn: ({ id, ...data }: { id: string; name: string; countryCode: string }) =>
+      api.patch(`/api/v1/eap-cities/${id}`, data),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['eap-cities'] }); resetForm() },
   })
 
   const deleteMutation = useMutation({
@@ -35,10 +40,20 @@ export default function EapCitiesPage() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['eap-cities'] }),
   })
 
-  const handleAdd = (e: React.FormEvent) => {
+  const startEdit = (city: EapCity) => {
+    setEditingId(city.id)
+    setName(city.name)
+    setCountryCode(city.countryCode)
+  }
+
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     if (!name.trim() || !countryCode.trim()) return
-    addMutation.mutate({ name: name.trim(), countryCode: countryCode.trim() })
+    if (editingId) {
+      updateMutation.mutate({ id: editingId, name: name.trim(), countryCode: countryCode.trim() })
+    } else {
+      addMutation.mutate({ name: name.trim(), countryCode: countryCode.trim() })
+    }
   }
 
   if (isLoading) {
@@ -53,7 +68,7 @@ export default function EapCitiesPage() {
     <div className="max-w-3xl mx-auto py-8 px-6">
       <h1 className="text-lg font-bold mb-6">{t('admin.eapCities')}</h1>
 
-      <form onSubmit={handleAdd} className="bg-white rounded-lg border p-4 mb-6 flex items-end gap-3">
+      <form onSubmit={handleSubmit} className="bg-white rounded-lg border p-4 mb-6 flex items-end gap-3">
         <div className="flex-1">
           <label className="block text-xs text-gray-500 mb-1">{t('admin.cityName')}</label>
           <input
@@ -92,11 +107,17 @@ export default function EapCitiesPage() {
         </div>
         <button
           type="submit"
-          disabled={addMutation.isPending}
+          disabled={addMutation.isPending || updateMutation.isPending}
           className="bg-gray-900 text-white text-sm font-medium px-4 py-1.5 rounded hover:bg-gray-800 disabled:opacity-50"
         >
-          {t('common.add')}
+          {editingId ? t('common.save') : t('common.add')}
         </button>
+        {editingId && (
+          <button type="button" onClick={resetForm}
+            className="text-sm text-gray-500 hover:text-gray-700 px-3 py-1.5">
+            {t('common.cancel')}
+          </button>
+        )}
       </form>
 
       <div className="bg-white rounded-lg border">
@@ -113,7 +134,11 @@ export default function EapCitiesPage() {
               <tr key={city.id} className="border-b hover:bg-gray-50">
                 <td className="px-3 py-2">{city.name}</td>
                 <td className="px-3 py-2 font-mono">{city.countryCode}</td>
-                <td className="px-3 py-2 text-right">
+                <td className="px-3 py-2 text-right space-x-2">
+                  <button onClick={() => startEdit(city)}
+                    className="text-xs text-blue-600 hover:text-blue-800">
+                    {t('common.edit')}
+                  </button>
                   <button
                     onClick={() => deleteMutation.mutate(city.id)}
                     className="text-xs text-red-600 hover:text-red-800"

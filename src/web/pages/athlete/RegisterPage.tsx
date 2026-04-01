@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { api, ApiError } from '@web/lib/api'
 import { LanguageSwitcher } from '@web/App'
-import type { Event, EapCity } from '@shared/types'
+import type { Event, EapCity, Country } from '@shared/types'
 
 // The events API returns Event joined with catalog data (name, discipline, gender, perfType)
 interface EventWithCatalog extends Event {
@@ -43,6 +43,11 @@ export default function AthleteRegisterPage() {
     queryKey: ['eap-cities'],
     queryFn: () => api.get('/api/v1/eap-cities'),
     enabled: form.isEap,
+  })
+
+  const { data: countries = [] } = useQuery<Country[]>({
+    queryKey: ['countries'],
+    queryFn: () => api.get('/api/v1/countries'),
   })
 
   // Fetch events filtered by gender
@@ -185,7 +190,10 @@ export default function AthleteRegisterPage() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className={labelCls}>{t('athlete.nationality')} *</label>
-                  <input className={inputCls} value={form.nationality} onChange={e => update('nationality', e.target.value.toUpperCase())} maxLength={3} placeholder="e.g. SUI" />
+                  <input className={inputCls} list="nat-list" value={form.nationality} onChange={e => update('nationality', e.target.value.toUpperCase())} maxLength={3} placeholder="e.g. SUI" />
+                  <datalist id="nat-list">
+                    {countries.map(c => <option key={c.code} value={c.code}>{c.name}</option>)}
+                  </datalist>
                 </div>
                 <div>
                   <label className={labelCls}>{t('athlete.phone')}</label>

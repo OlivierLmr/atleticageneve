@@ -36,6 +36,26 @@ app.post('/', requireAuth('committee'), async (c) => {
   return c.json(created[0], 201)
 })
 
+// PATCH /event-catalog/:id — committee only
+app.patch('/:id', requireAuth('committee'), async (c) => {
+  const db = c.get('db')
+  const { id } = c.req.param()
+  const body = await c.req.json()
+  const parsed = eventCatalogSchema.partial().safeParse(body)
+  if (!parsed.success) {
+    return c.json({ error: 'Validation failed', details: parsed.error.flatten() }, 400)
+  }
+
+  const existing = await db.select().from(schema.eventCatalog).where(eq(schema.eventCatalog.id, id)).limit(1)
+  if (existing.length === 0) {
+    return c.json({ error: 'Event catalog entry not found' }, 404)
+  }
+
+  await db.update(schema.eventCatalog).set(parsed.data).where(eq(schema.eventCatalog.id, id))
+  const updated = await db.select().from(schema.eventCatalog).where(eq(schema.eventCatalog.id, id)).limit(1)
+  return c.json(updated[0])
+})
+
 // DELETE /event-catalog/:id — committee only
 app.delete('/:id', requireAuth('committee'), async (c) => {
   const db = c.get('db')

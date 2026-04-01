@@ -32,6 +32,26 @@ app.post('/', requireAuth('committee'), async (c) => {
   return c.json(created[0], 201)
 })
 
+// PATCH /countries/:code — committee only
+app.patch('/:code', requireAuth('committee'), async (c) => {
+  const db = c.get('db')
+  const { code } = c.req.param()
+  const body = await c.req.json()
+  const parsed = countrySchema.partial().safeParse(body)
+  if (!parsed.success) {
+    return c.json({ error: 'Validation failed', details: parsed.error.flatten() }, 400)
+  }
+
+  const existing = await db.select().from(schema.country).where(eq(schema.country.code, code)).limit(1)
+  if (existing.length === 0) {
+    return c.json({ error: 'Country not found' }, 404)
+  }
+
+  await db.update(schema.country).set(parsed.data).where(eq(schema.country.code, code))
+  const updated = await db.select().from(schema.country).where(eq(schema.country.code, code)).limit(1)
+  return c.json(updated[0])
+})
+
 // DELETE /countries/:code — committee only
 app.delete('/:code', requireAuth('committee'), async (c) => {
   const db = c.get('db')

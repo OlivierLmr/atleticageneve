@@ -15,14 +15,19 @@ export default function CountriesPage() {
 
   const [code, setCode] = useState('')
   const [name, setName] = useState('')
+  const [editingCode, setEditingCode] = useState<string | null>(null)
+
+  const resetForm = () => { setCode(''); setName(''); setEditingCode(null) }
 
   const addMutation = useMutation({
     mutationFn: (data: { code: string; name: string }) => api.post('/api/v1/countries', data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['countries'] })
-      setCode('')
-      setName('')
-    },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['countries'] }); resetForm() },
+  })
+
+  const updateMutation = useMutation({
+    mutationFn: ({ code: c, name: n }: { code: string; name: string }) =>
+      api.patch(`/api/v1/countries/${c}`, { name: n }),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['countries'] }); resetForm() },
   })
 
   const deleteMutation = useMutation({
@@ -30,10 +35,20 @@ export default function CountriesPage() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['countries'] }),
   })
 
-  const handleAdd = (e: React.FormEvent) => {
+  const startEdit = (c: Country) => {
+    setEditingCode(c.code)
+    setCode(c.code)
+    setName(c.name)
+  }
+
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     if (!code.trim() || !name.trim()) return
-    addMutation.mutate({ code: code.trim().toUpperCase(), name: name.trim() })
+    if (editingCode) {
+      updateMutation.mutate({ code: editingCode, name: name.trim() })
+    } else {
+      addMutation.mutate({ code: code.trim().toUpperCase(), name: name.trim() })
+    }
   }
 
   if (isLoading) {
@@ -48,7 +63,7 @@ export default function CountriesPage() {
     <div className="max-w-3xl mx-auto py-8 px-6">
       <h1 className="text-lg font-bold mb-6">{t('admin.countries')}</h1>
 
-      <form onSubmit={handleAdd} className="bg-white rounded-lg border p-4 mb-6 flex items-end gap-3">
+      <form onSubmit={handleSubmit} className="bg-white rounded-lg border p-4 mb-6 flex items-end gap-3">
         <div>
           <label className="block text-xs text-gray-500 mb-1">{t('admin.countryCode')}</label>
           <input
@@ -56,7 +71,8 @@ export default function CountriesPage() {
             value={code}
             onChange={(e) => setCode(e.target.value)}
             maxLength={3}
-            className="w-24 px-2 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-gray-900"
+            disabled={!!editingCode}
+            className="w-24 px-2 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-gray-900 disabled:bg-gray-100"
             placeholder="SUI"
           />
         </div>
@@ -72,11 +88,17 @@ export default function CountriesPage() {
         </div>
         <button
           type="submit"
-          disabled={addMutation.isPending}
+          disabled={addMutation.isPending || updateMutation.isPending}
           className="bg-gray-900 text-white text-sm font-medium px-4 py-1.5 rounded hover:bg-gray-800 disabled:opacity-50"
         >
-          {t('common.add')}
+          {editingCode ? t('common.save') : t('common.add')}
         </button>
+        {editingCode && (
+          <button type="button" onClick={resetForm}
+            className="text-sm text-gray-500 hover:text-gray-700 px-3 py-1.5">
+            {t('common.cancel')}
+          </button>
+        )}
       </form>
 
       <div className="bg-white rounded-lg border">
@@ -93,7 +115,11 @@ export default function CountriesPage() {
               <tr key={c.code} className="border-b hover:bg-gray-50">
                 <td className="px-3 py-2 font-mono">{c.code}</td>
                 <td className="px-3 py-2">{c.name}</td>
-                <td className="px-3 py-2 text-right">
+                <td className="px-3 py-2 text-right space-x-2">
+                  <button onClick={() => startEdit(c)}
+                    className="text-xs text-blue-600 hover:text-blue-800">
+                    {t('common.edit')}
+                  </button>
                   <button
                     onClick={() => deleteMutation.mutate(c.code)}
                     className="text-xs text-red-600 hover:text-red-800"

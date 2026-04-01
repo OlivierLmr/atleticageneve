@@ -5,7 +5,7 @@ import { useQuery } from '@tanstack/react-query'
 import { api, ApiError } from '@web/lib/api'
 import { useAuth } from '@web/lib/auth'
 import { LanguageSwitcher } from '@web/App'
-import type { Event, EapCity } from '@shared/types'
+import type { Event, EapCity, Country } from '@shared/types'
 
 // Events API returns Event joined with catalog data
 interface EventWithCatalog extends Event {
@@ -49,6 +49,11 @@ export default function ManagerRegisterPage() {
     queryKey: ['eap-cities'],
     queryFn: () => api.get('/api/v1/eap-cities'),
     enabled: rows.some(r => r.isEap),
+  })
+
+  const { data: countries = [] } = useQuery<Country[]>({
+    queryKey: ['countries'],
+    queryFn: () => api.get('/api/v1/countries'),
   })
 
   const { data: events = [] } = useQuery<EventWithCatalog[]>({
@@ -167,7 +172,7 @@ export default function ManagerRegisterPage() {
                     <td className="px-1 py-1"><input className={inputCls} value={row.lastName} onChange={e => updateRow(row.key, 'lastName', e.target.value)} /></td>
                     <td className="px-1 py-1"><input className={inputCls} value={row.firstName} onChange={e => updateRow(row.key, 'firstName', e.target.value)} /></td>
                     <td className="px-1 py-1"><input type="date" className={inputCls} value={row.dateOfBirth} onChange={e => updateRow(row.key, 'dateOfBirth', e.target.value)} /></td>
-                    <td className="px-1 py-1"><input className={inputCls} value={row.nationality} onChange={e => updateRow(row.key, 'nationality', e.target.value.toUpperCase())} maxLength={3} /></td>
+                    <td className="px-1 py-1"><input className={inputCls} list="nat-list" value={row.nationality} onChange={e => updateRow(row.key, 'nationality', e.target.value.toUpperCase())} maxLength={3} /></td>
                     <td className="px-1 py-1">
                       <select className={inputCls} value={row.gender} onChange={e => updateRow(row.key, 'gender', e.target.value)}>
                         <option value="">—</option>
@@ -235,6 +240,9 @@ export default function ManagerRegisterPage() {
             </tbody>
           </table>
         </div>
+        <datalist id="nat-list">
+          {countries.map(c => <option key={c.code} value={c.code}>{c.name}</option>)}
+        </datalist>
 
         <div className="flex items-center justify-between mt-4">
           <button onClick={addRow} className="text-xs text-gray-600 hover:text-gray-900 border rounded px-3 py-1.5">

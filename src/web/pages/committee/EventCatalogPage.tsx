@@ -16,14 +16,20 @@ export default function EventCatalogPage() {
   const [name, setName] = useState('')
   const [discipline, setDiscipline] = useState<'Course' | 'Concours'>('Course')
   const [gender, setGender] = useState<'M' | 'F'>('M')
+  const [editingId, setEditingId] = useState<string | null>(null)
+
+  const resetForm = () => { setName(''); setDiscipline('Course'); setGender('M'); setEditingId(null) }
 
   const addMutation = useMutation({
     mutationFn: (data: { name: string; discipline: string; gender: string }) =>
       api.post('/api/v1/event-catalog', data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['event-catalog'] })
-      setName('')
-    },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['event-catalog'] }); resetForm() },
+  })
+
+  const updateMutation = useMutation({
+    mutationFn: ({ id, ...data }: { id: string; name: string; discipline: string; gender: string }) =>
+      api.patch(`/api/v1/event-catalog/${id}`, data),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['event-catalog'] }); resetForm() },
   })
 
   const deleteMutation = useMutation({
@@ -31,10 +37,21 @@ export default function EventCatalogPage() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['event-catalog'] }),
   })
 
-  const handleAdd = (e: React.FormEvent) => {
+  const startEdit = (item: EventCatalog) => {
+    setEditingId(item.id)
+    setName(item.name)
+    setDiscipline(item.discipline as 'Course' | 'Concours')
+    setGender(item.gender as 'M' | 'F')
+  }
+
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     if (!name.trim()) return
-    addMutation.mutate({ name: name.trim(), discipline, gender })
+    if (editingId) {
+      updateMutation.mutate({ id: editingId, name: name.trim(), discipline, gender })
+    } else {
+      addMutation.mutate({ name: name.trim(), discipline, gender })
+    }
   }
 
   if (isLoading) {
@@ -49,8 +66,7 @@ export default function EventCatalogPage() {
     <div className="max-w-3xl mx-auto py-8 px-6">
       <h1 className="text-lg font-bold mb-6">{t('admin.eventCatalog')}</h1>
 
-      {/* Add form */}
-      <form onSubmit={handleAdd} className="bg-white rounded-lg border p-4 mb-6 flex items-end gap-3">
+      <form onSubmit={handleSubmit} className="bg-white rounded-lg border p-4 mb-6 flex items-end gap-3">
         <div className="flex-1">
           <label className="block text-xs text-gray-500 mb-1">{t('admin.eventName')}</label>
           <input
@@ -85,14 +101,19 @@ export default function EventCatalogPage() {
         </div>
         <button
           type="submit"
-          disabled={addMutation.isPending}
+          disabled={addMutation.isPending || updateMutation.isPending}
           className="bg-gray-900 text-white text-sm font-medium px-4 py-1.5 rounded hover:bg-gray-800 disabled:opacity-50"
         >
-          {t('common.add')}
+          {editingId ? t('common.save') : t('common.add')}
         </button>
+        {editingId && (
+          <button type="button" onClick={resetForm}
+            className="text-sm text-gray-500 hover:text-gray-700 px-3 py-1.5">
+            {t('common.cancel')}
+          </button>
+        )}
       </form>
 
-      {/* Table */}
       <div className="bg-white rounded-lg border">
         <table className="w-full text-sm">
           <thead>
@@ -109,7 +130,11 @@ export default function EventCatalogPage() {
                 <td className="px-3 py-2">{item.name}</td>
                 <td className="px-3 py-2">{item.discipline}</td>
                 <td className="px-3 py-2">{item.gender}</td>
-                <td className="px-3 py-2 text-right">
+                <td className="px-3 py-2 text-right space-x-2">
+                  <button onClick={() => startEdit(item)}
+                    className="text-xs text-blue-600 hover:text-blue-800">
+                    {t('common.edit')}
+                  </button>
                   <button
                     onClick={() => deleteMutation.mutate(item.id)}
                     className="text-xs text-red-600 hover:text-red-800"
