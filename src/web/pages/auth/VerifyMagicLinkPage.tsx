@@ -16,7 +16,7 @@ export default function VerifyMagicLinkPage() {
   useEffect(() => {
     const token = searchParams.get('token')
     if (!token) {
-      setError('No token provided')
+      setError(t('auth.noToken'))
       return
     }
 

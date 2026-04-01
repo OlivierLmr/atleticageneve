@@ -124,7 +124,7 @@ export default function ManagerRegisterPage() {
           <h1 className="text-xl font-bold mb-2">Atletica Genève</h1>
           <div className="bg-white rounded-lg border p-6">
             <div className="text-3xl mb-3">&#10003;</div>
-            <p className="font-semibold text-sm mb-1">{registeredCount} athletes registered</p>
+            <p className="font-semibold text-sm mb-1">{t('manager.athletesRegistered', { count: registeredCount })}</p>
             <p className="text-xs text-gray-500">{t('manager.applicationsSubmitted')}</p>
           </div>
           <div className="flex gap-3 justify-center mt-4">
@@ -156,9 +156,9 @@ export default function ManagerRegisterPage() {
                 <th className="px-2 py-2 text-left font-medium">{t('athlete.lastName')} *</th>
                 <th className="px-2 py-2 text-left font-medium">{t('athlete.firstName')} *</th>
                 <th className="px-2 py-2 text-left font-medium">{t('athlete.dateOfBirth')}</th>
-                <th className="px-2 py-2 text-left font-medium w-16">NAT</th>
+                <th className="px-2 py-2 text-left font-medium w-16">{t('athlete.nationality')}</th>
                 <th className="px-2 py-2 text-left font-medium">{t('athlete.gender')} *</th>
-                <th className="px-2 py-2 text-left font-medium w-10">EAP</th>
+                <th className="px-2 py-2 text-left font-medium w-10">{t('athlete.eapMember')}</th>
                 <th className="px-2 py-2 text-left font-medium">{t('athlete.waProfile')}</th>
                 <th className="px-2 py-2 text-left font-medium">{t('athlete.event')}(s) *</th>
                 <th className="px-2 py-2 w-8"></th>

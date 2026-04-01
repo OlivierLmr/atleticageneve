@@ -167,7 +167,7 @@ export default function HotelRoomsPage() {
                 <div className="flex gap-2">
                   <button onClick={() => { setEditingHotelId(h.id); setHotelName_(h.name) }}
                     className="text-xs text-blue-600 hover:text-blue-800">{t('common.edit')}</button>
-                  <button onClick={() => { if (confirm(`Delete hotel "${h.name}" and all its room types?`)) deleteHotelMutation.mutate(h.id) }}
+                  <button onClick={() => { if (confirm(t('confirm.deleteHotel', { hotel: h.name }))) deleteHotelMutation.mutate(h.id) }}
                     className="text-xs text-red-600 hover:text-red-800">{t('common.delete')}</button>
                 </div>
               </div>

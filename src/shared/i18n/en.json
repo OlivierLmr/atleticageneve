@@ -46,6 +46,7 @@
     "magicLinkPrompt": "Enter your email to receive a login link",
     "invalidCredentials": "Invalid credentials",
     "sessionExpired": "Your session has expired, please log in again",
+    "noToken": "No token provided",
     "enterEmailOrUsername": "Email or username",
     "continue": "Continue",
     "registerAsAthleteOrManager": "Register as athlete or manager",
@@ -89,7 +90,8 @@
     "statusChange": "Are you sure you want to set {{athlete}} to \"{{status}}\"? This action cannot be easily undone.",
     "withdraw": "Are you sure you want to withdraw?",
     "withdrawAthlete": "Withdraw {{athlete}}?",
-    "archiveAthlete": "Archive {{athlete}}? This will hide them from all lists."
+    "archiveAthlete": "Archive {{athlete}}? This will hide them from all lists.",
+    "deleteHotel": "Delete hotel \"{{hotel}}\" and all its room types?"
   },
   "signup": {
     "title": "Welcome to Atletica Geneve",
@@ -143,7 +145,8 @@
     "myAthletes": "My Athletes",
     "addAthlete": "Add athlete",
     "batchRegister": "Batch Registration",
-    "applicationsSubmitted": "Applications have been submitted for review."
+    "applicationsSubmitted": "Applications have been submitted for review.",
+    "athletesRegistered": "{{count}} athletes registered"
   },
   "contract": {
     "title": "Contract",

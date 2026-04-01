@@ -46,6 +46,7 @@
     "magicLinkPrompt": "Entrez votre email pour recevoir un lien de connexion",
     "invalidCredentials": "Identifiants invalides",
     "sessionExpired": "Votre session a expiré, veuillez vous reconnecter",
+    "noToken": "Aucun jeton fourni",
     "enterEmailOrUsername": "Email ou nom d'utilisateur",
     "continue": "Continuer",
     "registerAsAthleteOrManager": "S'inscrire en tant qu'athlète ou manager",
@@ -89,7 +90,8 @@
     "statusChange": "Voulez-vous vraiment passer {{athlete}} à « {{status}} » ? Cette action ne peut pas être facilement annulée.",
     "withdraw": "Voulez-vous vraiment vous retirer ?",
     "withdrawAthlete": "Retirer {{athlete}} ?",
-    "archiveAthlete": "Archiver {{athlete}} ? Cela le masquera de toutes les listes."
+    "archiveAthlete": "Archiver {{athlete}} ? Cela le masquera de toutes les listes.",
+    "deleteHotel": "Supprimer l'hôtel « {{hotel}} » et tous ses types de chambres ?"
   },
   "signup": {
     "title": "Bienvenue à Atletica Genève",
@@ -143,7 +145,8 @@
     "myAthletes": "Mes athlètes",
     "addAthlete": "Ajouter un athlète",
     "batchRegister": "Inscription groupée",
-    "applicationsSubmitted": "Les candidatures ont été soumises pour examen."
+    "applicationsSubmitted": "Les candidatures ont été soumises pour examen.",
+    "athletesRegistered": "{{count}} athlètes inscrits"
   },
   "contract": {
     "title": "Contrat",
