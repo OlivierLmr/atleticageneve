@@ -53,9 +53,10 @@ export function LanguageSwitcher() {
 
 function ProtectedRoute({ children, roles }: { children: ReactNode; roles?: UserRole[] }) {
   const { user, isLoading } = useAuth()
+  const { t } = useTranslation()
 
   if (isLoading) {
-    return <div className="min-h-screen flex items-center justify-center text-gray-400">Loading...</div>
+    return <div className="min-h-screen flex items-center justify-center text-gray-400">{t('common.loading')}</div>
   }
 
   if (!user) {
@@ -72,19 +73,20 @@ function ProtectedRoute({ children, roles }: { children: ReactNode; roles?: User
 // ── Committee layout with navigation ─────────────────────────────────────────
 
 const COMMITTEE_NAV = [
-  { to: '/committee/dashboard', label: 'Dashboard' },
-  { to: '/committee/edition-config', label: 'Edition' },
-  { to: '/committee/events', label: 'Events' },
-  { to: '/committee/event-catalog', label: 'Event Catalog' },
-  { to: '/committee/countries', label: 'Countries' },
-  { to: '/committee/eap-cities', label: 'EAP Cities' },
-  { to: '/committee/hotel-rooms', label: 'Hotel Rooms' },
-  { to: '/committee/emails', label: 'Email Log' },
-  { to: '/committee/candidates', label: 'Candidates' },
+  { to: '/committee/dashboard', key: 'nav.dashboard' },
+  { to: '/committee/edition-config', key: 'nav.edition' },
+  { to: '/committee/events', key: 'nav.events' },
+  { to: '/committee/event-catalog', key: 'nav.eventCatalog' },
+  { to: '/committee/countries', key: 'nav.countries' },
+  { to: '/committee/eap-cities', key: 'nav.eapCities' },
+  { to: '/committee/hotel-rooms', key: 'nav.hotelRooms' },
+  { to: '/committee/emails', key: 'nav.emailLog' },
+  { to: '/committee/candidates', key: 'nav.candidates' },
 ]
 
 function CommitteeLayout() {
   const { user, logout } = useAuth()
+  const { t } = useTranslation()
   const location = useLocation()
 
   return (
@@ -92,7 +94,7 @@ function CommitteeLayout() {
       <nav className="bg-white border-b">
         <div className="max-w-7xl mx-auto px-6 flex items-center justify-between h-12">
           <div className="flex items-center gap-1 overflow-x-auto">
-            {COMMITTEE_NAV.map(({ to, label }) => {
+            {COMMITTEE_NAV.map(({ to, key }) => {
               const active = location.pathname === to || (to === '/committee/candidates' && location.pathname.startsWith('/committee/athletes/'))
               return (
                 <Link
@@ -104,7 +106,7 @@ function CommitteeLayout() {
                       : 'text-gray-600 hover:bg-gray-100'
                   }`}
                 >
-                  {label}
+                  {t(key)}
                 </Link>
               )
             })}
@@ -120,7 +122,7 @@ function CommitteeLayout() {
               onClick={() => logout()}
               className="text-xs text-gray-400 hover:text-gray-600"
             >
-              Logout
+              {t('auth.logout')}
             </button>
           </div>
         </div>
@@ -134,10 +136,11 @@ function CommitteeLayout() {
 
 function CollaboratorLayout() {
   const { user, logout } = useAuth()
+  const { t } = useTranslation()
   const location = useLocation()
 
   const navItems = [
-    { to: '/collaborator/candidates', label: 'Candidates' },
+    { to: '/collaborator/candidates', key: 'nav.candidates' },
   ]
 
   return (
@@ -145,7 +148,7 @@ function CollaboratorLayout() {
       <nav className="bg-white border-b">
         <div className="max-w-7xl mx-auto px-6 flex items-center justify-between h-12">
           <div className="flex items-center gap-1">
-            {navItems.map(({ to, label }) => {
+            {navItems.map(({ to, key }) => {
               const active = location.pathname === to
               return (
                 <Link
@@ -157,7 +160,7 @@ function CollaboratorLayout() {
                       : 'text-gray-600 hover:bg-gray-100'
                   }`}
                 >
-                  {label}
+                  {t(key)}
                 </Link>
               )
             })}
@@ -173,7 +176,7 @@ function CollaboratorLayout() {
               onClick={() => logout()}
               className="text-xs text-gray-400 hover:text-gray-600"
             >
-              Logout
+              {t('auth.logout')}
             </button>
           </div>
         </div>

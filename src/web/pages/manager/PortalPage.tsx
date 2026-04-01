@@ -121,12 +121,12 @@ export default function ManagerPortalPage() {
         {/* Filters */}
         <div className="flex items-center gap-3 mb-4">
           <select className={selectCls} value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
-            <option value="">{t('common.all')} statuses</option>
+            <option value="">{t('common.all')} {t('common.statuses')}</option>
             {(['to_review', 'agreement_sent', 'counter_offer_sent', 'confirmed', 'rejected', 'withdrawn'] as NegotiationStatus[]).map((s) => (
               <option key={s} value={s}>{t(`status.${s}`)}</option>
             ))}
           </select>
-          <span className="text-xs text-gray-400 ml-auto">{filtered.length} athletes</span>
+          <span className="text-xs text-gray-400 ml-auto">{filtered.length} {t('common.athletes')}</span>
         </div>
 
         {/* Athletes table */}
@@ -143,10 +143,10 @@ export default function ManagerPortalPage() {
               <thead>
                 <tr className="border-b bg-gray-50 text-xs text-gray-500">
                   <th className="px-3 py-2.5 text-left font-medium w-6"></th>
-                  <th className="px-3 py-2.5 text-left font-medium">Athlete</th>
+                  <th className="px-3 py-2.5 text-left font-medium">{t('athlete.lastName')}</th>
                   <th className="px-3 py-2.5 text-left font-medium">{t('athlete.event')}(s)</th>
-                  <th className="px-3 py-2.5 text-left font-medium">NAT</th>
-                  <th className="px-3 py-2.5 text-left font-medium">Status</th>
+                  <th className="px-3 py-2.5 text-left font-medium">{t('athlete.nationality')}</th>
+                  <th className="px-3 py-2.5 text-left font-medium">{t('selection.negotiation')}</th>
                   <th className="px-3 py-2.5 text-left font-medium">{t('common.actions')}</th>
                 </tr>
               </thead>
@@ -187,28 +187,28 @@ export default function ManagerPortalPage() {
                                 disabled={respondMutation.isPending}
                                 className="text-[10px] px-2 py-0.5 rounded bg-green-600 text-white hover:bg-green-700 disabled:opacity-50"
                               >
-                                Accept
+                                {t('contract.acceptOffer')}
                               </button>
                               <button
                                 onClick={() => respondMutation.mutate({ athleteId: ath.id, action: 'reject' })}
                                 disabled={respondMutation.isPending}
                                 className="text-[10px] px-2 py-0.5 rounded border border-red-200 text-red-600 hover:bg-red-50 disabled:opacity-50"
                               >
-                                Decline
+                                {t('contract.declineOffer')}
                               </button>
                             </>
                           )}
                           {['agreement_sent', 'counter_offer_sent', 'confirmed'].includes(ath.negotiationStatus) && (
                             <button
                               onClick={() => {
-                                if (confirm(`Withdraw ${ath.firstName} ${ath.lastName}?`)) {
+                                if (confirm(t('confirm.withdrawAthlete', { athlete: `${ath.firstName} ${ath.lastName}` }))) {
                                   respondMutation.mutate({ athleteId: ath.id, action: 'withdraw' })
                                 }
                               }}
                               disabled={respondMutation.isPending}
                               className="text-[10px] px-2 py-0.5 rounded border border-gray-200 text-gray-400 hover:text-red-600 disabled:opacity-50"
                             >
-                              Withdraw
+                              {t('contract.withdraw')}
                             </button>
                           )}
                         </div>
@@ -225,7 +225,7 @@ export default function ManagerPortalPage() {
                                 <th className="py-1 text-right font-medium">{t('athlete.personalBest')}</th>
                                 <th className="py-1 text-right font-medium">{t('athlete.seasonBest')}</th>
                                 <th className="py-1 text-right font-medium">{t('athlete.worldRanking')}</th>
-                                <th className="py-1 text-center font-medium">Selection</th>
+                                <th className="py-1 text-center font-medium">{t('selection.participation')}</th>
                               </tr>
                             </thead>
                             <tbody>

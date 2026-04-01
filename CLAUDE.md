@@ -1,2 +1,7 @@
 - after each piece of work is done, commit it.
 - do not deploy unless asked to.
+- After deploying, test the deployment by trying to connect as admin (e.g. using curl). You should also check that the frontend is able to do the same (i.e. it communicates correctly with the backend and is able to log in).
+- On this project, never hesitate to redesign things more fundamentally, with more drastic changes, even to the DB. It is always ok to have to reset the DB. This means that after any change, the result should be cohesive, and not feel like a stack of incremental changes.
+  - If a component is getting messy from accumulated patches, feel free to rewrite it rather than surgically editing 3 lines.
+  - If the file structure doesn't make sense anymore, feel free to reorganize it.
+  - Don't preserve old patterns just because they exist — if something should be different, make it different.

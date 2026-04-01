@@ -101,9 +101,9 @@ export default function AthletePortalPage() {
       <div className="max-w-5xl mx-auto px-6 py-6">
         {athletes.length === 0 ? (
           <div className="bg-white rounded-lg border p-8 text-center">
-            <p className="text-gray-400 text-sm mb-4">No applications found for your account.</p>
+            <p className="text-gray-400 text-sm mb-4">{t('athlete.noApplications')}</p>
             <Link to="/athlete/register" className="text-sm text-blue-600 underline">
-              Register for an event
+              {t('athlete.registerForEvent')}
             </Link>
           </div>
         ) : (
@@ -127,7 +127,7 @@ export default function AthletePortalPage() {
                     </span>
                   </div>
                   <p className="text-xs text-gray-400">
-                    {ath.applications.map(a => a.event?.name).filter(Boolean).join(', ') || 'No events'}
+                    {ath.applications.map(a => a.event?.name).filter(Boolean).join(', ') || t('athlete.noEvents')}
                   </p>
                 </button>
               ))}
@@ -162,7 +162,7 @@ export default function AthletePortalPage() {
                           <th className="py-1.5 text-right font-medium">{t('athlete.personalBest')}</th>
                           <th className="py-1.5 text-right font-medium">{t('athlete.seasonBest')}</th>
                           <th className="py-1.5 text-right font-medium">{t('athlete.worldRanking')}</th>
-                          <th className="py-1.5 text-center font-medium">Status</th>
+                          <th className="py-1.5 text-center font-medium">{t('selection.participation')}</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -270,7 +270,7 @@ export default function AthletePortalPage() {
                 {/* Agreement history */}
                 {selected.agreements.length > 1 && (
                   <div className="bg-white rounded-lg border p-4">
-                    <h3 className="font-semibold text-sm mb-3">Offer history</h3>
+                    <h3 className="font-semibold text-sm mb-3">{t('contract.offerHistory')}</h3>
                     <div className="space-y-2">
                       {selected.agreements.map((c) => (
                         <div key={c.id} className={`p-2 rounded text-xs border ${
@@ -278,7 +278,7 @@ export default function AthletePortalPage() {
                         }`}>
                           <div className="flex justify-between">
                             <span className="font-medium">
-                              v{c.version} — {c.direction === 'to_athlete' ? 'From organizer' : 'Your counter-offer'}
+                              v{c.version} — {c.direction === 'to_athlete' ? t('contract.fromOrganizer') : t('contract.yourCounterOffer')}
                             </span>
                             <span className="text-gray-500">{new Date(c.sentAt).toLocaleDateString()}</span>
                           </div>
@@ -291,7 +291,7 @@ export default function AthletePortalPage() {
                 {/* Interaction history */}
                 {selected.interactions && selected.interactions.length > 0 && (
                   <div className="bg-white rounded-lg border p-4">
-                    <h3 className="font-semibold text-sm mb-3">Activity</h3>
+                    <h3 className="font-semibold text-sm mb-3">{t('collaborator.activity')}</h3>
                     <div className="space-y-2">
                       {selected.interactions.slice(0, 10).map((ix) => (
                         <div key={ix.id} className="flex items-start gap-2 text-xs border-b pb-2 last:border-0">
@@ -310,7 +310,7 @@ export default function AthletePortalPage() {
                   <div className="text-right">
                     <button
                       onClick={() => {
-                        if (confirm('Are you sure you want to withdraw?')) {
+                        if (confirm(t('confirm.withdraw'))) {
                           respondMutation.mutate({ athleteId: selected.id, action: 'withdraw' })
                         }
                       }}
@@ -460,7 +460,7 @@ function CounterOfferForm({
             })}
           </div>
           {DINNER_LABELS.some(d => !latestOffer[`dinner${d.charAt(0).toUpperCase() + d.slice(1)}` as keyof Agreement]) && (
-            <p className="text-[10px] text-gray-400 mt-1">Greyed-out dinners were not included in the offer</p>
+            <p className="text-[10px] text-gray-400 mt-1">{t('contract.dinnersLockedHint')}</p>
           )}
         </div>
 

@@ -146,8 +146,8 @@ export default function DashboardPage() {
                 <tr className="border-b bg-gray-50 text-xs text-gray-500">
                   <th className="px-3 py-2 text-left font-medium">{t('athlete.event')}</th>
                   <th className="px-3 py-2 text-center font-medium">{t('dashboard.fillRate')}</th>
-                  <th className="px-3 py-2 text-center font-medium">Confirmed</th>
-                  <th className="px-3 py-2 text-center font-medium">In Neg.</th>
+                  <th className="px-3 py-2 text-center font-medium">{t('dashboard.confirmed')}</th>
+                  <th className="px-3 py-2 text-center font-medium">{t('dashboard.inNegotiation')}</th>
                   <th className="px-3 py-2 text-center font-medium">{t('dashboard.swissQuota')}</th>
                   <th className="px-3 py-2 text-center font-medium">{t('dashboard.eapQuota')}</th>
                 </tr>
@@ -199,7 +199,7 @@ export default function DashboardPage() {
             <div className="bg-white rounded-lg border p-4">
               <h3 className="font-semibold text-sm mb-3">{t('dashboard.selectors')}</h3>
               {selectors.length === 0 ? (
-                <p className="text-xs text-gray-400">No selectors assigned</p>
+                <p className="text-xs text-gray-400">{t('common.none')}</p>
               ) : (
                 <div className="space-y-2">
                   {selectors.map((s) => (

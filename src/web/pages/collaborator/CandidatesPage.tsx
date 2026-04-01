@@ -141,7 +141,7 @@ export default function CandidatesPage() {
               value={managerFilter}
               onChange={(e) => setManagerFilter(e.target.value)}
             >
-              <option value="">{t('common.all')} managers</option>
+              <option value="">{t('common.all')} {t('common.managers')}</option>
               {managers.map((m) => (
                 <option key={m.id} value={m.id}>{m.firstName} {m.lastName}</option>
               ))}
@@ -153,7 +153,7 @@ export default function CandidatesPage() {
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
           >
-            <option value="">{t('common.all')} statuses</option>
+            <option value="">{t('common.all')} {t('common.statuses')}</option>
             {(['to_review', 'agreement_sent', 'counter_offer_sent', 'confirmed', 'rejected', 'withdrawn'] as NegotiationStatus[]).map(
               (s) => (
                 <option key={s} value={s}>
@@ -183,23 +183,23 @@ export default function CandidatesPage() {
           </div>
         ) : filtered.length === 0 ? (
           <div className="bg-white rounded-lg border p-8 text-center text-gray-400 text-sm">
-            No candidates found
+            {t('common.noResults')}
           </div>
         ) : (
           <div className="bg-white rounded-lg border overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b bg-gray-50 text-xs text-gray-500">
-                  <th className="px-3 py-2.5 text-left font-medium">Athlete</th>
+                  <th className="px-3 py-2.5 text-left font-medium">{t('athlete.lastName')}</th>
                   <th className="px-3 py-2.5 text-left font-medium">{t('athlete.event')}</th>
-                  <th className="px-3 py-2.5 text-left font-medium">NAT</th>
-                  <th className="px-3 py-2.5 text-left font-medium">PB</th>
-                  <th className="px-3 py-2.5 text-left font-medium">SB</th>
-                  <th className="px-3 py-2.5 text-left font-medium">#WR</th>
+                  <th className="px-3 py-2.5 text-left font-medium">{t('athlete.nationality')}</th>
+                  <th className="px-3 py-2.5 text-left font-medium">{t('athlete.personalBest')}</th>
+                  <th className="px-3 py-2.5 text-left font-medium">{t('athlete.seasonBest')}</th>
+                  <th className="px-3 py-2.5 text-left font-medium">{t('athlete.worldRanking')}</th>
                   <th className="px-3 py-2.5 text-left font-medium">{t('selection.scoring')}</th>
                   <th className="px-3 py-2.5 text-left font-medium">{t('selection.recommendation')}</th>
-                  <th className="px-3 py-2.5 text-left font-medium">Negotiation</th>
-                  <th className="px-3 py-2.5 text-left font-medium">Participation</th>
+                  <th className="px-3 py-2.5 text-left font-medium">{t('selection.negotiation')}</th>
+                  <th className="px-3 py-2.5 text-left font-medium">{t('selection.participation')}</th>
                   <th className="px-3 py-2.5 text-left font-medium">{t('selection.estimatedCost')}</th>
                 </tr>
               </thead>
@@ -271,7 +271,7 @@ export default function CandidatesPage() {
                               : 'bg-yellow-100 text-yellow-800'
                           }`}
                         >
-                          {app.participationStatus}
+                          {t(`participation.${app.participationStatus}`)}
                         </span>
                       </td>
                       <td className="px-3 py-2.5 font-mono text-xs">
