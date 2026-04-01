@@ -90,9 +90,94 @@ export default function HotelRoomsPage() {
     )
   }
 
+  // ── Hotel CRUD ──────────────────────────────────────────────────────────
+  const [hotelName_, setHotelName_] = useState('')
+  const [editingHotelId, setEditingHotelId] = useState<string | null>(null)
+
+  const addHotelMutation = useMutation({
+    mutationFn: (data: { name: string }) => api.post('/api/v1/hotels', data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['hotels'] })
+      setHotelName_('')
+    },
+  })
+
+  const updateHotelMutation = useMutation({
+    mutationFn: ({ id, name }: { id: string; name: string }) =>
+      api.patch(`/api/v1/hotels/${id}`, { name }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['hotels'] })
+      setHotelName_('')
+      setEditingHotelId(null)
+    },
+  })
+
+  const deleteHotelMutation = useMutation({
+    mutationFn: (id: string) => api.delete(`/api/v1/hotels/${id}`),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['hotels', 'hotel-rooms'] }),
+  })
+
+  const handleHotelSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!hotelName_.trim()) return
+    if (editingHotelId) {
+      updateHotelMutation.mutate({ id: editingHotelId, name: hotelName_.trim() })
+    } else {
+      addHotelMutation.mutate({ name: hotelName_.trim() })
+    }
+  }
+
   return (
     <div className="max-w-4xl mx-auto py-8 px-6">
-      <h1 className="text-lg font-bold mb-6">{t('admin.hotelRooms')}</h1>
+      {/* Hotels section */}
+      <h1 className="text-lg font-bold mb-4">Hotels</h1>
+      <div className="bg-white rounded-lg border p-4 mb-8">
+        <form onSubmit={handleHotelSubmit} className="flex items-end gap-3 mb-4">
+          <div className="flex-1">
+            <label className="block text-xs text-gray-500 mb-1">Hotel name</label>
+            <input
+              type="text"
+              value={hotelName_}
+              onChange={(e) => setHotelName_(e.target.value)}
+              className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-gray-900"
+              placeholder="e.g. Hilton Geneva"
+            />
+          </div>
+          <button
+            type="submit"
+            disabled={addHotelMutation.isPending || updateHotelMutation.isPending}
+            className="bg-gray-900 text-white text-sm font-medium px-4 py-1.5 rounded hover:bg-gray-800 disabled:opacity-50"
+          >
+            {editingHotelId ? t('common.save') : t('common.add')}
+          </button>
+          {editingHotelId && (
+            <button type="button" onClick={() => { setEditingHotelId(null); setHotelName_('') }}
+              className="text-sm text-gray-500 hover:text-gray-700 px-3 py-1.5">
+              {t('common.cancel')}
+            </button>
+          )}
+        </form>
+        {hotels.length === 0 ? (
+          <p className="text-xs text-gray-400">No hotels yet</p>
+        ) : (
+          <div className="space-y-1">
+            {hotels.map((h) => (
+              <div key={h.id} className="flex items-center justify-between text-sm p-2 rounded hover:bg-gray-50">
+                <span>{h.name}</span>
+                <div className="flex gap-2">
+                  <button onClick={() => { setEditingHotelId(h.id); setHotelName_(h.name) }}
+                    className="text-xs text-blue-600 hover:text-blue-800">{t('common.edit')}</button>
+                  <button onClick={() => { if (confirm(`Delete hotel "${h.name}" and all its room types?`)) deleteHotelMutation.mutate(h.id) }}
+                    className="text-xs text-red-600 hover:text-red-800">{t('common.delete')}</button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Room types section */}
+      <h2 className="text-lg font-bold mb-4">{t('admin.hotelRooms')}</h2>
 
       <form onSubmit={handleSubmit} className="bg-white rounded-lg border p-4 mb-6">
         <div className="grid grid-cols-5 gap-3 items-end">

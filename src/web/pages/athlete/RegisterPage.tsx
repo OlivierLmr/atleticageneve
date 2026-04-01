@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { api, ApiError } from '@web/lib/api'
 import { LanguageSwitcher } from '@web/App'
-import type { Event } from '@shared/types'
+import type { Event, EapCity } from '@shared/types'
 
 // The events API returns Event joined with catalog data (name, discipline, gender, perfType)
 interface EventWithCatalog extends Event {
@@ -28,7 +28,7 @@ export default function AthleteRegisterPage() {
   const [form, setForm] = useState({
     firstName: '', lastName: '', gender: '' as 'M' | 'F' | '',
     dateOfBirth: '', phone: '', email: '', nationality: '',
-    federation: '', isEap: false, swiLicence: '',
+    federation: '', isEap: false, eapCity: '', swiLicence: '',
     // Competition
     eventIds: [] as string[],
     waProfileUrl: '',
@@ -37,6 +37,12 @@ export default function AthleteRegisterPage() {
     dopingFree: false,
     // Travel
     participantNotes: '', additionalNotes: '',
+  })
+
+  const { data: eapCities = [] } = useQuery<EapCity[]>({
+    queryKey: ['eap-cities'],
+    queryFn: () => api.get('/api/v1/eap-cities'),
+    enabled: form.isEap,
   })
 
   // Fetch events filtered by gender
@@ -78,6 +84,7 @@ export default function AthleteRegisterPage() {
         nationality: form.nationality,
         federation: form.federation || undefined,
         isEap: form.isEap,
+        eapCity: form.eapCity || undefined,
         isSwiss: form.nationality === 'SUI',
         swiLicence: form.swiLicence || undefined,
         athleteEmail: form.email,
@@ -190,9 +197,20 @@ export default function AthleteRegisterPage() {
                 <input className={inputCls} value={form.federation} onChange={e => update('federation', e.target.value)} />
               </div>
               <div className="flex items-center gap-2">
-                <input type="checkbox" id="eap" checked={form.isEap} onChange={e => update('isEap', e.target.checked)} />
+                <input type="checkbox" id="eap" checked={form.isEap} onChange={e => { update('isEap', e.target.checked); if (!e.target.checked) update('eapCity', '') }} />
                 <label htmlFor="eap" className="text-sm">{t('athlete.eapMember')}</label>
               </div>
+              {form.isEap && (
+                <div>
+                  <label className={labelCls}>{t('athlete.eapCity')}</label>
+                  <select className={inputCls} value={form.eapCity} onChange={e => update('eapCity', e.target.value)}>
+                    <option value="">--</option>
+                    {eapCities.map(c => (
+                      <option key={c.id} value={c.id}>{c.name} ({c.countryCode})</option>
+                    ))}
+                  </select>
+                </div>
+              )}
               {form.nationality === 'SUI' && (
                 <div>
                   <label className={labelCls}>{t('athlete.swissLicence')}</label>

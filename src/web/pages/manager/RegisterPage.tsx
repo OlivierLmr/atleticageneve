@@ -5,7 +5,7 @@ import { useQuery } from '@tanstack/react-query'
 import { api, ApiError } from '@web/lib/api'
 import { useAuth } from '@web/lib/auth'
 import { LanguageSwitcher } from '@web/App'
-import type { Event } from '@shared/types'
+import type { Event, EapCity } from '@shared/types'
 
 // Events API returns Event joined with catalog data
 interface EventWithCatalog extends Event {
@@ -23,6 +23,7 @@ interface AthleteRow {
   dateOfBirth: string
   gender: 'M' | 'F' | ''
   isEap: boolean
+  eapCity: string
   waProfileUrl: string
   eventIds: string[]
 }
@@ -30,7 +31,7 @@ interface AthleteRow {
 const emptyRow = (): AthleteRow => ({
   key: crypto.randomUUID(),
   lastName: '', firstName: '', nationality: '',
-  dateOfBirth: '', gender: '', isEap: false,
+  dateOfBirth: '', gender: '', isEap: false, eapCity: '',
   waProfileUrl: '', eventIds: [],
 })
 
@@ -43,6 +44,12 @@ export default function ManagerRegisterPage() {
   const [error, setError] = useState('')
   const [registeredCount, setRegisteredCount] = useState(0)
   const [expandedRow, setExpandedRow] = useState<string | null>(null)
+
+  const { data: eapCities = [] } = useQuery<EapCity[]>({
+    queryKey: ['eap-cities'],
+    queryFn: () => api.get('/api/v1/eap-cities'),
+    enabled: rows.some(r => r.isEap),
+  })
 
   const { data: events = [] } = useQuery<EventWithCatalog[]>({
     queryKey: ['events'],
@@ -90,6 +97,7 @@ export default function ManagerRegisterPage() {
         gender: r.gender as 'M' | 'F',
         eventIds: r.eventIds,
         isEap: r.isEap,
+        eapCity: r.eapCity || undefined,
         isSwiss: r.nationality === 'SUI',
         waProfileUrl: r.waProfileUrl || undefined,
         dateOfBirth: r.dateOfBirth || undefined,
@@ -168,7 +176,15 @@ export default function ManagerRegisterPage() {
                       </select>
                     </td>
                     <td className="px-1 py-1 text-center">
-                      <input type="checkbox" checked={row.isEap} onChange={e => updateRow(row.key, 'isEap', e.target.checked)} />
+                      <input type="checkbox" checked={row.isEap} onChange={e => { updateRow(row.key, 'isEap', e.target.checked); if (!e.target.checked) updateRow(row.key, 'eapCity', '') }} />
+                      {row.isEap && (
+                        <select className={`${inputCls} mt-1`} value={row.eapCity} onChange={e => updateRow(row.key, 'eapCity', e.target.value)}>
+                          <option value="">--</option>
+                          {eapCities.map(c => (
+                            <option key={c.id} value={c.id}>{c.name}</option>
+                          ))}
+                        </select>
+                      )}
                     </td>
                     <td className="px-1 py-1"><input className={inputCls} value={row.waProfileUrl} onChange={e => updateRow(row.key, 'waProfileUrl', e.target.value)} placeholder="worldathletics.org/..." /></td>
                     <td className="px-1 py-1">
