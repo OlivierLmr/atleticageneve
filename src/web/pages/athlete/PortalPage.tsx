@@ -5,7 +5,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from '@web/lib/api'
 import { useAuth } from '@web/lib/auth'
 import { LanguageSwitcher } from '@web/App'
-import { NIGHT_LABELS } from '@shared/constants'
+import { NIGHT_LABELS, DINNER_LABELS } from '@shared/constants'
 import type { Application, Athlete, Event, Agreement, Interaction, NegotiationStatus, ParticipationStatus, WaPerformance } from '@shared/types'
 
 interface PortalEvent extends Event {
@@ -421,6 +421,47 @@ function CounterOfferForm({
               )
             })}
           </div>
+        </div>
+
+        <div>
+          <label className={labelCls}>{t('contract.dinners')}</label>
+          <div className="flex gap-2">
+            {DINNER_LABELS.map((day) => {
+              const key = `dinner${day.charAt(0).toUpperCase() + day.slice(1)}` as keyof typeof form
+              const lockedOff = !latestOffer[key as keyof Agreement]
+              return (
+                <label key={day} className={`flex flex-col items-center text-xs px-2 py-1 rounded border ${
+                  lockedOff ? 'border-gray-200 bg-gray-100 text-gray-300 cursor-not-allowed' :
+                  form[key] ? 'bg-gray-900 text-white border-gray-900 cursor-pointer' : 'border-gray-300 cursor-pointer'
+                }`}>
+                  <input type="checkbox" className="sr-only" checked={form[key] as boolean} disabled={lockedOff}
+                    onChange={(e) => setForm((p) => ({ ...p, [key]: e.target.checked }))} />
+                  {t(`night.${day}`)}
+                </label>
+              )
+            })}
+          </div>
+          {DINNER_LABELS.some(d => !latestOffer[`dinner${d.charAt(0).toUpperCase() + d.slice(1)}` as keyof Agreement]) && (
+            <p className="text-[10px] text-gray-400 mt-1">Greyed-out dinners were not included in the offer</p>
+          )}
+        </div>
+
+        <div className="flex gap-4">
+          {([
+            ['stadiumMeals', t('contract.stadiumMeals')],
+            ['transportAirportHotel', t('contract.transportAirportHotel')],
+            ['transportHotelStadium', t('contract.transportHotelStadium')],
+          ] as const).map(([key, label]) => {
+            const lockedOff = !latestOffer[key]
+            return (
+              <label key={key} className={`flex items-center gap-2 text-xs ${lockedOff ? 'text-gray-300 cursor-not-allowed' : 'cursor-pointer'}`}>
+                <input type="checkbox" checked={form[key] as boolean} disabled={lockedOff}
+                  onChange={(e) => setForm((p) => ({ ...p, [key]: e.target.checked }))}
+                  className="accent-gray-900" />
+                {label}
+              </label>
+            )
+          })}
         </div>
 
         <div>
