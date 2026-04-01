@@ -2,15 +2,17 @@ import { Hono } from 'hono'
 import { zValidator } from '@hono/zod-validator'
 import { eq } from 'drizzle-orm'
 import * as schema from '../db/schema'
-import { athleteRegistrationSchema, batchAthleteRegistrationSchema, athleteUpdateSchema } from '@shared/validation'
+import { athleteRegistrationSchema, batchAthleteRegistrationSchema, athleteUpdateSchema, negotiationStatusChangeSchema } from '@shared/validation'
+import { NEGOTIATION_TRANSITIONS } from '@shared/constants'
 import { requireAuth } from '../middleware/auth'
 import { sendEmail, sendMagicLinkEmail } from '../services/email'
 import { generateToken, magicLinkExpiresAt } from '../services/auth'
 import type { Env } from '../index'
+import type { NegotiationStatus } from '@shared/types'
 
 const athletes = new Hono<Env>()
 
-// ── POST /athletes — register a single athlete + create applications ─────────
+// ── POST /athletes — self-registration (public, no auth) ─────────────────────
 
 athletes.post('/', zValidator('json', athleteRegistrationSchema), async (c) => {
   const data = c.req.valid('json')
@@ -46,13 +48,16 @@ athletes.post('/', zValidator('json', athleteRegistrationSchema), async (c) => {
     federation: data.federation ?? null,
     isEap: data.isEap,
     isSwiss: data.isSwiss,
-    distanceFromGva: data.distanceFromGva,
+    distanceFromGva: data.distanceFromGva ?? 0,
     waProfileUrl: data.waProfileUrl ?? null,
     swiLicence: data.swiLicence ?? null,
     athleteEmail: data.athleteEmail,
     athletePhone: data.athletePhone ?? null,
+    eapCity: data.eapCity ?? null,
     iRunClean: data.iRunClean ? 'yes' : 'unknown',
     dopingFree: data.dopingFree ? 'yes' : 'unknown',
+    participantNotes: data.participantNotes ?? null,
+    additionalNotes: data.additionalNotes ?? null,
     negotiationStatus: 'to_review',
   })
 
@@ -67,14 +72,12 @@ athletes.post('/', zValidator('json', athleteRegistrationSchema), async (c) => {
       athleteId,
       eventId,
       editionId: edition.id,
-      status: 'to_review',
       participationStatus: 'pending',
-      participantNotes: data.participantNotes ?? null,
-      additionalNotes: data.additionalNotes ?? null,
     })
 
     // Log interaction
     await db.insert(schema.interaction).values({
+      athleteId,
       applicationId,
       type: 'status_change',
       content: 'Application submitted',
@@ -132,7 +135,7 @@ athletes.post('/', zValidator('json', athleteRegistrationSchema), async (c) => {
   }, 201)
 })
 
-// ── POST /athletes/batch — register multiple athletes (manager) ───────────────
+// ── POST /athletes/batch — register multiple athletes (manager) ──────────────
 
 athletes.post('/batch', requireAuth('manager'), zValidator('json', batchAthleteRegistrationSchema), async (c) => {
   const { athletes: athleteList } = c.req.valid('json')
@@ -183,11 +186,11 @@ athletes.post('/batch', requireAuth('manager'), zValidator('json', batchAthleteR
         athleteId,
         eventId,
         editionId: edition.id,
-        status: 'to_review',
         participationStatus: 'pending',
       })
 
       await db.insert(schema.interaction).values({
+        athleteId,
         applicationId,
         type: 'status_change',
         content: `Application submitted by manager ${user.firstName} ${user.lastName}`,
@@ -209,11 +212,11 @@ athletes.post('/batch', requireAuth('manager'), zValidator('json', batchAthleteR
   return c.json({ registered: results }, 201)
 })
 
-// ── GET /athletes/:id — get athlete profile ───────────────────────────────────
+// ── GET /athletes/:id — get athlete profile ──────────────────────────────────
 
-athletes.get('/:id', async (c) => {
+athletes.get('/:id', requireAuth('collaborator', 'committee'), async (c) => {
   const db = c.get('db')
-  const id = c.req.param('id')
+  const id = c.req.param('id')!
 
   const results = await db.select().from(schema.athlete).where(eq(schema.athlete.id, id)).limit(1)
   if (results.length === 0) {
@@ -223,12 +226,12 @@ athletes.get('/:id', async (c) => {
   return c.json(results[0])
 })
 
-// ── PATCH /athletes/:id — update athlete personal data ────────────────────────
+// ── PATCH /athletes/:id — update athlete data ────────────────────────────────
 
 athletes.patch('/:id', requireAuth('athlete', 'manager', 'collaborator', 'committee'), zValidator('json', athleteUpdateSchema), async (c) => {
   const db = c.get('db')
   const user = c.get('user')!
-  const id = c.req.param('id')
+  const id = c.req.param('id')!
   const data = c.req.valid('json')
 
   // Verify athlete exists
@@ -246,12 +249,114 @@ athletes.patch('/:id', requireAuth('athlete', 'manager', 'collaborator', 'commit
     return c.json({ error: 'Not authorized to update this athlete' }, 403)
   }
 
+  // Auto-recompute estTotal if cost fields change
+  const updates: Record<string, unknown> = { ...data, updatedBy: user.id, updatedAt: new Date().toISOString() }
+  if ('estTravel' in data || 'estAccommodation' in data || 'estAppearance' in data) {
+    const travel = (data.estTravel ?? ath.estTravel) || 0
+    const accommodation = (data.estAccommodation ?? ath.estAccommodation) || 0
+    const appearance = (data.estAppearance ?? ath.estAppearance) || 0
+    updates.estTotal = travel + accommodation + appearance
+  }
+
   await db
     .update(schema.athlete)
-    .set({ ...data, updatedAt: new Date().toISOString() })
+    .set(updates)
     .where(eq(schema.athlete.id, id))
 
-  return c.json({ id, updated: Object.keys(data) })
+  return c.json({ id, updated: Object.keys(updates) })
+})
+
+// ── PATCH /athletes/:id/negotiation-status — change negotiation status ───────
+
+athletes.patch('/:id/negotiation-status', requireAuth('collaborator', 'committee'), async (c) => {
+  const db = c.get('db')
+  const user = c.get('user')!
+  const id = c.req.param('id')!
+
+  const body = await c.req.json()
+  const parsed = negotiationStatusChangeSchema.safeParse(body)
+  if (!parsed.success) {
+    return c.json({ error: 'Invalid status', details: parsed.error.flatten() }, 400)
+  }
+  const newStatus = parsed.data.status as NegotiationStatus
+
+  // Get athlete
+  const athRows = await db.select().from(schema.athlete).where(eq(schema.athlete.id, id)).limit(1)
+  if (athRows.length === 0) {
+    return c.json({ error: 'Athlete not found' }, 404)
+  }
+  const ath = athRows[0]
+  const currentStatus = ath.negotiationStatus as NegotiationStatus
+
+  // Validate transition
+  const allowed = NEGOTIATION_TRANSITIONS[currentStatus]
+  if (!allowed || !allowed.includes(newStatus)) {
+    return c.json({
+      error: `Cannot transition from "${currentStatus}" to "${newStatus}"`,
+      allowedTransitions: allowed,
+    }, 400)
+  }
+
+  // Update athlete negotiation status
+  const now = new Date().toISOString()
+  const terminalStates: NegotiationStatus[] = ['confirmed', 'rejected', 'withdrawn']
+  await db
+    .update(schema.athlete)
+    .set({
+      negotiationStatus: newStatus,
+      updatedAt: now,
+      ...(terminalStates.includes(newStatus) ? { decidedAt: now } : {}),
+    })
+    .where(eq(schema.athlete.id, id))
+
+  // Log interaction
+  await db.insert(schema.interaction).values({
+    athleteId: id,
+    type: 'status_change',
+    content: `Negotiation status changed from "${currentStatus}" to "${newStatus}"`,
+    authorId: user.id,
+    authorName: `${user.firstName} ${user.lastName}`,
+  })
+
+  return c.json({ id, status: newStatus, previousStatus: currentStatus })
+})
+
+// ── DELETE /athletes/:id — archive (committee only) ──────────────────────────
+
+athletes.delete('/:id', requireAuth('committee'), async (c) => {
+  const db = c.get('db')
+  const id = c.req.param('id')!
+
+  const athRows = await db.select().from(schema.athlete).where(eq(schema.athlete.id, id)).limit(1)
+  if (athRows.length === 0) {
+    return c.json({ error: 'Athlete not found' }, 404)
+  }
+
+  await db
+    .update(schema.athlete)
+    .set({ archivedAt: new Date().toISOString() })
+    .where(eq(schema.athlete.id, id))
+
+  return c.json({ id, archived: true })
+})
+
+// ── POST /athletes/:id/restore — restore (committee only) ────────────────────
+
+athletes.post('/:id/restore', requireAuth('committee'), async (c) => {
+  const db = c.get('db')
+  const id = c.req.param('id')!
+
+  const athRows = await db.select().from(schema.athlete).where(eq(schema.athlete.id, id)).limit(1)
+  if (athRows.length === 0) {
+    return c.json({ error: 'Athlete not found' }, 404)
+  }
+
+  await db
+    .update(schema.athlete)
+    .set({ archivedAt: null })
+    .where(eq(schema.athlete.id, id))
+
+  return c.json({ id, archived: false })
 })
 
 export default athletes

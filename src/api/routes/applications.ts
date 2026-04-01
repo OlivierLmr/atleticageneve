@@ -1,13 +1,12 @@
 import { Hono } from 'hono'
 import { eq, and, sql } from 'drizzle-orm'
 import * as schema from '../db/schema'
-import { negotiationStatusChangeSchema, participationStatusChangeSchema } from '@shared/validation'
-import { NEGOTIATION_TRANSITIONS, PARTICIPATION_TRANSITIONS } from '@shared/constants'
+import { participationStatusChangeSchema } from '@shared/validation'
+import { PARTICIPATION_TRANSITIONS } from '@shared/constants'
 import { computeScore } from '@shared/scoring'
 import { requireAuth } from '../middleware/auth'
-import { sendStatusChangeEmail } from '../services/email'
 import type { Env } from '../index'
-import type { NegotiationStatus, ParticipationStatus } from '@shared/types'
+import type { ParticipationStatus } from '@shared/types'
 
 const applications = new Hono<Env>()
 
@@ -19,25 +18,27 @@ applications.use('*', requireAuth('collaborator', 'committee'))
 applications.get('/', async (c) => {
   const db = c.get('db')
   const eventId = c.req.query('eventId')
-  const status = c.req.query('status')
+  const negotiationStatus = c.req.query('negotiationStatus')
   const managerId = c.req.query('managerId')
   const search = c.req.query('search')
 
   // Build conditions
   const conditions = []
   if (eventId) conditions.push(eq(schema.application.eventId, eventId))
-  if (status) conditions.push(eq(schema.application.status, status))
+  if (negotiationStatus) conditions.push(eq(schema.athlete.negotiationStatus, negotiationStatus))
 
-  // Query applications with athlete and event joins
+  // Query applications with athlete, event, and event catalog joins
   const rows = await db
     .select({
       application: schema.application,
       athlete: schema.athlete,
       event: schema.event,
+      catalog: schema.eventCatalog,
     })
     .from(schema.application)
     .innerJoin(schema.athlete, eq(schema.application.athleteId, schema.athlete.id))
     .innerJoin(schema.event, eq(schema.application.eventId, schema.event.id))
+    .innerJoin(schema.eventCatalog, eq(schema.event.catalogId, schema.eventCatalog.id))
     .where(conditions.length > 0 ? and(...conditions) : undefined)
     .orderBy(sql`${schema.application.score} DESC NULLS LAST`)
 
@@ -47,8 +48,14 @@ applications.get('/', async (c) => {
 
   let results = rows.map((r) => ({
     ...r.application,
-    athlete: r.athlete,
-    event: r.event,
+    athlete: {
+      ...r.athlete,
+      negotiationStatus: r.athlete.negotiationStatus,
+    },
+    event: {
+      ...r.event,
+      catalog: r.catalog,
+    },
     waPerformance: waPerfMap.get(`${r.application.athleteId}-${r.application.eventId}`) ?? null,
   }))
 
@@ -81,10 +88,12 @@ applications.get('/:id', async (c) => {
       application: schema.application,
       athlete: schema.athlete,
       event: schema.event,
+      catalog: schema.eventCatalog,
     })
     .from(schema.application)
     .innerJoin(schema.athlete, eq(schema.application.athleteId, schema.athlete.id))
     .innerJoin(schema.event, eq(schema.application.eventId, schema.event.id))
+    .innerJoin(schema.eventCatalog, eq(schema.event.catalogId, schema.eventCatalog.id))
     .where(eq(schema.application.id, id))
     .limit(1)
 
@@ -94,18 +103,18 @@ applications.get('/:id', async (c) => {
 
   const row = rows[0]
 
-  // Fetch contracts (athlete-level)
-  const contracts = await db
+  // Fetch agreements (athlete-level)
+  const agreements = await db
     .select()
-    .from(schema.contractOffer)
-    .where(eq(schema.contractOffer.athleteId, row.application.athleteId))
-    .orderBy(schema.contractOffer.version)
+    .from(schema.agreement)
+    .where(eq(schema.agreement.athleteId, row.application.athleteId))
+    .orderBy(schema.agreement.version)
 
-  // Fetch interactions
+  // Fetch interactions (athlete-level, include application-level)
   const interactions = await db
     .select()
     .from(schema.interaction)
-    .where(eq(schema.interaction.applicationId, id))
+    .where(eq(schema.interaction.athleteId, row.application.athleteId))
     .orderBy(sql`${schema.interaction.createdAt} DESC`)
 
   // Fetch WA performance
@@ -121,113 +130,17 @@ applications.get('/:id', async (c) => {
   return c.json({
     ...row.application,
     athlete: row.athlete,
-    event: row.event,
-    contracts,
+    event: {
+      ...row.event,
+      catalog: row.catalog,
+    },
+    agreements,
     interactions,
     waPerformance: waPerfs[0] ?? null,
   })
 })
 
-// ── PATCH /applications/:id/status — transition negotiation status (athlete-level) ──
-
-applications.patch('/:id/status', async (c) => {
-  const db = c.get('db')
-  const user = c.get('user')!
-  const id = c.req.param('id')
-
-  // Parse body
-  const body = await c.req.json()
-  const parsed = negotiationStatusChangeSchema.safeParse(body)
-  if (!parsed.success) {
-    return c.json({ error: 'Invalid status', details: parsed.error.flatten() }, 400)
-  }
-  const newStatus = parsed.data.status as NegotiationStatus
-
-  // Get application to find athlete
-  const apps = await db
-    .select()
-    .from(schema.application)
-    .where(eq(schema.application.id, id))
-    .limit(1)
-
-  if (apps.length === 0) {
-    return c.json({ error: 'Application not found' }, 404)
-  }
-
-  const app = apps[0]
-
-  // Get athlete for negotiation status
-  const athRows = await db.select().from(schema.athlete).where(eq(schema.athlete.id, app.athleteId)).limit(1)
-  if (athRows.length === 0) {
-    return c.json({ error: 'Athlete not found' }, 404)
-  }
-  const ath = athRows[0]
-  const currentStatus = ath.negotiationStatus as NegotiationStatus
-
-  // Validate transition
-  const allowed = NEGOTIATION_TRANSITIONS[currentStatus]
-  if (!allowed || !allowed.includes(newStatus)) {
-    return c.json({
-      error: `Cannot transition from "${currentStatus}" to "${newStatus}"`,
-      allowedTransitions: allowed,
-    }, 400)
-  }
-
-  // Update athlete negotiation status
-  const now = new Date().toISOString()
-  await db
-    .update(schema.athlete)
-    .set({ negotiationStatus: newStatus, updatedAt: now })
-    .where(eq(schema.athlete.id, ath.id))
-
-  // Also update legacy application.status for backward compat
-  await db
-    .update(schema.application)
-    .set({
-      status: newStatus,
-      updatedAt: now,
-      ...((['accepted', 'rejected', 'withdrawn'].includes(newStatus)) ? { decidedAt: now } : {}),
-    })
-    .where(eq(schema.application.id, id))
-
-  // Log interaction
-  await db.insert(schema.interaction).values({
-    applicationId: id,
-    type: 'status_change',
-    content: `Status changed from "${currentStatus}" to "${newStatus}"`,
-    authorId: user.id,
-    authorName: `${user.firstName} ${user.lastName}`,
-  })
-
-  // Send email notifications
-  if (ath.athleteEmail) {
-    sendStatusChangeEmail(
-      ath.athleteEmail,
-      `${ath.firstName} ${ath.lastName}`,
-      newStatus,
-      'http://localhost:5173/athlete/portal'
-    )
-  }
-  if (ath.managerId) {
-    const managers = await db
-      .select()
-      .from(schema.user)
-      .where(eq(schema.user.id, ath.managerId))
-      .limit(1)
-    if (managers.length > 0 && managers[0].email) {
-      sendStatusChangeEmail(
-        managers[0].email,
-        `${ath.firstName} ${ath.lastName}`,
-        newStatus,
-        'http://localhost:5173/manager/portal'
-      )
-    }
-  }
-
-  return c.json({ id, athleteId: ath.id, status: newStatus, previousStatus: currentStatus })
-})
-
-// ── PATCH /applications/:id/participation-status — toggle participation ──────
+// ── PATCH /applications/:id/participation-status — change participationStatus ─
 
 applications.patch('/:id/participation-status', async (c) => {
   const db = c.get('db')
@@ -252,7 +165,8 @@ applications.patch('/:id/participation-status', async (c) => {
     return c.json({ error: 'Application not found' }, 404)
   }
 
-  const currentStatus = apps[0].participationStatus as ParticipationStatus
+  const app = apps[0]
+  const currentStatus = app.participationStatus as ParticipationStatus
 
   // Validate transition
   const allowed = PARTICIPATION_TRANSITIONS[currentStatus]
@@ -265,11 +179,12 @@ applications.patch('/:id/participation-status', async (c) => {
 
   await db
     .update(schema.application)
-    .set({ participationStatus: newStatus, updatedAt: new Date().toISOString() })
+    .set({ participationStatus: newStatus })
     .where(eq(schema.application.id, id))
 
   // Log interaction
   await db.insert(schema.interaction).values({
+    athleteId: app.athleteId,
     applicationId: id,
     type: 'status_change',
     content: `Participation status changed to "${newStatus}"`,
@@ -280,22 +195,24 @@ applications.patch('/:id/participation-status', async (c) => {
   return c.json({ id, participationStatus: newStatus, previousStatus: currentStatus })
 })
 
-// ── POST /applications/:id/score — re-compute score ──────────────────────────
+// ── POST /applications/:id/score — recompute score ───────────────────────────
 
 applications.post('/:id/score', async (c) => {
   const db = c.get('db')
   const id = c.req.param('id')
 
-  // Get application with athlete and event
+  // Get application with athlete, event, and catalog
   const rows = await db
     .select({
       application: schema.application,
       athlete: schema.athlete,
       event: schema.event,
+      catalog: schema.eventCatalog,
     })
     .from(schema.application)
     .innerJoin(schema.athlete, eq(schema.application.athleteId, schema.athlete.id))
     .innerJoin(schema.event, eq(schema.application.eventId, schema.event.id))
+    .innerJoin(schema.eventCatalog, eq(schema.event.catalogId, schema.eventCatalog.id))
     .where(eq(schema.application.id, id))
     .limit(1)
 
@@ -303,9 +220,9 @@ applications.post('/:id/score', async (c) => {
     return c.json({ error: 'Application not found' }, 404)
   }
 
-  const { application: app, athlete: ath, event: evt } = rows[0]
+  const { application: app, athlete: ath, event: evt, catalog } = rows[0]
 
-  // Read PB/SB from wa_performance instead of application
+  // Read PB/SB from wa_performance
   const waPerfs = await db
     .select()
     .from(schema.waPerformance)
@@ -316,32 +233,48 @@ applications.post('/:id/score', async (c) => {
     .limit(1)
 
   const waPerf = waPerfs[0]
-  if (!waPerf || !waPerf.personalBestVal) {
+  if (!waPerf || waPerf.personalBest == null) {
     // No WA data — score pending
     await db
       .update(schema.application)
-      .set({ score: null, recommendation: 'Pending', updatedAt: new Date().toISOString() })
+      .set({ score: null, recommendation: 'Pending' })
       .where(eq(schema.application.id, id))
 
     return c.json({ id, score: null, recommendation: 'Pending' })
   }
 
+  // Get edition for weights
+  const editions = await db.select().from(schema.edition).limit(1)
+  const edition = editions[0]
+  const weights = edition ? {
+    weightPB: edition.weightPB,
+    weightSB: edition.weightSB,
+    weightRanking: edition.weightRanking,
+    weightCost: edition.weightCost,
+    bonusEap: edition.bonusEap,
+  } : undefined
+
+  // Determine perfType from catalog discipline
+  const perfType = catalog.discipline === 'Course' ? 'MIN' as const : 'MAX' as const
+
   const scoreResult = computeScore({
-    eventId: app.eventId,
-    personalBest: waPerf.personalBest ?? '0',
-    seasonBest: waPerf.seasonBest ?? '0',
-    swissMinima: String(evt.swissMinima),
+    personalBest: waPerf.personalBest ?? 0,
+    seasonBest: waPerf.seasonBest ?? 0,
     worldRanking: waPerf.worldRanking ?? 100,
-    estimatedCostTotal: app.estTotal ?? 0,
+    estimatedCostTotal: ath.estTotal ?? 0,
     isEap: ath.isEap,
-  })
+    isSwiss: ath.isSwiss,
+    perfType,
+    intMinima: evt.intMinima,
+    swissMinima: evt.swissMinima,
+    eapMinima: evt.eapMinima,
+  }, weights)
 
   await db
     .update(schema.application)
     .set({
       score: scoreResult.finalScore,
       recommendation: scoreResult.recommendation,
-      updatedAt: new Date().toISOString(),
     })
     .where(eq(schema.application.id, id))
 
@@ -351,49 +284,6 @@ applications.post('/:id/score', async (c) => {
     recommendation: scoreResult.recommendation,
     breakdown: scoreResult,
   })
-})
-
-// ── PATCH /applications/:id — update application fields (internal notes, logistics, etc.) ──
-
-applications.patch('/:id', async (c) => {
-  const db = c.get('db')
-  const id = c.req.param('id')
-  const body = await c.req.json()
-
-  // Only allow certain fields to be updated
-  const allowedFields = [
-    'internalNotes', 'assignedSelector',
-    'hotelId', 'roomNumber', 'accommodationReqs',
-    'arrivalDate', 'arrivalFlight', 'arrivalFrom', 'arrivalTime',
-    'departureDate', 'departureFlight', 'departureTo', 'departureTime',
-    'estTravel', 'estAccommodation', 'estAppearance', 'estTotal',
-  ]
-
-  const updates: Record<string, unknown> = { updatedAt: new Date().toISOString() }
-  for (const field of allowedFields) {
-    if (field in body) {
-      updates[field] = body[field]
-    }
-  }
-
-  // Recalculate estTotal if cost fields changed
-  if ('estTravel' in body || 'estAccommodation' in body || 'estAppearance' in body) {
-    const apps = await db.select().from(schema.application).where(eq(schema.application.id, id)).limit(1)
-    if (apps.length > 0) {
-      const current = apps[0]
-      const travel = (body.estTravel ?? current.estTravel) || 0
-      const accommodation = (body.estAccommodation ?? current.estAccommodation) || 0
-      const appearance = (body.estAppearance ?? current.estAppearance) || 0
-      updates.estTotal = travel + accommodation + appearance
-    }
-  }
-
-  await db
-    .update(schema.application)
-    .set(updates)
-    .where(eq(schema.application.id, id))
-
-  return c.json({ id, updated: Object.keys(updates) })
 })
 
 // ── POST /applications/:id/interactions — add an interaction ─────────────────
@@ -416,7 +306,7 @@ applications.post('/:id/interactions', async (c) => {
     return c.json({ error: `type must be one of: ${validTypes.join(', ')}` }, 400)
   }
 
-  // Verify application exists
+  // Verify application exists and get athleteId
   const apps = await db
     .select()
     .from(schema.application)
@@ -430,6 +320,7 @@ applications.post('/:id/interactions', async (c) => {
   const interactionId = crypto.randomUUID()
   await db.insert(schema.interaction).values({
     id: interactionId,
+    athleteId: apps[0].athleteId,
     applicationId: id,
     type,
     content,
