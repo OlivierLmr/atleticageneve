@@ -6,7 +6,7 @@ import { api } from '@web/lib/api'
 import { useAuth } from '@web/lib/auth'
 import { LanguageSwitcher } from '@web/App'
 import { NIGHT_LABELS } from '@shared/constants'
-import type { Application, Athlete, Event, Agreement, NegotiationStatus } from '@shared/types'
+import type { Application, Athlete, Event, Agreement, Interaction, NegotiationStatus, ParticipationStatus, WaPerformance } from '@shared/types'
 
 interface PortalEvent extends Event {
   name: string
@@ -14,9 +14,15 @@ interface PortalEvent extends Event {
   gender: string
 }
 
+interface PortalApplication extends Application {
+  event: PortalEvent | null
+  waPerformance: WaPerformance | null
+}
+
 interface PortalAthlete extends Athlete {
-  applications: (Application & { event: PortalEvent | null })[]
+  applications: PortalApplication[]
   agreements: Agreement[]
+  interactions: Interaction[]
 }
 
 const STATUS_COLORS: Record<NegotiationStatus, string> = {
@@ -26,6 +32,25 @@ const STATUS_COLORS: Record<NegotiationStatus, string> = {
   confirmed: 'bg-green-100 text-green-800',
   rejected: 'bg-red-100 text-red-800',
   withdrawn: 'bg-gray-100 text-gray-500',
+}
+
+const PARTICIPATION_COLORS: Record<ParticipationStatus, string> = {
+  pending: 'bg-yellow-100 text-yellow-800',
+  selected: 'bg-green-100 text-green-800',
+  not_selected: 'bg-red-100 text-red-800',
+}
+
+function formatPerf(value: number | null | undefined): string {
+  if (value == null) return '—'
+  // Times (under 1000) are in seconds — format as mm:ss.cc or ss.cc
+  if (value < 100) return value.toFixed(2)
+  if (value < 1000) {
+    const min = Math.floor(value / 60)
+    const sec = (value % 60).toFixed(2).padStart(5, '0')
+    return min > 0 ? `${min}:${sec}` : sec
+  }
+  // Distances/heights in cm — format as m.cm
+  return (value / 100).toFixed(2)
 }
 
 export default function AthletePortalPage() {
@@ -134,17 +159,47 @@ export default function AthletePortalPage() {
                   <div className="flex justify-between items-start mb-3">
                     <div>
                       <h2 className="font-semibold">{selected.firstName} {selected.lastName}</h2>
-                      <p className="text-xs text-gray-400">{selected.nationality}</p>
+                      <p className="text-xs text-gray-400">{selected.nationality} · {selected.gender === 'M' ? t('athlete.male') : t('athlete.female')}</p>
                     </div>
                     <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_COLORS[selected.negotiationStatus]}`}>
                       {t(`status.${selected.negotiationStatus}`)}
                     </span>
                   </div>
-                  {/* Events list */}
-                  <div className="text-xs text-gray-600">
-                    <span className="text-gray-400">{t('athlete.event')}(s):</span>{' '}
-                    {selected.applications.map(a => a.event?.name).filter(Boolean).join(', ') || '—'}
-                  </div>
+                </div>
+
+                {/* Applications table — per-event detail */}
+                <div className="bg-white rounded-lg border p-4">
+                  <h3 className="font-semibold text-sm mb-3">{t('athlete.event')}(s)</h3>
+                  {selected.applications.length === 0 ? (
+                    <p className="text-xs text-gray-400">—</p>
+                  ) : (
+                    <table className="w-full text-xs">
+                      <thead>
+                        <tr className="border-b text-gray-500">
+                          <th className="py-1.5 text-left font-medium">{t('athlete.event')}</th>
+                          <th className="py-1.5 text-right font-medium">{t('athlete.personalBest')}</th>
+                          <th className="py-1.5 text-right font-medium">{t('athlete.seasonBest')}</th>
+                          <th className="py-1.5 text-right font-medium">{t('athlete.worldRanking')}</th>
+                          <th className="py-1.5 text-center font-medium">Status</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {selected.applications.map((app) => (
+                          <tr key={app.id} className="border-b last:border-0">
+                            <td className="py-2 font-medium">{app.event?.name ?? '—'}</td>
+                            <td className="py-2 text-right">{formatPerf(app.waPerformance?.personalBest)}</td>
+                            <td className="py-2 text-right">{formatPerf(app.waPerformance?.seasonBest)}</td>
+                            <td className="py-2 text-right">{app.waPerformance?.worldRanking ?? '—'}</td>
+                            <td className="py-2 text-center">
+                              <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${PARTICIPATION_COLORS[app.participationStatus as ParticipationStatus]}`}>
+                                {t(`participation.${app.participationStatus}`)}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
                 </div>
 
                 {/* Latest offer — hide totalCost for athletes */}
@@ -244,6 +299,23 @@ export default function AthletePortalPage() {
                             </span>
                             <span className="text-gray-500">{new Date(c.sentAt).toLocaleDateString()}</span>
                           </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Interaction history */}
+                {selected.interactions && selected.interactions.length > 0 && (
+                  <div className="bg-white rounded-lg border p-4">
+                    <h3 className="font-semibold text-sm mb-3">Activity</h3>
+                    <div className="space-y-2">
+                      {selected.interactions.slice(0, 10).map((ix) => (
+                        <div key={ix.id} className="flex items-start gap-2 text-xs border-b pb-2 last:border-0">
+                          <span className="text-gray-400 whitespace-nowrap">
+                            {new Date(ix.createdAt).toLocaleDateString()}
+                          </span>
+                          <span className="text-gray-600">{ix.content}</span>
                         </div>
                       ))}
                     </div>

@@ -1,5 +1,5 @@
 import { Hono } from 'hono'
-import { eq, or, desc, max } from 'drizzle-orm'
+import { eq, or, and, desc, max } from 'drizzle-orm'
 import * as schema from '../db/schema'
 import { agreementSchema } from '@shared/validation'
 import { requireAuth } from '../middleware/auth'
@@ -40,6 +40,11 @@ portal.get('/athlete', requireAuth('athlete', 'manager'), async (c) => {
       .innerJoin(schema.eventCatalog, eq(schema.event.catalogId, schema.eventCatalog.id))
       .where(eq(schema.application.athleteId, ath.id))
 
+    // Fetch WA performance for each application
+    const waPerfs = await db.select().from(schema.waPerformance)
+      .where(eq(schema.waPerformance.athleteId, ath.id))
+    const waPerfMap = new Map(waPerfs.map(wp => [`${wp.athleteId}-${wp.eventId}`, wp]))
+
     const applications = appRows.map(r => ({
       ...r.application,
       event: {
@@ -48,6 +53,7 @@ portal.get('/athlete', requireAuth('athlete', 'manager'), async (c) => {
         discipline: r.catalog.discipline,
         gender: r.catalog.gender,
       },
+      waPerformance: waPerfMap.get(`${r.application.athleteId}-${r.application.eventId}`) ?? null,
     }))
 
     // Agreements at athlete level (from agreement table)
@@ -331,6 +337,11 @@ portal.get('/manager', requireAuth('manager'), async (c) => {
       .innerJoin(schema.eventCatalog, eq(schema.event.catalogId, schema.eventCatalog.id))
       .where(eq(schema.application.athleteId, ath.id))
 
+    // Fetch WA performance for each application
+    const waPerfs = await db.select().from(schema.waPerformance)
+      .where(eq(schema.waPerformance.athleteId, ath.id))
+    const waPerfMap = new Map(waPerfs.map(wp => [`${wp.athleteId}-${wp.eventId}`, wp]))
+
     const applications = appRows.map(r => ({
       ...r.application,
       event: {
@@ -339,6 +350,7 @@ portal.get('/manager', requireAuth('manager'), async (c) => {
         discipline: r.catalog.discipline,
         gender: r.catalog.gender,
       },
+      waPerformance: waPerfMap.get(`${r.application.athleteId}-${r.application.eventId}`) ?? null,
     }))
 
     // Agreements

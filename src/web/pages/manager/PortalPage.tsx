@@ -5,7 +5,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from '@web/lib/api'
 import { useAuth } from '@web/lib/auth'
 import { LanguageSwitcher } from '@web/App'
-import type { Application, Athlete, Event, Agreement, NegotiationStatus } from '@shared/types'
+import type { Application, Athlete, Event, Agreement, NegotiationStatus, ParticipationStatus, WaPerformance } from '@shared/types'
 
 interface PortalEvent extends Event {
   name: string
@@ -13,8 +13,13 @@ interface PortalEvent extends Event {
   gender: string
 }
 
+interface PortalApplication extends Application {
+  event: PortalEvent | null
+  waPerformance: WaPerformance | null
+}
+
 interface ManagerAthlete extends Athlete {
-  applications: (Application & { event: PortalEvent | null })[]
+  applications: PortalApplication[]
   agreements: Agreement[]
 }
 
@@ -39,11 +44,29 @@ const STATUS_COLORS: Record<NegotiationStatus, string> = {
   withdrawn: 'bg-gray-100 text-gray-500',
 }
 
+const PARTICIPATION_COLORS: Record<ParticipationStatus, string> = {
+  pending: 'bg-yellow-100 text-yellow-800',
+  selected: 'bg-green-100 text-green-800',
+  not_selected: 'bg-red-100 text-red-800',
+}
+
+function formatPerf(value: number | null | undefined): string {
+  if (value == null) return '—'
+  if (value < 100) return value.toFixed(2)
+  if (value < 1000) {
+    const min = Math.floor(value / 60)
+    const sec = (value % 60).toFixed(2).padStart(5, '0')
+    return min > 0 ? `${min}:${sec}` : sec
+  }
+  return (value / 100).toFixed(2)
+}
+
 export default function ManagerPortalPage() {
   const { t } = useTranslation()
   const { user, logout } = useAuth()
   const queryClient = useQueryClient()
   const [statusFilter, setStatusFilter] = useState('')
+  const [expandedId, setExpandedId] = useState<string | null>(null)
 
   const { data, isLoading } = useQuery<ManagerPortalData>({
     queryKey: ['manager-portal'],
@@ -143,6 +166,7 @@ export default function ManagerPortalPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b bg-gray-50 text-xs text-gray-500">
+                  <th className="px-3 py-2.5 text-left font-medium w-6"></th>
                   <th className="px-3 py-2.5 text-left font-medium">Athlete</th>
                   <th className="px-3 py-2.5 text-left font-medium">{t('athlete.event')}(s)</th>
                   <th className="px-3 py-2.5 text-left font-medium">NAT</th>
@@ -152,61 +176,110 @@ export default function ManagerPortalPage() {
               </thead>
               <tbody>
                 {filtered.map((ath) => (
-                  <tr key={ath.id} className="border-b hover:bg-gray-50">
-                    <td className="px-3 py-2.5 font-medium">
-                      <Link to={`/manager/athletes/${ath.id}`} className="hover:underline">
-                        {ath.lastName}, {ath.firstName}
-                      </Link>
-                    </td>
-                    <td className="px-3 py-2.5 text-gray-600 text-xs">
-                      {ath.applications.map(a => a.event?.name).filter(Boolean).join(', ') || '—'}
-                    </td>
-                    <td className="px-3 py-2.5 text-xs">{ath.nationality}</td>
-                    <td className="px-3 py-2.5">
-                      <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${STATUS_COLORS[ath.negotiationStatus]}`}>
-                        {t(`status.${ath.negotiationStatus}`)}
-                      </span>
-                    </td>
-                    <td className="px-3 py-2.5">
-                      <div className="flex gap-1">
-                        {ath.negotiationStatus === 'agreement_sent' && (
-                          <>
-                            <button
-                              onClick={() => respondMutation.mutate({ athleteId: ath.id, action: 'accept' })}
-                              disabled={respondMutation.isPending}
-                              className="text-[10px] px-2 py-0.5 rounded bg-green-600 text-white hover:bg-green-700 disabled:opacity-50"
-                            >
-                              Accept
-                            </button>
-                            <button
-                              onClick={() => respondMutation.mutate({ athleteId: ath.id, action: 'reject' })}
-                              disabled={respondMutation.isPending}
-                              className="text-[10px] px-2 py-0.5 rounded border border-red-200 text-red-600 hover:bg-red-50 disabled:opacity-50"
-                            >
-                              Decline
-                            </button>
-                          </>
-                        )}
-                        {['agreement_sent', 'counter_offer_sent', 'confirmed'].includes(ath.negotiationStatus) && (
+                  <>
+                    <tr key={ath.id} className="border-b hover:bg-gray-50">
+                      <td className="px-3 py-2.5">
+                        {ath.applications.length > 0 && (
                           <button
-                            onClick={() => {
-                              if (confirm(`Withdraw ${ath.firstName} ${ath.lastName}?`)) {
-                                respondMutation.mutate({ athleteId: ath.id, action: 'withdraw' })
-                              }
-                            }}
-                            disabled={respondMutation.isPending}
-                            className="text-[10px] px-2 py-0.5 rounded border border-gray-200 text-gray-400 hover:text-red-600 disabled:opacity-50"
+                            onClick={() => setExpandedId(expandedId === ath.id ? null : ath.id)}
+                            className="text-gray-400 hover:text-gray-600 text-xs"
                           >
-                            Withdraw
+                            {expandedId === ath.id ? '▾' : '▸'}
                           </button>
                         )}
-                      </div>
-                    </td>
-                  </tr>
+                      </td>
+                      <td className="px-3 py-2.5 font-medium">
+                        <Link to={`/manager/athletes/${ath.id}`} className="hover:underline">
+                          {ath.lastName}, {ath.firstName}
+                        </Link>
+                      </td>
+                      <td className="px-3 py-2.5 text-gray-600 text-xs">
+                        {ath.applications.map(a => a.event?.name).filter(Boolean).join(', ') || '—'}
+                      </td>
+                      <td className="px-3 py-2.5 text-xs">{ath.nationality}</td>
+                      <td className="px-3 py-2.5">
+                        <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${STATUS_COLORS[ath.negotiationStatus]}`}>
+                          {t(`status.${ath.negotiationStatus}`)}
+                        </span>
+                      </td>
+                      <td className="px-3 py-2.5">
+                        <div className="flex gap-1">
+                          {ath.negotiationStatus === 'agreement_sent' && (
+                            <>
+                              <button
+                                onClick={() => respondMutation.mutate({ athleteId: ath.id, action: 'accept' })}
+                                disabled={respondMutation.isPending}
+                                className="text-[10px] px-2 py-0.5 rounded bg-green-600 text-white hover:bg-green-700 disabled:opacity-50"
+                              >
+                                Accept
+                              </button>
+                              <button
+                                onClick={() => respondMutation.mutate({ athleteId: ath.id, action: 'reject' })}
+                                disabled={respondMutation.isPending}
+                                className="text-[10px] px-2 py-0.5 rounded border border-red-200 text-red-600 hover:bg-red-50 disabled:opacity-50"
+                              >
+                                Decline
+                              </button>
+                            </>
+                          )}
+                          {['agreement_sent', 'counter_offer_sent', 'confirmed'].includes(ath.negotiationStatus) && (
+                            <button
+                              onClick={() => {
+                                if (confirm(`Withdraw ${ath.firstName} ${ath.lastName}?`)) {
+                                  respondMutation.mutate({ athleteId: ath.id, action: 'withdraw' })
+                                }
+                              }}
+                              disabled={respondMutation.isPending}
+                              className="text-[10px] px-2 py-0.5 rounded border border-gray-200 text-gray-400 hover:text-red-600 disabled:opacity-50"
+                            >
+                              Withdraw
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                    {/* Expanded row: per-event detail */}
+                    {expandedId === ath.id && ath.applications.length > 0 && (
+                      <tr key={`${ath.id}-detail`} className="border-b bg-gray-50/50">
+                        <td colSpan={6} className="px-6 py-3">
+                          <table className="w-full text-xs">
+                            <thead>
+                              <tr className="text-gray-500">
+                                <th className="py-1 text-left font-medium">{t('athlete.event')}</th>
+                                <th className="py-1 text-right font-medium">{t('athlete.personalBest')}</th>
+                                <th className="py-1 text-right font-medium">{t('athlete.seasonBest')}</th>
+                                <th className="py-1 text-right font-medium">{t('athlete.worldRanking')}</th>
+                                <th className="py-1 text-center font-medium">Selection</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {ath.applications.map((app) => (
+                                <tr key={app.id} className="border-t border-gray-200">
+                                  <td className="py-1.5 font-medium">{app.event?.name ?? '—'}</td>
+                                  <td className="py-1.5 text-right">{formatPerf(app.waPerformance?.personalBest)}</td>
+                                  <td className="py-1.5 text-right">{formatPerf(app.waPerformance?.seasonBest)}</td>
+                                  <td className="py-1.5 text-right">{app.waPerformance?.worldRanking ?? '—'}</td>
+                                  <td className="py-1.5 text-center">
+                                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${PARTICIPATION_COLORS[app.participationStatus as ParticipationStatus]}`}>
+                                      {t(`participation.${app.participationStatus}`)}
+                                    </span>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </td>
+                      </tr>
+                    )}
+                  </>
                 ))}
               </tbody>
             </table>
           </div>
+        )}
+
+        {respondMutation.isError && (
+          <p className="text-xs text-red-600 mt-2">{(respondMutation.error as Error)?.message || t('common.error')}</p>
         )}
       </div>
     </div>
