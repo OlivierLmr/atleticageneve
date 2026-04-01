@@ -2,14 +2,11 @@
 
 export type NegotiationStatus =
   | 'to_review'
-  | 'contract_sent'
-  | 'counter_offer'
-  | 'accepted'
+  | 'agreement_sent'
+  | 'counter_offer_sent'
+  | 'confirmed'
   | 'rejected'
   | 'withdrawn'
-
-/** @deprecated Use NegotiationStatus — kept for backward compat */
-export type ApplicationStatus = NegotiationStatus
 
 export type ParticipationStatus = 'pending' | 'selected' | 'not_selected'
 
@@ -23,8 +20,21 @@ export type IRunCleanStatus = 'yes' | 'no' | 'in_progress' | 'unknown'
 export type DopingFreeStatus = 'yes' | 'no' | 'unknown'
 export type PaymentStatus = 'pending' | 'done'
 export type PaymentMethod = 'cash' | 'bank' | 'western_union' | 'paypal' | 'other'
-export type MealType = 'breakfast' | 'lunch' | 'dinner'
-export type PerfType = 'MIN' | 'MAX' // MIN = lower is better (time), MAX = higher is better (distance)
+export type PerfType = 'MIN' | 'MAX'
+
+export type Recommendation =
+  | 'Highly Recommended'
+  | 'Recommended'
+  | 'Under Review'
+  | 'Not Recommended'
+
+export type InteractionType =
+  | 'email'
+  | 'call'
+  | 'note'
+  | 'status_change'
+  | 'agreement'
+  | 'counter_offer'
 
 // ── Domain entities ───────────────────────────────────────────────────────────
 
@@ -37,7 +47,7 @@ export interface User {
   firstName: string
   lastName: string
   organization: string | null
-  preferredLang: 'en' | 'fr'
+  preferredLang: string
   isActive: boolean
   createdAt: string
   updatedAt: string
@@ -49,34 +59,60 @@ export interface Edition {
   year: number
   startDate: string
   endDate: string
+  currency: string
   totalBudget: number
-  dinnerCostPp: number
   stadiumMealCost: number
   transportAirportHotelCost: number
   transportHotelStadiumCost: number
+  notificationEmail: string
+  weightPB: number
+  weightSB: number
+  weightRanking: number
+  weightCost: number
+  bonusEap: number
   createdAt: string
   updatedAt: string
+}
+
+export interface EventCatalog {
+  id: string
+  name: string
+  discipline: string
+  gender: Gender
 }
 
 export interface Event {
   id: string
   editionId: string
-  name: string
-  discipline: string
-  gender: Gender
-  perfType: PerfType
+  catalogId: string
   maxSlots: number
   intMinima: number
   swissMinima: number
   eapMinima: number | null
-  meetRecord: string | null
-  targetPerf: string | null
+  meetRecord: number | null
+  targetPerf: number | null
   swissQuota: number
   eapQuota: number
-  prize1st: number
-  prize2nd: number
-  prize3rd: number
+  prizeMoney1st: number
+  prizeMoney2nd: number
+  prizeMoney3rd: number
+  prizeMoney4th: number
+  prizeMoney5th: number
+  prizeMoney6th: number
+  prizeMoney7th: number
+  prizeMoney8th: number
   createdAt: string
+}
+
+export interface Country {
+  code: string
+  name: string
+}
+
+export interface EapCity {
+  id: string
+  name: string
+  countryCode: string
 }
 
 export interface Athlete {
@@ -84,6 +120,7 @@ export interface Athlete {
   userId: string | null
   managerId: string | null
   editionId: string | null
+  assignedSelector: string | null
   firstName: string
   lastName: string
   dateOfBirth: string | null
@@ -100,34 +137,9 @@ export interface Athlete {
   athleteEmail: string | null
   athletePhone: string | null
   negotiationStatus: NegotiationStatus
+  decidedAt: string | null
   iRunClean: IRunCleanStatus
   dopingFree: DopingFreeStatus
-  createdAt: string
-  updatedAt: string
-}
-
-export interface Application {
-  id: string
-  athleteId: string
-  eventId: string
-  editionId: string
-  assignedSelector: string | null
-  status: NegotiationStatus // legacy — kept in DB
-  participationStatus: ParticipationStatus
-  personalBest: string | null
-  personalBestVal: number | null
-  seasonBest: string | null
-  seasonBestVal: number | null
-  worldRanking: number | null
-  perfUpdatedAt: string | null
-  estTravel: number
-  estAccommodation: number
-  estAppearance: number
-  estTotal: number
-  score: number | null
-  recommendation: string | null
-  hotelId: string | null
-  roomNumber: string | null
   accommodationReqs: string | null
   arrivalDate: string | null
   arrivalFlight: string | null
@@ -137,45 +149,50 @@ export interface Application {
   departureFlight: string | null
   departureTo: string | null
   departureTime: string | null
-  iRunClean: IRunCleanStatus // legacy — now on athlete
-  dopingFree: DopingFreeStatus // legacy — now on athlete
-  participantNotes: string | null
-  additionalNotes: string | null
-  internalNotes: string | null
+  estTravel: number
+  estAccommodation: number
+  estAppearance: number
+  estTotal: number
   bankIban: string | null
   paymentStatus: PaymentStatus
   paymentAmount: number | null
   paymentDate: string | null
   paymentMethod: PaymentMethod | null
-  appliedAt: string
-  decidedAt: string | null
-  createdAt: string
+  participantNotes: string | null
+  additionalNotes: string | null
+  internalNotes: string | null
+  archivedAt: string | null
+  updatedBy: string | null
   updatedAt: string
+  createdAt: string
 }
 
-export interface HotelNightDays {
-  tue: boolean
-  wed: boolean
-  thu: boolean
-  fri: boolean
-  sat: boolean
-  sun: boolean
-}
-
-export interface ContractOffer {
+export interface Application {
   id: string
-  applicationId: string // legacy
-  athleteId: string | null
+  athleteId: string
+  eventId: string
+  editionId: string
+  participationStatus: ParticipationStatus
+  personalBest: number | null
+  seasonBest: number | null
+  worldRanking: number | null
+  score: number | null
+  recommendation: Recommendation | null
+  appliedAt: string
+}
+
+export interface Agreement {
+  id: string
+  athleteId: string
   version: number
   direction: OfferDirection
-  bonus: number
+  appearanceFee: number
   otherCompensation: number
   otherCompensationDesc: string | null
   transport: number
-  localTransport: boolean // legacy
   transportAirportHotel: boolean
   transportHotelStadium: boolean
-  hotelId: string | null
+  hotelRoomId: string | null
   hotelNightTue: boolean
   hotelNightWed: boolean
   hotelNightThu: boolean
@@ -189,7 +206,6 @@ export interface ContractOffer {
   dinnerSat: boolean
   dinnerSun: boolean
   stadiumMeals: boolean
-  catering: number // legacy
   notes: string | null
   totalCost: number
   sentBy: string | null
@@ -201,65 +217,77 @@ export interface Hotel {
   id: string
   editionId: string
   name: string
-  roomTypes: string | null
-  costPerNight: number
-  totalRooms: number
   createdAt: string
 }
 
-export interface MealOption {
+export interface HotelRoom {
   id: string
-  editionId: string
-  day: string
-  mealType: MealType
-  venue: string
-  costPp: number
-  capacity: number | null
-  createdAt: string
+  hotelId: string
+  roomType: string
+  costPerNight: number
+  dinnerCost: number
+  reservedRooms: number
+}
+
+export interface HotelNightDays {
+  tue: boolean
+  wed: boolean
+  thu: boolean
+  fri: boolean
+  sat: boolean
+  sun: boolean
 }
 
 export interface Interaction {
   id: string
-  applicationId: string
-  type: 'email' | 'call' | 'note' | 'status_change' | 'contract' | 'counter_offer'
+  athleteId: string
+  applicationId: string | null
+  type: InteractionType
   content: string
   authorId: string | null
   authorName: string
   createdAt: string
 }
 
+export interface EmailLog {
+  id: string
+  to: string
+  subject: string
+  body: string
+  lang: string
+  sentAt: string
+  relatedAthleteId: string | null
+}
+
 export interface WaPerformance {
   id: string
   athleteId: string
   eventId: string
-  personalBest: string | null
-  personalBestVal: number | null
-  seasonBest: string | null
-  seasonBestVal: number | null
+  personalBest: number | null
+  seasonBest: number | null
   worldRanking: number | null
-  updatedAt: string
-  createdAt: string
 }
 
 // ── Scoring ───────────────────────────────────────────────────────────────────
-
-export type Recommendation =
-  | 'Highly Recommended'
-  | 'Recommended'
-  | 'Under Review'
-  | 'Not Recommended'
 
 export interface ScoreBreakdown {
   eligible: boolean
   f1PB: number
   f2SB: number
   f3Ranking: number
-  f5Cost: number
-  qQuota: number
-  beta: number
+  f4Cost: number
+  eapBonus: number
   weightedSum: number
   finalScore: number
   recommendation: Recommendation
+}
+
+export interface EditionWeights {
+  weightPB: number
+  weightSB: number
+  weightRanking: number
+  weightCost: number
+  bonusEap: number
 }
 
 // ── API request/response helpers ──────────────────────────────────────────────
@@ -267,7 +295,7 @@ export interface ScoreBreakdown {
 export interface ApplicationWithDetails extends Application {
   athlete: Athlete
   event: Event
-  contracts: ContractOffer[]
+  agreements: Agreement[]
   interactions: Interaction[]
   waPerformance?: WaPerformance | null
 }

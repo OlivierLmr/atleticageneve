@@ -26,21 +26,18 @@ export const athleteRegistrationSchema = z.object({
   federation: z.string().optional(),
   isEap: z.boolean().default(false),
   isSwiss: z.boolean().default(false),
-  distanceFromGva: z.number().int().min(0).default(0),
+  distanceFromGva: z.number().int().min(0).optional(),
   waProfileUrl: z.string().url().optional().or(z.literal('')),
   swiLicence: z.string().optional(),
   athleteEmail: z.string().email(),
   athletePhone: z.string().optional(),
-  // Manager info (if registering via manager)
   managerId: z.string().optional(),
-  // Event applications — multiple events
   eventIds: z.array(z.string().min(1)).min(1),
-  // Compliance (boolean checkboxes)
   iRunClean: z.boolean().default(false),
   dopingFree: z.boolean().default(false),
-  // Notes
   participantNotes: z.string().optional(),
   additionalNotes: z.string().optional(),
+  eapCity: z.string().optional(),
 })
 
 // ── Batch athlete registration (by manager) ──────────────────────────────────
@@ -70,7 +67,7 @@ export const managerRegistrationSchema = z.object({
   organization: z.string().optional(),
 })
 
-// ── Athlete personal data update (PATCH) ─────────────────────────────────────
+// ── Athlete update (PATCH) ───────────────────────────────────────────────────
 
 export const athleteUpdateSchema = z.object({
   firstName: z.string().min(1).optional(),
@@ -81,25 +78,49 @@ export const athleteUpdateSchema = z.object({
   federation: z.string().optional().nullable(),
   isEap: z.boolean().optional(),
   isSwiss: z.boolean().optional(),
+  distanceFromGva: z.number().int().min(0).optional(),
   waProfileUrl: z.string().url().optional().nullable().or(z.literal('')),
   swiLicence: z.string().optional().nullable(),
+  honours: z.string().optional().nullable(),
   athleteEmail: z.string().email().optional().nullable(),
   athletePhone: z.string().optional().nullable(),
   eapCity: z.string().optional().nullable(),
   iRunClean: z.enum(['yes', 'no', 'in_progress', 'unknown']).optional(),
   dopingFree: z.enum(['yes', 'no', 'unknown']).optional(),
+  assignedSelector: z.string().optional().nullable(),
+  accommodationReqs: z.string().optional().nullable(),
+  arrivalDate: z.string().optional().nullable(),
+  arrivalFlight: z.string().optional().nullable(),
+  arrivalFrom: z.string().optional().nullable(),
+  arrivalTime: z.string().optional().nullable(),
+  departureDate: z.string().optional().nullable(),
+  departureFlight: z.string().optional().nullable(),
+  departureTo: z.string().optional().nullable(),
+  departureTime: z.string().optional().nullable(),
+  estTravel: z.number().int().min(0).optional(),
+  estAccommodation: z.number().int().min(0).optional(),
+  estAppearance: z.number().int().min(0).optional(),
+  estTotal: z.number().int().min(0).optional(),
+  bankIban: z.string().optional().nullable(),
+  paymentStatus: z.enum(['pending', 'done']).optional(),
+  paymentAmount: z.number().int().min(0).optional().nullable(),
+  paymentDate: z.string().optional().nullable(),
+  paymentMethod: z.enum(['cash', 'bank', 'western_union', 'paypal', 'other']).optional().nullable(),
+  participantNotes: z.string().optional().nullable(),
+  additionalNotes: z.string().optional().nullable(),
+  internalNotes: z.string().optional().nullable(),
 })
 
-// ── Contract offer ────────────────────────────────────────────────────────────
+// ── Agreement ─────────────────────────────────────────────────────────────────
 
-export const contractOfferSchema = z.object({
-  bonus: z.number().int().min(0).default(0),
+export const agreementSchema = z.object({
+  appearanceFee: z.number().int().min(0).default(0),
   otherCompensation: z.number().int().min(0).default(0),
   otherCompensationDesc: z.string().optional(),
   transport: z.number().int().min(0).default(0),
   transportAirportHotel: z.boolean().default(false),
   transportHotelStadium: z.boolean().default(false),
-  hotelId: z.string().optional(),
+  hotelRoomId: z.string().optional(),
   hotelNightTue: z.boolean().default(false),
   hotelNightWed: z.boolean().default(false),
   hotelNightThu: z.boolean().default(false),
@@ -119,11 +140,8 @@ export const contractOfferSchema = z.object({
 // ── Negotiation status change (athlete-level) ────────────────────────────────
 
 export const negotiationStatusChangeSchema = z.object({
-  status: z.enum(['to_review', 'contract_sent', 'counter_offer', 'accepted', 'rejected', 'withdrawn']),
+  status: z.enum(['to_review', 'agreement_sent', 'counter_offer_sent', 'confirmed', 'rejected', 'withdrawn']),
 })
-
-/** @deprecated Use negotiationStatusChangeSchema */
-export const statusChangeSchema = negotiationStatusChangeSchema
 
 // ── Participation status change (per-event) ──────────────────────────────────
 
@@ -131,55 +149,125 @@ export const participationStatusChangeSchema = z.object({
   participationStatus: z.enum(['pending', 'selected', 'not_selected']),
 })
 
-// ── Logistics update ──────────────────────────────────────────────────────────
+// ── Event create ──────────────────────────────────────────────────────────────
 
-export const logisticsUpdateSchema = z.object({
-  arrivalDate: z.string().optional().nullable(),
-  arrivalFlight: z.string().optional().nullable(),
-  arrivalFrom: z.string().optional().nullable(),
-  arrivalTime: z.string().optional().nullable(),
-  departureDate: z.string().optional().nullable(),
-  departureFlight: z.string().optional().nullable(),
-  departureTo: z.string().optional().nullable(),
-  departureTime: z.string().optional().nullable(),
-  accommodationReqs: z.string().optional().nullable(),
-})
-
-// ── Event config ──────────────────────────────────────────────────────────────
-
-export const eventConfigSchema = z.object({
-  name: z.string().min(1),
-  discipline: z.string().min(1),
-  gender: z.enum(['M', 'F']),
-  perfType: z.enum(['MIN', 'MAX']),
+export const eventCreateSchema = z.object({
+  catalogId: z.string().min(1),
   maxSlots: z.number().int().min(1),
   intMinima: z.number().positive(),
   swissMinima: z.number().positive(),
   eapMinima: z.number().positive().optional(),
-  meetRecord: z.string().optional(),
-  targetPerf: z.string().optional(),
+  meetRecord: z.number().optional(),
+  targetPerf: z.number().optional(),
   swissQuota: z.number().int().min(0).default(1),
   eapQuota: z.number().int().min(0).default(1),
-  prize1st: z.number().int().min(0).default(0),
-  prize2nd: z.number().int().min(0).default(0),
-  prize3rd: z.number().int().min(0).default(0),
+  prizeMoney1st: z.number().int().min(0).optional(),
+  prizeMoney2nd: z.number().int().min(0).optional(),
+  prizeMoney3rd: z.number().int().min(0).optional(),
+  prizeMoney4th: z.number().int().min(0).optional(),
+  prizeMoney5th: z.number().int().min(0).optional(),
+  prizeMoney6th: z.number().int().min(0).optional(),
+  prizeMoney7th: z.number().int().min(0).optional(),
+  prizeMoney8th: z.number().int().min(0).optional(),
 })
 
-// ── Hotel config ──────────────────────────────────────────────────────────────
+// ── Event update ──────────────────────────────────────────────────────────────
 
-export const hotelConfigSchema = z.object({
+export const eventUpdateSchema = z.object({
+  maxSlots: z.number().int().min(1).optional(),
+  intMinima: z.number().positive().optional(),
+  swissMinima: z.number().positive().optional(),
+  eapMinima: z.number().positive().optional().nullable(),
+  meetRecord: z.number().optional().nullable(),
+  targetPerf: z.number().optional().nullable(),
+  swissQuota: z.number().int().min(0).optional(),
+  eapQuota: z.number().int().min(0).optional(),
+  prizeMoney1st: z.number().int().min(0).optional(),
+  prizeMoney2nd: z.number().int().min(0).optional(),
+  prizeMoney3rd: z.number().int().min(0).optional(),
+  prizeMoney4th: z.number().int().min(0).optional(),
+  prizeMoney5th: z.number().int().min(0).optional(),
+  prizeMoney6th: z.number().int().min(0).optional(),
+  prizeMoney7th: z.number().int().min(0).optional(),
+  prizeMoney8th: z.number().int().min(0).optional(),
+})
+
+// ── Edition config ────────────────────────────────────────────────────────────
+
+const DEFAULT_WEIGHT_PB = 25
+const DEFAULT_WEIGHT_SB = 35
+const DEFAULT_WEIGHT_RANKING = 30
+const DEFAULT_WEIGHT_COST = 10
+
+export const editionConfigSchema = z.object({
+  name: z.string().min(1).optional(),
+  year: z.number().int().optional(),
+  startDate: z.string().optional(),
+  endDate: z.string().optional(),
+  currency: z.string().optional(),
+  totalBudget: z.number().int().min(0).optional(),
+  stadiumMealCost: z.number().int().min(0).optional(),
+  transportAirportHotelCost: z.number().int().min(0).optional(),
+  transportHotelStadiumCost: z.number().int().min(0).optional(),
+  notificationEmail: z.string().email().optional(),
+  weightPB: z.number().int().min(0).max(100).optional(),
+  weightSB: z.number().int().min(0).max(100).optional(),
+  weightRanking: z.number().int().min(0).max(100).optional(),
+  weightCost: z.number().int().min(0).max(100).optional(),
+  bonusEap: z.number().int().min(0).max(100).optional(),
+}).refine((data) => {
+  const hasAnyWeight = data.weightPB !== undefined || data.weightSB !== undefined ||
+    data.weightRanking !== undefined || data.weightCost !== undefined
+  if (!hasAnyWeight) return true
+  const sum = (data.weightPB ?? DEFAULT_WEIGHT_PB) +
+    (data.weightSB ?? DEFAULT_WEIGHT_SB) +
+    (data.weightRanking ?? DEFAULT_WEIGHT_RANKING) +
+    (data.weightCost ?? DEFAULT_WEIGHT_COST)
+  return sum === 100
+}, { message: 'Weight fields (weightPB + weightSB + weightRanking + weightCost) must sum to 100' })
+
+// ── Hotel ─────────────────────────────────────────────────────────────────────
+
+export const hotelSchema = z.object({
   name: z.string().min(1),
-  roomTypes: z.string().optional(),
+})
+
+export const hotelRoomSchema = z.object({
+  hotelId: z.string().min(1),
+  roomType: z.string().min(1),
   costPerNight: z.number().int().min(0),
-  totalRooms: z.number().int().min(0),
+  dinnerCost: z.number().int().min(0),
+  reservedRooms: z.number().int().min(0),
+})
+
+// ── Event catalog ─────────────────────────────────────────────────────────────
+
+export const eventCatalogSchema = z.object({
+  name: z.string().min(1),
+  discipline: z.enum(['Course', 'Concours']),
+  gender: z.enum(['M', 'F']),
+})
+
+// ── Country ───────────────────────────────────────────────────────────────────
+
+export const countrySchema = z.object({
+  code: z.string().length(3),
+  name: z.string().min(1),
+})
+
+// ── EAP city ──────────────────────────────────────────────────────────────────
+
+export const eapCitySchema = z.object({
+  name: z.string().min(1),
+  countryCode: z.string().length(3),
 })
 
 // ── WA Performance ───────────────────────────────────────────────────────────
 
 export const waPerformanceSchema = z.object({
-  personalBest: z.string().optional(),
-  personalBestVal: z.number().optional(),
-  seasonBest: z.string().optional(),
-  seasonBestVal: z.number().optional(),
+  athleteId: z.string().min(1),
+  eventId: z.string().min(1),
+  personalBest: z.number().optional(),
+  seasonBest: z.number().optional(),
   worldRanking: z.number().int().min(1).optional(),
 })
