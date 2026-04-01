@@ -39,6 +39,13 @@ interface HotelWithRooms extends Hotel {
   rooms: HotelRoom[]
 }
 
+interface StaffUser {
+  id: string
+  firstName: string
+  lastName: string
+  role: string
+}
+
 // ── Status badge ─────────────────────────────────────────────────────────────
 
 const STATUS_COLORS: Record<NegotiationStatus, string> = {
@@ -122,6 +129,11 @@ export default function AthletePage() {
     queryFn: () => api.get('/api/v1/hotels'),
   })
 
+  const { data: staffUsers = [] } = useQuery<StaffUser[]>({
+    queryKey: ['staff-users'],
+    queryFn: () => api.get('/api/v1/users?role=collaborator,committee'),
+  })
+
   // Flatten hotel rooms for the dropdown
   const allRooms = hotels.flatMap(h => h.rooms.map(r => ({ ...r, hotelName: h.name })))
 
@@ -142,6 +154,13 @@ export default function AthletePage() {
   // Internal notes (on athlete)
   const [internalNotes, setInternalNotes] = useState('')
   const [notesInitialized, setNotesInitialized] = useState(false)
+
+  // Collapsible sections
+  const [openSection, setOpenSection] = useState<string | null>(null)
+
+  // WA Performance edit
+  const [editingPerf, setEditingPerf] = useState(false)
+  const [perfForm, setPerfForm] = useState({ personalBest: '', seasonBest: '', worldRanking: '' })
 
   // Initialize from fetched data
   if (app && !notesInitialized) {
@@ -201,6 +220,21 @@ export default function AthletePage() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['application', id] }),
   })
 
+  const athleteUpdateMutation = useMutation({
+    mutationFn: (data: Record<string, unknown>) =>
+      api.patch(`/api/v1/athletes/${app?.athleteId}`, data),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['application', id] }),
+  })
+
+  const waPerfMutation = useMutation({
+    mutationFn: (data: { athleteId: string; eventId: string; personalBest?: number; seasonBest?: number; worldRanking?: number }) =>
+      api.post('/api/v1/wa-performance', data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['application', id] })
+      setEditingPerf(false)
+    },
+  })
+
   // ── Render ───────────────────────────────────────────────────────────────
 
   if (isLoading || !app) {
@@ -213,10 +247,13 @@ export default function AthletePage() {
 
   const currentStatus = app.athlete.negotiationStatus as NegotiationStatus
   const allowedTransitions = NEGOTIATION_TRANSITIONS[currentStatus] ?? []
+  const allDecided = app.siblingApplications?.length > 0 && app.siblingApplications.every(s => s.participationStatus !== 'pending')
 
   const inputCls =
     'w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-gray-900'
   const labelCls = 'block text-xs font-medium text-gray-500 mb-1'
+
+  const toggleSection = (name: string) => setOpenSection(openSection === name ? null : name)
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -246,7 +283,7 @@ export default function AthletePage() {
 
       <div className="max-w-7xl mx-auto px-6 py-6">
         <div className="grid grid-cols-3 gap-6">
-          {/* ── Left column: Athlete info + Scoring ──────────────────────── */}
+          {/* ── Left column: Athlete info + Scoring + Editors ─────────── */}
           <div className="space-y-4">
             {/* Athlete info */}
             <div className="bg-white rounded-lg border p-4">
@@ -261,29 +298,89 @@ export default function AthletePage() {
                   </span>
                 } />
                 <Row label={t('athlete.federation')} value={app.athlete.federation ?? '—'} />
-                {app.waPerformance ? (
-                  <>
-                    <Row label={t('athlete.personalBest')} value={
-                      <span className="font-mono">{app.waPerformance.personalBest ?? '—'}</span>
-                    } />
-                    <Row label={t('athlete.seasonBest')} value={
-                      <span className="font-mono">{app.waPerformance.seasonBest ?? '—'}</span>
-                    } />
-                    <Row label={t('athlete.worldRanking')} value={
-                      app.waPerformance.worldRanking != null ? `#${app.waPerformance.worldRanking}` : '—'
-                    } />
-                  </>
+                {/* Performance with edit toggle */}
+                {editingPerf ? (
+                  <div className="space-y-1 pt-1 border-t">
+                    <div>
+                      <label className={labelCls}>{t('athlete.personalBest')}</label>
+                      <input type="number" step="0.01" className={inputCls} value={perfForm.personalBest}
+                        onChange={e => setPerfForm(p => ({ ...p, personalBest: e.target.value }))} />
+                    </div>
+                    <div>
+                      <label className={labelCls}>{t('athlete.seasonBest')}</label>
+                      <input type="number" step="0.01" className={inputCls} value={perfForm.seasonBest}
+                        onChange={e => setPerfForm(p => ({ ...p, seasonBest: e.target.value }))} />
+                    </div>
+                    <div>
+                      <label className={labelCls}>{t('athlete.worldRanking')}</label>
+                      <input type="number" className={inputCls} value={perfForm.worldRanking}
+                        onChange={e => setPerfForm(p => ({ ...p, worldRanking: e.target.value }))} />
+                    </div>
+                    <div className="flex gap-2 pt-1">
+                      <button
+                        onClick={() => {
+                          waPerfMutation.mutate({
+                            athleteId: app.athleteId,
+                            eventId: app.eventId,
+                            ...(perfForm.personalBest ? { personalBest: parseFloat(perfForm.personalBest) } : {}),
+                            ...(perfForm.seasonBest ? { seasonBest: parseFloat(perfForm.seasonBest) } : {}),
+                            ...(perfForm.worldRanking ? { worldRanking: parseInt(perfForm.worldRanking) } : {}),
+                          })
+                        }}
+                        disabled={waPerfMutation.isPending}
+                        className="text-xs bg-gray-900 text-white px-3 py-1 rounded hover:bg-gray-800 disabled:opacity-50"
+                      >
+                        {t('common.save')}
+                      </button>
+                      <button onClick={() => setEditingPerf(false)} className="text-xs text-gray-400 hover:text-gray-600">
+                        {t('common.cancel')}
+                      </button>
+                    </div>
+                    {waPerfMutation.isError && (
+                      <p className="text-xs text-red-600">{(waPerfMutation.error as Error)?.message || t('common.error')}</p>
+                    )}
+                  </div>
                 ) : (
                   <>
-                    <Row label={t('athlete.personalBest')} value={
-                      <span className="font-mono">{app.personalBest ?? '—'}</span>
-                    } />
-                    <Row label={t('athlete.seasonBest')} value={
-                      <span className="font-mono">{app.seasonBest ?? '—'}</span>
-                    } />
-                    <Row label={t('athlete.worldRanking')} value={
-                      app.worldRanking != null ? `#${app.worldRanking}` : '—'
-                    } />
+                    {app.waPerformance ? (
+                      <>
+                        <Row label={t('athlete.personalBest')} value={
+                          <span className="font-mono">{app.waPerformance.personalBest ?? '—'}</span>
+                        } />
+                        <Row label={t('athlete.seasonBest')} value={
+                          <span className="font-mono">{app.waPerformance.seasonBest ?? '—'}</span>
+                        } />
+                        <Row label={t('athlete.worldRanking')} value={
+                          app.waPerformance.worldRanking != null ? `#${app.waPerformance.worldRanking}` : '—'
+                        } />
+                      </>
+                    ) : (
+                      <>
+                        <Row label={t('athlete.personalBest')} value={
+                          <span className="font-mono">{app.personalBest ?? '—'}</span>
+                        } />
+                        <Row label={t('athlete.seasonBest')} value={
+                          <span className="font-mono">{app.seasonBest ?? '—'}</span>
+                        } />
+                        <Row label={t('athlete.worldRanking')} value={
+                          app.worldRanking != null ? `#${app.worldRanking}` : '—'
+                        } />
+                      </>
+                    )}
+                    <button
+                      onClick={() => {
+                        const wp = app.waPerformance
+                        setPerfForm({
+                          personalBest: wp?.personalBest != null ? String(wp.personalBest) : '',
+                          seasonBest: wp?.seasonBest != null ? String(wp.seasonBest) : '',
+                          worldRanking: wp?.worldRanking != null ? String(wp.worldRanking) : '',
+                        })
+                        setEditingPerf(true)
+                      }}
+                      className="text-[10px] text-blue-600 hover:text-blue-800 mt-1"
+                    >
+                      Edit performance
+                    </button>
                   </>
                 )}
                 {app.athlete.waProfileUrl && (
@@ -334,39 +431,160 @@ export default function AthletePage() {
               </div>
             </div>
 
-            {/* Compliance — from athlete level */}
-            <div className="bg-white rounded-lg border p-4">
-              <h3 className="font-semibold text-sm mb-3">{t('compliance.title')}</h3>
-              <div className="space-y-2 text-sm">
-                <Row label={t('compliance.iRunClean')} value={
-                  <ComplianceBadge status={app.athlete.iRunClean} />
-                } />
-                <Row label={t('compliance.dopingFree')} value={
-                  <ComplianceBadge status={app.athlete.dopingFree} />
-                } />
-              </div>
-            </div>
+            {/* ── Collapsible editor sections ──────────────────────────── */}
 
-            {/* Internal notes (on athlete) */}
-            <div className="bg-white rounded-lg border p-4">
-              <h3 className="font-semibold text-sm mb-2">{t('common.notes')} (internal)</h3>
-              <textarea
-                className={inputCls}
-                rows={3}
-                value={internalNotes}
-                onChange={(e) => setInternalNotes(e.target.value)}
+            {/* Personal data */}
+            <CollapsibleSection title="Personal Data" isOpen={openSection === 'personal'} onToggle={() => toggleSection('personal')}>
+              <AthleteFieldEditor
+                athlete={app.athlete}
+                fields={[
+                  { key: 'firstName', label: t('athlete.firstName'), type: 'text' },
+                  { key: 'lastName', label: t('athlete.lastName'), type: 'text' },
+                  { key: 'dateOfBirth', label: t('athlete.dateOfBirth'), type: 'date' },
+                  { key: 'nationality', label: t('athlete.nationality'), type: 'text' },
+                  { key: 'gender', label: t('athlete.gender'), type: 'select', options: [{ value: 'M', label: t('athlete.male') }, { value: 'F', label: t('athlete.female') }] },
+                  { key: 'federation', label: t('athlete.federation'), type: 'text' },
+                  { key: 'athleteEmail', label: t('athlete.email'), type: 'text' },
+                  { key: 'athletePhone', label: t('athlete.phone'), type: 'text' },
+                  { key: 'waProfileUrl', label: t('athlete.waProfile'), type: 'text' },
+                  { key: 'swiLicence', label: t('athlete.swissLicence'), type: 'text' },
+                  { key: 'honours', label: 'Honours', type: 'text' },
+                  { key: 'isEap', label: t('athlete.eapMember'), type: 'checkbox' },
+                  { key: 'isSwiss', label: 'Swiss', type: 'checkbox' },
+                  { key: 'eapCity', label: 'EAP City', type: 'text' },
+                ]}
+                onSave={(data) => athleteUpdateMutation.mutate(data)}
+                isPending={athleteUpdateMutation.isPending}
+                error={athleteUpdateMutation.error}
+                t={t}
               />
-              <button
-                onClick={() => internalNotesMutation.mutate(internalNotes)}
-                disabled={internalNotesMutation.isPending}
-                className="mt-2 text-xs bg-gray-900 text-white px-3 py-1 rounded hover:bg-gray-800 disabled:opacity-50"
-              >
-                {t('common.save')}
-              </button>
-            </div>
+            </CollapsibleSection>
+
+            {/* Compliance */}
+            <CollapsibleSection title={t('compliance.title')} isOpen={openSection === 'compliance'} onToggle={() => toggleSection('compliance')}>
+              <AthleteFieldEditor
+                athlete={app.athlete}
+                fields={[
+                  { key: 'iRunClean', label: t('compliance.iRunClean'), type: 'select', options: [
+                    { value: 'yes', label: 'Yes' }, { value: 'no', label: 'No' },
+                    { value: 'in_progress', label: 'In progress' }, { value: 'unknown', label: 'Unknown' },
+                  ]},
+                  { key: 'dopingFree', label: t('compliance.dopingFree'), type: 'select', options: [
+                    { value: 'yes', label: 'Yes' }, { value: 'no', label: 'No' }, { value: 'unknown', label: 'Unknown' },
+                  ]},
+                ]}
+                onSave={(data) => athleteUpdateMutation.mutate(data)}
+                isPending={athleteUpdateMutation.isPending}
+                error={athleteUpdateMutation.error}
+                t={t}
+              />
+            </CollapsibleSection>
+
+            {/* Logistics */}
+            <CollapsibleSection title={t('logistics.title')} isOpen={openSection === 'logistics'} onToggle={() => toggleSection('logistics')}>
+              <AthleteFieldEditor
+                athlete={app.athlete}
+                fields={[
+                  { key: 'arrivalDate', label: `${t('logistics.arrival')} ${t('logistics.date')}`, type: 'date' },
+                  { key: 'arrivalFlight', label: `${t('logistics.arrival')} ${t('logistics.flightNumber')}`, type: 'text' },
+                  { key: 'arrivalFrom', label: `${t('logistics.arrival')} ${t('logistics.from')}`, type: 'text' },
+                  { key: 'arrivalTime', label: `${t('logistics.arrival')} ${t('logistics.time')}`, type: 'text' },
+                  { key: 'departureDate', label: `${t('logistics.departure')} ${t('logistics.date')}`, type: 'date' },
+                  { key: 'departureFlight', label: `${t('logistics.departure')} ${t('logistics.flightNumber')}`, type: 'text' },
+                  { key: 'departureTo', label: `${t('logistics.departure')} ${t('logistics.to')}`, type: 'text' },
+                  { key: 'departureTime', label: `${t('logistics.departure')} ${t('logistics.time')}`, type: 'text' },
+                  { key: 'accommodationReqs', label: t('logistics.specialRequests'), type: 'textarea' },
+                ]}
+                onSave={(data) => athleteUpdateMutation.mutate(data)}
+                isPending={athleteUpdateMutation.isPending}
+                error={athleteUpdateMutation.error}
+                t={t}
+              />
+            </CollapsibleSection>
+
+            {/* Cost estimates */}
+            <CollapsibleSection title={t('selection.estimatedCost')} isOpen={openSection === 'costs'} onToggle={() => toggleSection('costs')}>
+              <AthleteFieldEditor
+                athlete={app.athlete}
+                fields={[
+                  { key: 'estTravel', label: 'Est. travel (CHF)', type: 'number' },
+                  { key: 'estAccommodation', label: 'Est. accommodation (CHF)', type: 'number' },
+                  { key: 'estAppearance', label: 'Est. appearance (CHF)', type: 'number' },
+                ]}
+                onSave={(data) => athleteUpdateMutation.mutate(data)}
+                isPending={athleteUpdateMutation.isPending}
+                error={athleteUpdateMutation.error}
+                t={t}
+              />
+              <p className="text-xs text-gray-400 mt-1">Total auto-computed as sum of the three fields.</p>
+            </CollapsibleSection>
+
+            {/* Assigned selector */}
+            <CollapsibleSection title={t('selection.assignedSelector')} isOpen={openSection === 'selector'} onToggle={() => toggleSection('selector')}>
+              <SelectorAssign
+                currentValue={app.athlete.assignedSelector}
+                staffUsers={staffUsers}
+                onSave={(val) => athleteUpdateMutation.mutate({ assignedSelector: val || null })}
+                isPending={athleteUpdateMutation.isPending}
+                t={t}
+              />
+            </CollapsibleSection>
+
+            {/* Payment */}
+            <CollapsibleSection title="Payment" isOpen={openSection === 'payment'} onToggle={() => toggleSection('payment')}>
+              <AthleteFieldEditor
+                athlete={app.athlete}
+                fields={[
+                  { key: 'bankIban', label: 'IBAN', type: 'text' },
+                  { key: 'paymentStatus', label: 'Payment status', type: 'select', options: [
+                    { value: 'pending', label: 'Pending' }, { value: 'done', label: 'Done' },
+                  ]},
+                  { key: 'paymentAmount', label: 'Amount (CHF)', type: 'number' },
+                  { key: 'paymentDate', label: 'Payment date', type: 'date' },
+                  { key: 'paymentMethod', label: 'Method', type: 'select', options: [
+                    { value: '', label: '—' }, { value: 'cash', label: 'Cash' }, { value: 'bank', label: 'Bank' },
+                    { value: 'western_union', label: 'Western Union' }, { value: 'paypal', label: 'PayPal' }, { value: 'other', label: 'Other' },
+                  ]},
+                ]}
+                onSave={(data) => athleteUpdateMutation.mutate(data)}
+                isPending={athleteUpdateMutation.isPending}
+                error={athleteUpdateMutation.error}
+                t={t}
+              />
+            </CollapsibleSection>
+
+            {/* Notes */}
+            <CollapsibleSection title={t('common.notes')} isOpen={openSection === 'notes'} onToggle={() => toggleSection('notes')}>
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">Participant notes</label>
+                  <p className="text-xs text-gray-600 bg-gray-50 p-2 rounded min-h-[2rem]">{app.athlete.participantNotes || '—'}</p>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">Additional notes</label>
+                  <p className="text-xs text-gray-600 bg-gray-50 p-2 rounded min-h-[2rem]">{app.athlete.additionalNotes || '—'}</p>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">Internal notes (staff only)</label>
+                  <textarea
+                    className={inputCls}
+                    rows={3}
+                    value={internalNotes}
+                    onChange={(e) => setInternalNotes(e.target.value)}
+                  />
+                  <button
+                    onClick={() => internalNotesMutation.mutate(internalNotes)}
+                    disabled={internalNotesMutation.isPending}
+                    className="mt-2 text-xs bg-gray-900 text-white px-3 py-1 rounded hover:bg-gray-800 disabled:opacity-50"
+                  >
+                    {t('common.save')}
+                  </button>
+                </div>
+              </div>
+            </CollapsibleSection>
           </div>
 
-          {/* ── Center column: Agreement ──────────────────────────────────── */}
+          {/* ── Center column: Agreement ──────────────────────────────── */}
           <div className="space-y-4">
             {/* Status actions */}
             <div className="bg-white rounded-lg border p-4">
@@ -490,10 +708,10 @@ export default function AthletePage() {
               {participationMutation.isError && (
                 <p className="text-xs text-red-600 mt-2">{(participationMutation.error as Error)?.message || t('common.error')}</p>
               )}
-              {app.siblingApplications?.length > 0 && app.siblingApplications.every(s => s.participationStatus !== 'pending') && (
+              {allDecided && (
                 <p className="text-xs text-green-600 mt-2">All events decided — ready to send agreement</p>
               )}
-              {app.siblingApplications?.length > 0 && app.siblingApplications.some(s => s.participationStatus === 'pending') && (
+              {app.siblingApplications?.length > 0 && !allDecided && (
                 <p className="text-xs text-gray-400 mt-2">Decide all events before sending an agreement</p>
               )}
             </div>
@@ -505,7 +723,8 @@ export default function AthletePage() {
                 {!showAgreementForm && currentStatus !== 'confirmed' && currentStatus !== 'rejected' && currentStatus !== 'withdrawn' && (
                   <button
                     onClick={() => setShowAgreementForm(true)}
-                    className="text-xs text-blue-600 hover:text-blue-800"
+                    disabled={!allDecided}
+                    className={`text-xs ${allDecided ? 'text-blue-600 hover:text-blue-800' : 'text-gray-300 cursor-not-allowed'}`}
                   >
                     {latestAgreement ? 'New version' : t('contract.sendOffer')}
                   </button>
@@ -721,7 +940,7 @@ export default function AthletePage() {
             )}
           </div>
 
-          {/* ── Right column: Interactions timeline ──────────────────────── */}
+          {/* ── Right column: Interactions timeline ──────────────────── */}
           <div className="space-y-4">
             {/* Add interaction */}
             <div className="bg-white rounded-lg border p-4">
@@ -786,17 +1005,118 @@ function Row({ label, value }: { label: string; value: React.ReactNode }) {
   )
 }
 
-function ComplianceBadge({ status }: { status: string }) {
-  const colors: Record<string, string> = {
-    yes: 'bg-green-100 text-green-700',
-    no: 'bg-red-100 text-red-700',
-    in_progress: 'bg-yellow-100 text-yellow-700',
-    unknown: 'bg-gray-100 text-gray-500',
-  }
+function CollapsibleSection({ title, isOpen, onToggle, children }: {
+  title: string; isOpen: boolean; onToggle: () => void; children: React.ReactNode
+}) {
   return (
-    <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${colors[status] ?? colors.unknown}`}>
-      {status}
-    </span>
+    <div className="bg-white rounded-lg border">
+      <button onClick={onToggle} className="w-full flex items-center justify-between p-3 text-sm font-semibold hover:bg-gray-50">
+        {title}
+        <span className="text-gray-400 text-xs">{isOpen ? '▾' : '▸'}</span>
+      </button>
+      {isOpen && <div className="px-4 pb-4">{children}</div>}
+    </div>
+  )
+}
+
+interface FieldDef {
+  key: string
+  label: string
+  type: 'text' | 'number' | 'date' | 'select' | 'checkbox' | 'textarea'
+  options?: { value: string; label: string }[]
+}
+
+function AthleteFieldEditor({ athlete, fields, onSave, isPending, error, t }: {
+  athlete: Athlete
+  fields: FieldDef[]
+  onSave: (data: Record<string, unknown>) => void
+  isPending: boolean
+  error: Error | null
+  t: (key: string) => string
+}) {
+  const [form, setForm] = useState<Record<string, unknown>>(() => {
+    const init: Record<string, unknown> = {}
+    for (const f of fields) {
+      init[f.key] = (athlete as unknown as Record<string, unknown>)[f.key] ?? (f.type === 'checkbox' ? false : f.type === 'number' ? 0 : '')
+    }
+    return init
+  })
+
+  const inputCls = 'w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-gray-900'
+
+  return (
+    <div className="space-y-2">
+      {fields.map(f => (
+        <div key={f.key}>
+          {f.type === 'checkbox' ? (
+            <label className="flex items-center gap-2 text-xs cursor-pointer">
+              <input type="checkbox" checked={form[f.key] as boolean}
+                onChange={e => setForm(p => ({ ...p, [f.key]: e.target.checked }))} />
+              {f.label}
+            </label>
+          ) : f.type === 'select' ? (
+            <>
+              <label className="block text-xs font-medium text-gray-500 mb-1">{f.label}</label>
+              <select className={inputCls} value={form[f.key] as string}
+                onChange={e => setForm(p => ({ ...p, [f.key]: e.target.value }))}>
+                {f.options?.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+              </select>
+            </>
+          ) : f.type === 'textarea' ? (
+            <>
+              <label className="block text-xs font-medium text-gray-500 mb-1">{f.label}</label>
+              <textarea className={inputCls} rows={2} value={form[f.key] as string}
+                onChange={e => setForm(p => ({ ...p, [f.key]: e.target.value }))} />
+            </>
+          ) : (
+            <>
+              <label className="block text-xs font-medium text-gray-500 mb-1">{f.label}</label>
+              <input type={f.type} className={inputCls} value={form[f.key] as string | number}
+                onChange={e => setForm(p => ({ ...p, [f.key]: f.type === 'number' ? (parseInt(e.target.value) || 0) : e.target.value }))} />
+            </>
+          )}
+        </div>
+      ))}
+      <button
+        onClick={() => onSave(form)}
+        disabled={isPending}
+        className="mt-2 text-xs bg-gray-900 text-white px-3 py-1 rounded hover:bg-gray-800 disabled:opacity-50"
+      >
+        {t('common.save')}
+      </button>
+      {error && <p className="text-xs text-red-600">{error.message || t('common.error')}</p>}
+    </div>
+  )
+}
+
+function SelectorAssign({ currentValue, staffUsers, onSave, isPending, t }: {
+  currentValue: string | null
+  staffUsers: StaffUser[]
+  onSave: (val: string) => void
+  isPending: boolean
+  t: (key: string) => string
+}) {
+  const [value, setValue] = useState(currentValue ?? '')
+  return (
+    <div className="space-y-2">
+      <select
+        className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-gray-900"
+        value={value}
+        onChange={e => setValue(e.target.value)}
+      >
+        <option value="">— Unassigned —</option>
+        {staffUsers.map(u => (
+          <option key={u.id} value={u.id}>{u.firstName} {u.lastName}</option>
+        ))}
+      </select>
+      <button
+        onClick={() => onSave(value)}
+        disabled={isPending}
+        className="text-xs bg-gray-900 text-white px-3 py-1 rounded hover:bg-gray-800 disabled:opacity-50"
+      >
+        {t('common.save')}
+      </button>
+    </div>
   )
 }
 
