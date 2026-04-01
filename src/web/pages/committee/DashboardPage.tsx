@@ -1,9 +1,7 @@
 import { useTranslation } from 'react-i18next'
-import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { api } from '@web/lib/api'
 import { useAuth } from '@web/lib/auth'
-import { LanguageSwitcher } from '@web/App'
 
 interface EventStat {
   eventId: string
@@ -71,7 +69,7 @@ interface DashboardData {
 
 export default function DashboardPage() {
   const { t } = useTranslation()
-  const { user, logout } = useAuth()
+  const { user } = useAuth()
 
   const { data, isLoading } = useQuery<DashboardData>({
     queryKey: ['dashboard'],
@@ -90,32 +88,7 @@ export default function DashboardPage() {
   const budgetUsedPct = edition.totalBudget > 0 ? (kpi.budgetCommitted / edition.totalBudget) * 100 : 0
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white border-b px-6 py-3">
-        <div className="max-w-7xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Link to="/" className="text-lg font-bold">Atletica Genève</Link>
-            <span className="text-xs text-gray-400">
-              {t('dashboard.title')} — {edition.name} {edition.year}
-            </span>
-          </div>
-          <div className="flex items-center gap-3">
-            {user && (
-              <span className="text-xs text-gray-400">
-                {user.firstName} {user.lastName}
-              </span>
-            )}
-            {user && (
-              <button onClick={() => logout()} className="text-xs text-gray-400 hover:text-gray-600">
-                {t('auth.logout')}
-              </button>
-            )}
-            <LanguageSwitcher />
-          </div>
-        </div>
-      </div>
-
+    <div>
       <div className="max-w-7xl mx-auto px-6 py-6 space-y-6">
         {/* KPI cards */}
         <div className="grid grid-cols-6 gap-4">

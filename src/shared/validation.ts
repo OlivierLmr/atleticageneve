@@ -38,7 +38,10 @@ export const athleteRegistrationSchema = z.object({
   participantNotes: z.string().optional(),
   additionalNotes: z.string().optional(),
   eapCity: z.string().optional(),
-})
+}).refine((data) => {
+  if (data.isEap && !data.eapCity) return false
+  return true
+}, { message: 'eapCity is required when isEap is true', path: ['eapCity'] })
 
 // ── Batch athlete registration (by manager) ──────────────────────────────────
 
@@ -109,7 +112,10 @@ export const athleteUpdateSchema = z.object({
   participantNotes: z.string().optional().nullable(),
   additionalNotes: z.string().optional().nullable(),
   internalNotes: z.string().optional().nullable(),
-})
+}).refine((data) => {
+  if (data.isEap === true && 'eapCity' in data && !data.eapCity) return false
+  return true
+}, { message: 'eapCity is required when isEap is true', path: ['eapCity'] })
 
 // ── Agreement ─────────────────────────────────────────────────────────────────
 

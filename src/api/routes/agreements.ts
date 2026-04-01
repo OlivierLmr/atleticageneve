@@ -3,6 +3,7 @@ import { eq, desc, and } from 'drizzle-orm'
 import * as schema from '../db/schema'
 import { agreementSchema } from '@shared/validation'
 import { requireAuth } from '../middleware/auth'
+import { sendEmail } from '../services/email'
 import type { Env } from '../index'
 import type { NegotiationStatus, ParticipationStatus } from '@shared/types'
 
@@ -195,6 +196,46 @@ agreements.post('/:athleteId/agreements', async (c) => {
     authorId: user.id,
     authorName: `${user.firstName} ${user.lastName}`,
   })
+
+  // Send email notification to athlete and manager about the agreement
+  const athleteName = `${ath.firstName} ${ath.lastName}`
+  const nightCount = [
+    data.hotelNightTue, data.hotelNightWed, data.hotelNightThu,
+    data.hotelNightFri, data.hotelNightSat, data.hotelNightSun,
+  ].filter(Boolean).length
+
+  const agreementSummary = [
+    `Appearance fee: CHF ${data.appearanceFee}`,
+    `Transport: CHF ${data.transport}`,
+    `Hotel nights: ${nightCount}`,
+    `Total cost: CHF ${totalCost}`,
+    data.notes ? `Notes: ${data.notes}` : null,
+  ].filter(Boolean).join('\n')
+
+  const agreementBody = `An agreement offer (v${nextVersion}) has been sent for ${athleteName}.\n\n${agreementSummary}\n\nPlease log in to the portal to review and respond.`
+
+  if (ath.athleteEmail) {
+    await sendEmail({
+      db,
+      to: ath.athleteEmail,
+      subject: `Agreement offer — ${athleteName}`,
+      body: agreementBody,
+      relatedAthleteId: athleteId,
+    })
+  }
+
+  if (ath.managerId) {
+    const managerRows = await db.select().from(schema.user).where(eq(schema.user.id, ath.managerId)).limit(1)
+    if (managerRows.length > 0 && managerRows[0].email) {
+      await sendEmail({
+        db,
+        to: managerRows[0].email,
+        subject: `Agreement offer — ${athleteName}`,
+        body: agreementBody,
+        relatedAthleteId: athleteId,
+      })
+    }
+  }
 
   return c.json({
     id: agreementId,

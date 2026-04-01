@@ -286,17 +286,21 @@ portal.post('/athlete/:athleteId/respond', requireAuth('athlete', 'manager'), as
     return c.json({ error: `Invalid action: ${action}` }, 400)
   }
 
-  // Notify collaborators via email
+  // Notify collaborators via email using edition's notification email
   const updatedAth = await db.select().from(schema.athlete).where(eq(schema.athlete.id, athleteId)).limit(1)
   const newStatus = updatedAth[0]?.negotiationStatus ?? action
 
-  await sendEmail({
-    db,
-    to: 'collaborators@atleticageneve.ch',
-    subject: `Application update — ${ath.firstName} ${ath.lastName}`,
-    body: `${ath.firstName} ${ath.lastName} has ${action}ed the offer.\nNew status: ${newStatus}`,
-    relatedAthleteId: athleteId,
-  })
+  const editions = await db.select().from(schema.edition).limit(1)
+  const notificationEmail = editions[0]?.notificationEmail
+  if (notificationEmail) {
+    await sendEmail({
+      db,
+      to: notificationEmail,
+      subject: `Application update — ${ath.firstName} ${ath.lastName}`,
+      body: `${ath.firstName} ${ath.lastName} has ${action}ed the offer.\nNew status: ${newStatus}`,
+      relatedAthleteId: athleteId,
+    })
+  }
 
   return c.json({ athleteId, status: newStatus, previousStatus: currentStatus })
 })

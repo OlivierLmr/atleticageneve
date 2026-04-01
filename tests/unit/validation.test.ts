@@ -90,6 +90,7 @@ describe('athleteRegistrationSchema', () => {
       dateOfBirth: '1994-09-26',
       federation: 'FIDAL',
       isEap: true,
+      eapCity: 'eap-1',
       iRunClean: true,
       dopingFree: true,
       participantNotes: 'Some notes',

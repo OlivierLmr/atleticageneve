@@ -1,7 +1,7 @@
 import { useState } from 'react'
-import { BrowserRouter, Routes, Route, Link, Navigate } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Link, Navigate, Outlet, useLocation } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { AuthProvider, useAuth } from '@web/lib/auth'
 import LoginPage from '@web/pages/auth/LoginPage'
 import MagicLinkPage from '@web/pages/auth/MagicLinkPage'
@@ -70,15 +70,120 @@ function ProtectedRoute({ children, roles }: { children: ReactNode; roles?: User
   return <>{children}</>
 }
 
-// ── Home page ─────────────────────────────────────────────────────────────────
+// ── Committee layout with navigation ─────────────────────────────────────────
 
-interface DevEmail {
-  to: string
-  subject: string
-  body: string
-  lang: string
-  sentAt: string
+const COMMITTEE_NAV = [
+  { to: '/committee/dashboard', label: 'Dashboard' },
+  { to: '/committee/edition-config', label: 'Edition' },
+  { to: '/committee/event-catalog', label: 'Event Catalog' },
+  { to: '/committee/countries', label: 'Countries' },
+  { to: '/committee/eap-cities', label: 'EAP Cities' },
+  { to: '/committee/hotel-rooms', label: 'Hotel Rooms' },
+  { to: '/committee/email-log', label: 'Email Log' },
+  { to: '/committee/candidates', label: 'Candidates' },
+]
+
+function CommitteeLayout() {
+  const { user, logout } = useAuth()
+  const location = useLocation()
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      <nav className="bg-white border-b">
+        <div className="max-w-7xl mx-auto px-6 flex items-center justify-between h-12">
+          <div className="flex items-center gap-1 overflow-x-auto">
+            {COMMITTEE_NAV.map(({ to, label }) => {
+              const active = location.pathname === to || (to === '/committee/candidates' && location.pathname.startsWith('/committee/athletes/'))
+              return (
+                <Link
+                  key={to}
+                  to={to}
+                  className={`px-3 py-1.5 text-sm rounded-md whitespace-nowrap ${
+                    active
+                      ? 'bg-gray-900 text-white font-medium'
+                      : 'text-gray-600 hover:bg-gray-100'
+                  }`}
+                >
+                  {label}
+                </Link>
+              )
+            })}
+          </div>
+          <div className="flex items-center gap-3 shrink-0 ml-4">
+            {user && (
+              <span className="text-xs text-gray-400">
+                {user.firstName} {user.lastName}
+              </span>
+            )}
+            <LanguageSwitcher />
+            <button
+              onClick={() => logout()}
+              className="text-xs text-gray-400 hover:text-gray-600"
+            >
+              Logout
+            </button>
+          </div>
+        </div>
+      </nav>
+      <Outlet />
+    </div>
+  )
 }
+
+// ── Collaborator layout with navigation ──────────────────────────────────────
+
+function CollaboratorLayout() {
+  const { user, logout } = useAuth()
+  const location = useLocation()
+
+  const navItems = [
+    { to: '/collaborator/candidates', label: 'Candidates' },
+  ]
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      <nav className="bg-white border-b">
+        <div className="max-w-7xl mx-auto px-6 flex items-center justify-between h-12">
+          <div className="flex items-center gap-1">
+            {navItems.map(({ to, label }) => {
+              const active = location.pathname === to
+              return (
+                <Link
+                  key={to}
+                  to={to}
+                  className={`px-3 py-1.5 text-sm rounded-md whitespace-nowrap ${
+                    active
+                      ? 'bg-gray-900 text-white font-medium'
+                      : 'text-gray-600 hover:bg-gray-100'
+                  }`}
+                >
+                  {label}
+                </Link>
+              )
+            })}
+          </div>
+          <div className="flex items-center gap-3 shrink-0 ml-4">
+            {user && (
+              <span className="text-xs text-gray-400">
+                {user.firstName} {user.lastName}
+              </span>
+            )}
+            <LanguageSwitcher />
+            <button
+              onClick={() => logout()}
+              className="text-xs text-gray-400 hover:text-gray-600"
+            >
+              Logout
+            </button>
+          </div>
+        </div>
+      </nav>
+      <Outlet />
+    </div>
+  )
+}
+
+// ── Home page ─────────────────────────────────────────────────────────────────
 
 function HomePage() {
   const { t } = useTranslation()
@@ -90,12 +195,6 @@ function HomePage() {
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
-
-  const { data: emails = [] } = useQuery<DevEmail[]>({
-    queryKey: ['dev-emails'],
-    queryFn: () => api.get('/api/v1/emails'),
-    refetchInterval: 5000,
-  })
 
   // If already logged in, redirect to the right portal
   if (user && !loading) {
@@ -267,26 +366,6 @@ function HomePage() {
         )}
       </div>
 
-      {/* DEV ONLY — email log */}
-      {emails.length > 0 && (
-        <div className="mt-4 mb-12">
-          <p className="text-xs font-semibold uppercase tracking-wide text-orange-500 mb-2">
-            Dev — Emails sent (last hour)
-          </p>
-          <div className="flex flex-col gap-2">
-            {emails.slice().reverse().map((em, i) => (
-              <div key={i} className="border border-orange-200 bg-orange-50 rounded-md px-3 py-2">
-                <div className="flex justify-between text-[10px] text-orange-400 mb-1">
-                  <span>To: {em.to}</span>
-                  <span>{new Date(em.sentAt).toLocaleTimeString()}</span>
-                </div>
-                <p className="text-xs font-medium text-gray-900 mb-1">{em.subject}</p>
-                <pre className="text-[10px] text-gray-600 whitespace-pre-wrap font-mono">{em.body}</pre>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
     </div>
   )
 }
@@ -332,51 +411,36 @@ export default function App() {
             } />
 
             {/* Collaborator — requires collaborator role */}
-            <Route path="/collaborator/candidates" element={
-              <ProtectedRoute roles={['collaborator', 'committee']}>
-                <CandidatesPage />
+            <Route path="/collaborator" element={
+              <ProtectedRoute roles={['collaborator']}>
+                <CollaboratorLayout />
               </ProtectedRoute>
-            } />
-            <Route path="/collaborator/athletes/:id" element={
-              <ProtectedRoute roles={['collaborator', 'committee']}>
-                <CollaboratorAthletePage />
-              </ProtectedRoute>
-            } />
+            }>
+              <Route path="candidates" element={<CandidatesPage />} />
+              <Route path="athletes/:id" element={<CollaboratorAthletePage />} />
+            </Route>
 
-            {/* Committee — requires committee role */}
-            <Route path="/committee/dashboard" element={
+            {/* Committee — requires committee role (uses CommitteeLayout with nav) */}
+            <Route path="/committee" element={
               <ProtectedRoute roles={['committee']}>
-                <DashboardPage />
+                <CommitteeLayout />
               </ProtectedRoute>
-            } />
-            <Route path="/committee/edition-config" element={
+            }>
+              <Route path="dashboard" element={<DashboardPage />} />
+              <Route path="edition-config" element={<EditionConfigPage />} />
+              <Route path="event-catalog" element={<EventCatalogPage />} />
+              <Route path="countries" element={<CountriesPage />} />
+              <Route path="eap-cities" element={<EapCitiesPage />} />
+              <Route path="hotel-rooms" element={<HotelRoomsPage />} />
+              <Route path="email-log" element={<EmailLogPage />} />
+              <Route path="candidates" element={<CandidatesPage />} />
+              <Route path="athletes/:id" element={<CollaboratorAthletePage />} />
+            </Route>
+
+            {/* Redirects for committee users hitting collaborator paths */}
+            <Route path="/collaborator/candidates" element={
               <ProtectedRoute roles={['committee']}>
-                <EditionConfigPage />
-              </ProtectedRoute>
-            } />
-            <Route path="/committee/event-catalog" element={
-              <ProtectedRoute roles={['committee']}>
-                <EventCatalogPage />
-              </ProtectedRoute>
-            } />
-            <Route path="/committee/countries" element={
-              <ProtectedRoute roles={['committee']}>
-                <CountriesPage />
-              </ProtectedRoute>
-            } />
-            <Route path="/committee/eap-cities" element={
-              <ProtectedRoute roles={['committee']}>
-                <EapCitiesPage />
-              </ProtectedRoute>
-            } />
-            <Route path="/committee/hotel-rooms" element={
-              <ProtectedRoute roles={['committee']}>
-                <HotelRoomsPage />
-              </ProtectedRoute>
-            } />
-            <Route path="/committee/email-log" element={
-              <ProtectedRoute roles={['committee']}>
-                <EmailLogPage />
+                <Navigate to="/committee/candidates" replace />
               </ProtectedRoute>
             } />
           </Routes>

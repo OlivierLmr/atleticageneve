@@ -5,7 +5,7 @@ import * as schema from '../db/schema'
 import { athleteRegistrationSchema, batchAthleteRegistrationSchema, athleteUpdateSchema, negotiationStatusChangeSchema } from '@shared/validation'
 import { NEGOTIATION_TRANSITIONS } from '@shared/constants'
 import { requireAuth } from '../middleware/auth'
-import { sendEmail, sendMagicLinkEmail } from '../services/email'
+import { sendEmail, sendMagicLinkEmail, sendStatusChangeEmail } from '../services/email'
 import { generateToken, magicLinkExpiresAt } from '../services/auth'
 import type { Env } from '../index'
 import type { NegotiationStatus } from '@shared/types'
@@ -126,6 +126,24 @@ athletes.post('/', zValidator('json', athleteRegistrationSchema), async (c) => {
     const baseUrl = c.req.header('Origin') ?? 'http://localhost:5173'
     await sendMagicLinkEmail(db, data.athleteEmail, token, baseUrl)
     magicLinkSent = true
+  }
+
+  // If managerId provided, notify the manager
+  if (data.managerId) {
+    const managers = await db
+      .select()
+      .from(schema.user)
+      .where(eq(schema.user.id, data.managerId))
+      .limit(1)
+
+    if (managers.length > 0 && managers[0].email) {
+      await sendEmail({
+        db,
+        to: managers[0].email,
+        subject: `New athlete registered under your management: ${data.firstName} ${data.lastName}`,
+        body: `${data.firstName} ${data.lastName} has registered and listed you as their manager.\n\nEvents: ${data.eventIds.join(', ')}`,
+      })
+    }
   }
 
   return c.json({
@@ -319,6 +337,44 @@ athletes.patch('/:id/negotiation-status', requireAuth('collaborator', 'committee
     authorName: `${user.firstName} ${user.lastName}`,
   })
 
+  // Send email notification to athlete and manager
+  const editions = await db.select().from(schema.edition).limit(1)
+  const edition = editions[0]
+  const baseUrl = c.req.header('Origin') ?? 'http://localhost:5173'
+  const portalUrl = `${baseUrl}/portal`
+
+  // Look up athlete's user record for preferred language
+  let athleteLang: 'en' | 'fr' = 'en'
+  if (ath.userId) {
+    const userRows = await db.select().from(schema.user).where(eq(schema.user.id, ath.userId)).limit(1)
+    if (userRows.length > 0) {
+      athleteLang = (userRows[0].preferredLang as 'en' | 'fr') ?? 'en'
+    }
+  }
+
+  if (ath.athleteEmail) {
+    await sendStatusChangeEmail(db, ath.athleteEmail, `${ath.firstName} ${ath.lastName}`, newStatus, portalUrl, athleteLang, undefined, id)
+  }
+
+  if (ath.managerId) {
+    const managerRows = await db.select().from(schema.user).where(eq(schema.user.id, ath.managerId)).limit(1)
+    if (managerRows.length > 0 && managerRows[0].email) {
+      const managerLang = (managerRows[0].preferredLang as 'en' | 'fr') ?? 'en'
+      await sendStatusChangeEmail(db, managerRows[0].email, `${ath.firstName} ${ath.lastName}`, newStatus, portalUrl, managerLang, undefined, id)
+    }
+  }
+
+  // Notify edition notification email
+  if (edition?.notificationEmail) {
+    await sendEmail({
+      db,
+      to: edition.notificationEmail,
+      subject: `Status change — ${ath.firstName} ${ath.lastName}`,
+      body: `${ath.firstName} ${ath.lastName} status changed from "${currentStatus}" to "${newStatus}" by ${user.firstName} ${user.lastName}.`,
+      relatedAthleteId: id,
+    })
+  }
+
   return c.json({ id, status: newStatus, previousStatus: currentStatus })
 })
 
@@ -358,6 +414,59 @@ athletes.post('/:id/restore', requireAuth('committee'), async (c) => {
     .where(eq(schema.athlete.id, id))
 
   return c.json({ id, archived: false })
+})
+
+// ── POST /athletes/:id/interactions — add interaction at athlete level ────────
+
+athletes.post('/:id/interactions', requireAuth('collaborator', 'committee'), async (c) => {
+  const db = c.get('db')
+  const user = c.get('user')!
+  const id = c.req.param('id')!
+  const body = await c.req.json()
+
+  const type = body.type
+  const content = body.content
+  const applicationId = body.applicationId ?? null
+
+  if (!type || !content) {
+    return c.json({ error: 'type and content are required' }, 400)
+  }
+
+  const validTypes = ['email', 'call', 'note']
+  if (!validTypes.includes(type)) {
+    return c.json({ error: `type must be one of: ${validTypes.join(', ')}` }, 400)
+  }
+
+  // Verify athlete exists
+  const athRows = await db.select().from(schema.athlete).where(eq(schema.athlete.id, id)).limit(1)
+  if (athRows.length === 0) {
+    return c.json({ error: 'Athlete not found' }, 404)
+  }
+
+  // If applicationId provided, verify it belongs to this athlete
+  if (applicationId) {
+    const appRows = await db
+      .select()
+      .from(schema.application)
+      .where(eq(schema.application.id, applicationId))
+      .limit(1)
+    if (appRows.length === 0 || appRows[0].athleteId !== id) {
+      return c.json({ error: 'Application not found or does not belong to this athlete' }, 400)
+    }
+  }
+
+  const interactionId = crypto.randomUUID()
+  await db.insert(schema.interaction).values({
+    id: interactionId,
+    athleteId: id,
+    applicationId,
+    type,
+    content,
+    authorId: user.id,
+    authorName: `${user.firstName} ${user.lastName}`,
+  })
+
+  return c.json({ id: interactionId }, 201)
 })
 
 export default athletes

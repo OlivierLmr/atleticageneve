@@ -102,7 +102,7 @@ function defaultAgreement(existing?: Agreement) {
 export default function AthletePage() {
   const { t } = useTranslation()
   const { id } = useParams<{ id: string }>()
-  const { user, logout } = useAuth()
+  const { user } = useAuth()
   const queryClient = useQueryClient()
 
   const { data: app, isLoading } = useQuery<ApplicationDetail>({
@@ -168,7 +168,10 @@ export default function AthletePage() {
 
   const noteMutation = useMutation({
     mutationFn: (data: { type: string; content: string }) =>
-      api.post(`/api/v1/applications/${id}/interactions`, data),
+      api.post(`/api/v1/athletes/${app?.athleteId}/interactions`, {
+        ...data,
+        applicationId: id,
+      }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['application', id] })
       setNoteContent('')
@@ -209,7 +212,7 @@ export default function AthletePage() {
       <div className="bg-white border-b px-6 py-3">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <Link to="/collaborator/candidates" className="text-sm text-gray-400 hover:text-gray-600">
+            <Link to={user?.role === 'committee' ? '/committee/candidates' : '/collaborator/candidates'} className="text-sm text-gray-400 hover:text-gray-600">
               &larr; {t('selection.candidates')}
             </Link>
             <span className="text-lg font-bold">
@@ -224,19 +227,6 @@ export default function AthletePage() {
             </span>
           </div>
           <div className="flex items-center gap-3">
-            {user && (
-              <span className="text-xs text-gray-400">
-                {user.firstName} {user.lastName}
-              </span>
-            )}
-            {user && (
-              <button
-                onClick={() => logout()}
-                className="text-xs text-gray-400 hover:text-gray-600"
-              >
-                {t('auth.logout')}
-              </button>
-            )}
             <LanguageSwitcher />
           </div>
         </div>

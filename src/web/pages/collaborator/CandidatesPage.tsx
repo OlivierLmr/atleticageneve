@@ -40,7 +40,7 @@ interface EventListItem extends Event {
 
 export default function CandidatesPage() {
   const { t } = useTranslation()
-  const { user, logout } = useAuth()
+  const { user } = useAuth()
   const [eventFilter, setEventFilter] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
   const [search, setSearch] = useState('')
@@ -89,25 +89,11 @@ export default function CandidatesPage() {
       <div className="bg-white border-b px-6 py-3">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <Link to="/" className="text-lg font-bold">
-              Atletica Genève
-            </Link>
-            <span className="text-xs text-gray-400">{t('selection.title')}</span>
+            <span className="text-lg font-bold">
+              {t('selection.title')}
+            </span>
           </div>
           <div className="flex items-center gap-3">
-            {user && (
-              <span className="text-xs text-gray-400">
-                {user.firstName} {user.lastName}
-              </span>
-            )}
-            {user && (
-              <button
-                onClick={() => logout()}
-                className="text-xs text-gray-400 hover:text-gray-600"
-              >
-                {t('auth.logout')}
-              </button>
-            )}
             <LanguageSwitcher />
           </div>
         </div>
@@ -214,7 +200,7 @@ export default function CandidatesPage() {
                     <tr key={app.id} className="border-b hover:bg-gray-50 transition-colors">
                       <td className="px-3 py-2.5">
                         <Link
-                          to={`/collaborator/athletes/${app.id}`}
+                          to={user?.role === 'committee' ? `/committee/athletes/${app.id}` : `/collaborator/athletes/${app.id}`}
                           className="font-medium text-gray-900 hover:underline"
                         >
                           {app.athlete.lastName}, {app.athlete.firstName}

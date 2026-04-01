@@ -3,7 +3,7 @@ import { zValidator } from '@hono/zod-validator'
 import { eq } from 'drizzle-orm'
 import * as schema from '../db/schema'
 import { managerRegistrationSchema } from '@shared/validation'
-import { generateToken, sessionExpiresAt } from '../services/auth'
+import { generateToken, sessionExpiresAt, magicLinkExpiresAt } from '../services/auth'
 import { sendMagicLinkEmail } from '../services/email'
 import type { Env } from '../index'
 
@@ -24,7 +24,7 @@ managers.post('/register', zValidator('json', managerRegistrationSchema), async 
     await db.insert(schema.magicLink).values({
       userId: user.id,
       token,
-      expiresAt: sessionExpiresAt(),
+      expiresAt: magicLinkExpiresAt(),
     })
     const baseUrl = c.req.header('Origin') ?? 'http://localhost:5173'
     await sendMagicLinkEmail(db, data.email, token, baseUrl, (user.preferredLang as 'en' | 'fr') ?? 'en')

@@ -179,6 +179,7 @@ dashboard.get('/', async (c) => {
       startDate: edition.startDate,
       endDate: edition.endDate,
       totalBudget: edition.totalBudget,
+      currency: edition.currency,
     },
     kpi: {
       totalAthletes,

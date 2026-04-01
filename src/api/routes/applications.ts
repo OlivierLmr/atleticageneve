@@ -1,5 +1,5 @@
 import { Hono } from 'hono'
-import { eq, and, sql } from 'drizzle-orm'
+import { eq, and, sql, isNull } from 'drizzle-orm'
 import * as schema from '../db/schema'
 import { participationStatusChangeSchema } from '@shared/validation'
 import { PARTICIPATION_TRANSITIONS } from '@shared/constants'
@@ -23,7 +23,7 @@ applications.get('/', async (c) => {
   const search = c.req.query('search')
 
   // Build conditions
-  const conditions = []
+  const conditions = [isNull(schema.athlete.archivedAt)]
   if (eventId) conditions.push(eq(schema.application.eventId, eventId))
   if (negotiationStatus) conditions.push(eq(schema.athlete.negotiationStatus, negotiationStatus))
 
