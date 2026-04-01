@@ -290,10 +290,12 @@ portal.post('/athlete/:athleteId/respond', requireAuth('athlete', 'manager'), as
   const updatedAth = await db.select().from(schema.athlete).where(eq(schema.athlete.id, athleteId)).limit(1)
   const newStatus = updatedAth[0]?.negotiationStatus ?? action
 
-  sendEmail({
+  await sendEmail({
+    db,
     to: 'collaborators@atleticageneve.ch',
     subject: `Application update — ${ath.firstName} ${ath.lastName}`,
     body: `${ath.firstName} ${ath.lastName} has ${action}ed the offer.\nNew status: ${newStatus}`,
+    relatedAthleteId: athleteId,
   })
 
   return c.json({ athleteId, status: newStatus, previousStatus: currentStatus })

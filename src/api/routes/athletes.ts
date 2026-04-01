@@ -124,7 +124,7 @@ athletes.post('/', zValidator('json', athleteRegistrationSchema), async (c) => {
     })
 
     const baseUrl = c.req.header('Origin') ?? 'http://localhost:5173'
-    sendMagicLinkEmail(data.athleteEmail, token, baseUrl)
+    await sendMagicLinkEmail(db, data.athleteEmail, token, baseUrl)
     magicLinkSent = true
   }
 
@@ -203,7 +203,8 @@ athletes.post('/batch', requireAuth('manager'), zValidator('json', batchAthleteR
   }
 
   // Email stub to manager
-  sendEmail({
+  await sendEmail({
+    db,
     to: user.email ?? 'manager@unknown',
     subject: `Batch registration complete — ${results.length} athletes`,
     body: `You have registered ${results.length} athletes:\n${results.map(r => `- ${r.firstName} ${r.lastName} (${r.eventIds.join(', ')})`).join('\n')}`,

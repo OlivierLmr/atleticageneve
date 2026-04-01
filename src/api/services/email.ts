@@ -1,36 +1,34 @@
 /**
- * Email service stub — logs to console instead of sending actual emails.
+ * Email service stub — logs to console and persists to email_log table.
  * Replace with a real provider (Resend, SendGrid, etc.) for production.
  */
 
+import type { DrizzleD1Database } from 'drizzle-orm/d1'
+import * as schema from '../db/schema'
+
+type DB = DrizzleD1Database<typeof schema>
+
 interface EmailParams {
+  db: DB
   to: string
   subject: string
   body: string
   lang?: 'en' | 'fr'
+  relatedAthleteId?: string
 }
 
-export interface EmailLogEntry {
-  to: string
-  subject: string
-  body: string
-  lang: string
-  sentAt: string
-}
-
-// In-memory email log for dev — remove in production
-const emailLog: EmailLogEntry[] = []
-
-export function getRecentEmails(maxAgeMs = 60 * 60 * 1000): EmailLogEntry[] {
-  const cutoff = new Date(Date.now() - maxAgeMs).toISOString()
-  return emailLog.filter((e) => e.sentAt >= cutoff)
-}
-
-export function sendEmail({ to, subject, body, lang = 'en' }: EmailParams): void {
-  emailLog.push({ to, subject, body, lang, sentAt: new Date().toISOString() })
+export async function sendEmail({ db, to, subject, body, lang = 'en', relatedAthleteId }: EmailParams): Promise<void> {
+  // Persist to email_log
+  await db.insert(schema.emailLog).values({
+    to,
+    subject,
+    body,
+    lang,
+    relatedAthleteId: relatedAthleteId ?? null,
+  })
 
   console.log('═══════════════════════════════════════════════════════════════')
-  console.log(`📧 EMAIL STUB [${lang.toUpperCase()}]`)
+  console.log(`EMAIL STUB [${lang.toUpperCase()}]`)
   console.log(`   To:      ${to}`)
   console.log(`   Subject: ${subject}`)
   console.log(`   Body:`)
@@ -38,24 +36,26 @@ export function sendEmail({ to, subject, body, lang = 'en' }: EmailParams): void
   console.log('═══════════════════════════════════════════════════════════════')
 }
 
-export function sendMagicLinkEmail(email: string, token: string, baseUrl: string, lang: 'en' | 'fr' = 'en'): void {
+export async function sendMagicLinkEmail(db: DB, email: string, token: string, baseUrl: string, lang: 'en' | 'fr' = 'en'): Promise<void> {
   const link = `${baseUrl}/auth/verify?token=${token}`
   const subject = lang === 'fr' ? 'Votre lien de connexion — Atletica Genève' : 'Your login link — Atletica Geneve'
   const body = lang === 'fr'
     ? `Bonjour,\n\nCliquez sur le lien suivant pour vous connecter :\n${link}\n\nCe lien est à usage unique et expire dans 30 minutes.\n\nAtletica Genève`
     : `Hello,\n\nClick the following link to log in:\n${link}\n\nThis link is single-use and expires in 30 minutes.\n\nAtletica Geneve`
 
-  sendEmail({ to: email, subject, body, lang })
+  await sendEmail({ db, to: email, subject, body, lang })
 }
 
-export function sendStatusChangeEmail(
+export async function sendStatusChangeEmail(
+  db: DB,
   email: string,
   athleteName: string,
   status: string,
   portalUrl: string,
   lang: 'en' | 'fr' = 'en',
   magicLinkUrl?: string,
-): void {
+  relatedAthleteId?: string,
+): Promise<void> {
   const statusLabels: Record<string, Record<string, string>> = {
     en: {
       to_review: 'Under review',
@@ -92,5 +92,5 @@ export function sendStatusChangeEmail(
     ? `Bonjour,\n\nLa candidature de ${athleteName} a été mise à jour.\nNouveau statut : ${label}${linkLine}\n\nAtletica Genève`
     : `Hello,\n\nThe application for ${athleteName} has been updated.\nNew status: ${label}${linkLine}\n\nAtletica Geneve`
 
-  sendEmail({ to: email, subject, body, lang })
+  await sendEmail({ db, to: email, subject, body, lang, relatedAthleteId })
 }

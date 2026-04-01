@@ -27,7 +27,7 @@ managers.post('/register', zValidator('json', managerRegistrationSchema), async 
       expiresAt: sessionExpiresAt(),
     })
     const baseUrl = c.req.header('Origin') ?? 'http://localhost:5173'
-    sendMagicLinkEmail(data.email, token, baseUrl, (user.preferredLang as 'en' | 'fr') ?? 'en')
+    await sendMagicLinkEmail(db, data.email, token, baseUrl, (user.preferredLang as 'en' | 'fr') ?? 'en')
     return c.json({ message: 'Account exists — login link sent', userId: user.id })
   }
 

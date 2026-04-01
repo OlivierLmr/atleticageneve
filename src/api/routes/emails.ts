@@ -1,0 +1,39 @@
+import { Hono } from 'hono'
+import { desc, eq } from 'drizzle-orm'
+import * as schema from '../db/schema'
+import { requireAuth } from '../middleware/auth'
+import type { Env } from '../index'
+
+const app = new Hono<Env>()
+
+// GET /emails — committee only, returns email log
+app.get('/', requireAuth('committee'), async (c) => {
+  const db = c.get('db')
+  const limit = parseInt(c.req.query('limit') || '100', 10)
+  const offset = parseInt(c.req.query('offset') || '0', 10)
+
+  const items = await db
+    .select()
+    .from(schema.emailLog)
+    .orderBy(desc(schema.emailLog.sentAt))
+    .limit(limit)
+    .offset(offset)
+
+  return c.json(items)
+})
+
+// GET /emails/athlete/:athleteId — emails for a specific athlete
+app.get('/athlete/:athleteId', requireAuth('committee', 'collaborator'), async (c) => {
+  const db = c.get('db')
+  const { athleteId } = c.req.param()
+
+  const items = await db
+    .select()
+    .from(schema.emailLog)
+    .where(eq(schema.emailLog.relatedAthleteId, athleteId))
+    .orderBy(desc(schema.emailLog.sentAt))
+
+  return c.json(items)
+})
+
+export default app

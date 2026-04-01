@@ -13,7 +13,12 @@ import portalRoutes from './routes/portal'
 import dashboardRoutes from './routes/dashboard'
 import hotelRoutes from './routes/hotels'
 import waPerformanceRoutes from './routes/wa-performance'
-import { getRecentEmails } from './services/email'
+import editionRoutes from './routes/editions'
+import eventCatalogRoutes from './routes/event-catalog'
+import countryRoutes from './routes/countries'
+import eapCityRoutes from './routes/eap-cities'
+import hotelRoomRoutes from './routes/hotel-rooms'
+import emailRoutes from './routes/emails'
 
 export type Env = {
   Bindings: {
@@ -64,17 +69,11 @@ app.route('/api/v1/portal', portalRoutes)
 app.route('/api/v1/dashboard', dashboardRoutes)
 app.route('/api/v1/hotels', hotelRoutes)
 app.route('/api/v1/wa-performance', waPerformanceRoutes)
-
-// DEV ONLY — email log viewer (remove in production)
-app.get('/api/v1/dev/emails', (c) => c.json(getRecentEmails()))
-
-app.get('/api/v1/editions/current', async (c) => {
-  const db = c.get('db')
-  const editions = await db.select().from(schema.edition).limit(1)
-  if (editions.length === 0) {
-    return c.json({ error: 'No edition configured' }, 404)
-  }
-  return c.json(editions[0])
-})
+app.route('/api/v1/editions', editionRoutes)
+app.route('/api/v1/event-catalog', eventCatalogRoutes)
+app.route('/api/v1/countries', countryRoutes)
+app.route('/api/v1/eap-cities', eapCityRoutes)
+app.route('/api/v1/hotel-rooms', hotelRoomRoutes)
+app.route('/api/v1/emails', emailRoutes)
 
 export default app

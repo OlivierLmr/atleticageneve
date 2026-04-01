@@ -85,7 +85,7 @@ auth.post('/magic-link', zValidator('json', magicLinkRequestSchema), async (c) =
 
   const baseUrl = c.req.header('Origin') ?? 'http://localhost:5173'
   const lang = (user.preferredLang as 'en' | 'fr') ?? 'en'
-  sendMagicLinkEmail(email, token, baseUrl, lang)
+  await sendMagicLinkEmail(db, email, token, baseUrl, lang)
 
   return c.json({ message: 'If an account exists, a login link has been sent' })
 })
@@ -129,7 +129,7 @@ auth.post('/identify', async (c) => {
     })
     const baseUrl = c.req.header('Origin') ?? 'http://localhost:5173'
     const lang = (user.preferredLang as 'en' | 'fr') ?? 'en'
-    sendMagicLinkEmail(user.email, token, baseUrl, lang)
+    await sendMagicLinkEmail(db, user.email, token, baseUrl, lang)
   }
 
   return c.json({ method: 'magic_link', message: 'If this email is registered, a login link has been sent.' })
