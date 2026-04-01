@@ -19,6 +19,7 @@ import CountriesPage from '@web/pages/committee/CountriesPage'
 import EapCitiesPage from '@web/pages/committee/EapCitiesPage'
 import HotelRoomsPage from '@web/pages/committee/HotelRoomsPage'
 import EmailLogPage from '@web/pages/committee/EmailLogPage'
+import EventsPage from '@web/pages/committee/EventsPage'
 import { api, ApiError } from '@web/lib/api'
 import type { ReactNode } from 'react'
 import type { UserRole } from '@shared/types'
@@ -73,6 +74,7 @@ function ProtectedRoute({ children, roles }: { children: ReactNode; roles?: User
 const COMMITTEE_NAV = [
   { to: '/committee/dashboard', label: 'Dashboard' },
   { to: '/committee/edition-config', label: 'Edition' },
+  { to: '/committee/events', label: 'Events' },
   { to: '/committee/event-catalog', label: 'Event Catalog' },
   { to: '/committee/countries', label: 'Countries' },
   { to: '/committee/eap-cities', label: 'EAP Cities' },
@@ -424,6 +426,7 @@ export default function App() {
             }>
               <Route path="dashboard" element={<DashboardPage />} />
               <Route path="edition-config" element={<EditionConfigPage />} />
+              <Route path="events" element={<EventsPage />} />
               <Route path="event-catalog" element={<EventCatalogPage />} />
               <Route path="countries" element={<CountriesPage />} />
               <Route path="eap-cities" element={<EapCitiesPage />} />
