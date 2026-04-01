@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
 import { useAuth } from '@web/lib/auth'
+import { ApiError } from '@web/lib/api'
 
 /**
  * Magic link login page for athletes and managers.
@@ -23,8 +24,8 @@ export default function MagicLinkPage() {
     try {
       await requestMagicLink(email)
       setSent(true)
-    } catch {
-      setError(t('common.error'))
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : t('common.error'))
     } finally {
       setLoading(false)
     }

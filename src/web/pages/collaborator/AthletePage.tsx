@@ -396,7 +396,7 @@ export default function AthletePage() {
                 )}
               </div>
               {statusMutation.isError && (
-                <p className="text-xs text-red-600 mt-2">{t('common.error')}</p>
+                <p className="text-xs text-red-600 mt-2">{(statusMutation.error as Error)?.message || t('common.error')}</p>
               )}
 
               {/* Confirmation dialog */}
@@ -651,7 +651,7 @@ export default function AthletePage() {
                     </button>
                   </div>
                   {agreementMutation.isError && (
-                    <p className="text-xs text-red-600">{t('common.error')}</p>
+                    <p className="text-xs text-red-600">{(agreementMutation.error as Error)?.message || t('common.error')}</p>
                   )}
                 </div>
               </div>

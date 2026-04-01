@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link, useNavigate } from 'react-router-dom'
-import { api } from '@web/lib/api'
+import { api, ApiError } from '@web/lib/api'
 import { LanguageSwitcher } from '@web/App'
 
 export default function ManagerSignupPage() {
@@ -33,8 +33,8 @@ export default function ManagerSignupPage() {
         localStorage.setItem('session_token', res.token)
       }
       navigate('/manager/register')
-    } catch {
-      setError(t('common.error'))
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : t('common.error'))
     } finally {
       setLoading(false)
     }

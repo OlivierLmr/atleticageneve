@@ -209,7 +209,7 @@ export default function AthletePortalPage() {
                     )}
 
                     {respondMutation.isError && (
-                      <p className="text-xs text-red-600 mt-2">{t('common.error')}</p>
+                      <p className="text-xs text-red-600 mt-2">{(respondMutation.error as Error)?.message || t('common.error')}</p>
                     )}
                   </div>
                 ) : (

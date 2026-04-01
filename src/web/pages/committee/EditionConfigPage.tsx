@@ -104,7 +104,7 @@ export default function EditionConfigPage() {
             {mutation.isPending ? t('common.loading') : t('common.save')}
           </button>
           {saved && <span className="text-sm text-green-600">{t('admin.saved')}</span>}
-          {mutation.isError && <span className="text-sm text-red-600">{t('common.error')}</span>}
+          {mutation.isError && <span className="text-sm text-red-600">{(mutation.error as Error)?.message || t('common.error')}</span>}
         </div>
       </form>
     </div>

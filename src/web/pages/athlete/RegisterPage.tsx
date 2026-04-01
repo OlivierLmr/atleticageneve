@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { api } from '@web/lib/api'
+import { api, ApiError } from '@web/lib/api'
 import { LanguageSwitcher } from '@web/App'
 import type { Event } from '@shared/types'
 
@@ -90,8 +90,8 @@ export default function AthleteRegisterPage() {
         additionalNotes: form.additionalNotes || undefined,
       })
       setSubmitted(true)
-    } catch {
-      setError(t('common.error'))
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : t('common.error'))
     } finally {
       setSubmitting(false)
     }

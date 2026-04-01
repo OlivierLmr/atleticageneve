@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '@web/lib/auth'
+import { ApiError } from '@web/lib/api'
 
 /**
  * Login page for collaborators and committee members (username/password).
@@ -24,8 +25,8 @@ export default function LoginPage() {
     try {
       await login(username, password)
       navigate('/collaborator/candidates')
-    } catch {
-      setError(t('auth.invalidCredentials'))
+    } catch (err) {
+      setError(err instanceof ApiError && err.status !== 401 ? err.message : t('auth.invalidCredentials'))
     } finally {
       setLoading(false)
     }

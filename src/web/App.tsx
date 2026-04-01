@@ -20,7 +20,7 @@ import EventCatalogPage from '@web/pages/committee/EventCatalogPage'
 import CountriesPage from '@web/pages/committee/CountriesPage'
 import EapCitiesPage from '@web/pages/committee/EapCitiesPage'
 import HotelRoomsPage from '@web/pages/committee/HotelRoomsPage'
-import { api } from '@web/lib/api'
+import { api, ApiError } from '@web/lib/api'
 import type { ReactNode } from 'react'
 import type { UserRole } from '@shared/types'
 
@@ -217,8 +217,8 @@ function HomePage() {
       )
       localStorage.setItem('session_token', res.token)
       window.location.href = res.user.role === 'committee' ? '/committee/dashboard' : '/collaborator/candidates'
-    } catch {
-      setError(t('auth.invalidCredentials'))
+    } catch (err) {
+      setError(err instanceof ApiError && err.status !== 401 ? err.message : t('auth.invalidCredentials'))
     } finally {
       setLoading(false)
     }
@@ -236,8 +236,8 @@ function HomePage() {
       } else {
         setMode('magic_link_sent')
       }
-    } catch {
-      setError(t('common.error'))
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : t('common.error'))
     } finally {
       setLoading(false)
     }
