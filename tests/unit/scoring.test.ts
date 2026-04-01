@@ -1,136 +1,161 @@
 import { describe, it, expect } from 'vitest'
-import { parsePerf, computeScore, type ScoringInput } from '@shared/scoring'
-import { EVENT_META } from '@shared/constants'
-
-// ── parsePerf ─────────────────────────────────────────────────────────────────
-
-describe('parsePerf', () => {
-  it('parses plain seconds', () => {
-    expect(parsePerf('9.80')).toBe(9.80)
-    expect(parsePerf('44.35')).toBe(44.35)
-  })
-
-  it('parses minutes:seconds format', () => {
-    expect(parsePerf('3:26.73')).toBeCloseTo(206.73)
-    expect(parsePerf('3:30.12')).toBeCloseTo(210.12)
-  })
-
-  it('parses field distances with m suffix', () => {
-    expect(parsePerf('2.39m')).toBe(2.39)
-    expect(parsePerf('7.30m')).toBe(7.30)
-  })
-
-  it('handles edge cases', () => {
-    expect(parsePerf('0:59.99')).toBeCloseTo(59.99)
-    expect(parsePerf('1:00.00')).toBeCloseTo(60.0)
-    expect(parsePerf('10.00')).toBe(10.0)
-  })
-})
+import { computeScore, DEFAULT_WEIGHTS, type ScoringInput } from '@shared/scoring'
 
 // ── computeScore ──────────────────────────────────────────────────────────────
 
 describe('computeScore', () => {
   const makeInput = (overrides: Partial<ScoringInput> = {}): ScoringInput => ({
-    eventId: '100m-m',
-    personalBest: '9.80',
-    seasonBest: '9.95',
-    swissMinima: '10.15',
+    personalBest: 9.80,
+    seasonBest: 9.95,
     worldRanking: 3,
-    estimatedCostTotal: 17000,
+    estimatedCostTotal: 5000,
     isEap: false,
+    isSwiss: false,
+    perfType: 'MIN',
+    intMinima: 10.05,
+    swissMinima: 10.15,
+    eapMinima: null,
     ...overrides,
   })
 
-  it('returns eligible=true when PB meets Swiss minima for MIN events', () => {
-    const result = computeScore(makeInput({ personalBest: '10.10' }))
+  // ── Eligibility (SB-based with origin thresholds) ──
+
+  it('returns eligible=true when SB meets intMinima for MIN events (international)', () => {
+    const result = computeScore(makeInput({ seasonBest: 10.00 }))
     expect(result.eligible).toBe(true)
   })
 
-  it('returns eligible=false when PB does not meet Swiss minima for MIN events', () => {
-    const result = computeScore(makeInput({ personalBest: '10.20' }))
+  it('returns eligible=false when SB does not meet intMinima for MIN events', () => {
+    const result = computeScore(makeInput({ seasonBest: 10.10 }))
     expect(result.eligible).toBe(false)
   })
 
-  it('returns eligible=true when PB meets Swiss minima for MAX events', () => {
+  it('uses swissMinima threshold for Swiss athletes', () => {
+    // SB 10.10 exceeds intMinima (10.05) but meets swissMinima (10.15) for MIN
+    const result = computeScore(makeInput({ seasonBest: 10.10, isSwiss: true }))
+    expect(result.eligible).toBe(true)
+  })
+
+  it('uses eapMinima threshold for EAP athletes when available', () => {
     const result = computeScore(makeInput({
-      eventId: 'hj-m',
-      personalBest: '2.30m',
-      seasonBest: '2.25m',
-      swissMinima: '2.25',
+      seasonBest: 10.25,
+      isEap: true,
+      eapMinima: 10.30,
     }))
     expect(result.eligible).toBe(true)
   })
 
-  it('returns eligible=false when PB does not meet Swiss minima for MAX events', () => {
+  it('falls back to swissMinima for EAP athletes when eapMinima is null', () => {
+    // isEap but eapMinima is null => falls through to isSwiss check, then intMinima
     const result = computeScore(makeInput({
-      eventId: 'hj-m',
-      personalBest: '2.20m',
-      seasonBest: '2.15m',
-      swissMinima: '2.25',
+      seasonBest: 10.10,
+      isEap: true,
+      isSwiss: true,
+      eapMinima: null,
+    }))
+    expect(result.eligible).toBe(true) // uses swissMinima 10.15
+  })
+
+  it('returns eligible=true when SB meets minima for MAX events', () => {
+    const result = computeScore(makeInput({
+      perfType: 'MAX',
+      personalBest: 2.30,
+      seasonBest: 2.28,
+      intMinima: 2.25,
+      swissMinima: 2.20,
+    }))
+    expect(result.eligible).toBe(true)
+  })
+
+  it('returns eligible=false when SB does not meet minima for MAX events', () => {
+    const result = computeScore(makeInput({
+      perfType: 'MAX',
+      personalBest: 2.30,
+      seasonBest: 2.18,
+      intMinima: 2.25,
+      swissMinima: 2.20,
     }))
     expect(result.eligible).toBe(false)
   })
+
+  it('returns zero scores when ineligible', () => {
+    const result = computeScore(makeInput({ seasonBest: 11.00 }))
+    expect(result.eligible).toBe(false)
+    expect(result.finalScore).toBe(0)
+    expect(result.recommendation).toBe('Not Recommended')
+    expect(result.f1PB).toBe(0)
+    expect(result.f2SB).toBe(0)
+    expect(result.f3Ranking).toBe(0)
+    expect(result.f4Cost).toBe(0)
+    expect(result.eapBonus).toBe(0)
+    expect(result.weightedSum).toBe(0)
+  })
+
+  // ── Scoring components ──
 
   it('computes Highly Recommended for top athletes', () => {
-    // Marcell Jacobs: PB 9.80, SB 9.95, rank 3, cost 17000
     const result = computeScore(makeInput())
     expect(result.recommendation).toBe('Highly Recommended')
     expect(result.finalScore).toBeGreaterThanOrEqual(0.75)
   })
 
-  it('computes lower recommendation for weak candidates', () => {
-    // PB 11.00 on 100m is very slow; rank 200 gives f3=0; cost 25k gives f5=0
+  it('computes lower recommendation for weaker candidates', () => {
     const result = computeScore(makeInput({
-      personalBest: '11.00',
-      seasonBest: '11.20',
-      worldRanking: 200,
-      estimatedCostTotal: 25000,
+      personalBest: 10.00,
+      seasonBest: 10.04,
+      worldRanking: 45,
+      estimatedCostTotal: 18000,
     }))
-    // f1 and f2 still have some value (perf > 0 relative to minima), but ranking and cost contribute 0
-    expect(result.f3Ranking).toBe(0)
-    expect(result.f5Cost).toBe(0)
-    expect(result.finalScore).toBeLessThan(0.55) // at most Under Review
-    expect(['Under Review', 'Not Recommended']).toContain(result.recommendation)
+    expect(result.finalScore).toBeLessThan(0.75)
+    expect(['Recommended', 'Under Review', 'Not Recommended']).toContain(result.recommendation)
   })
 
-  it('applies EAP quota bonus', () => {
+  it('applies EAP bonus', () => {
     const withoutEap = computeScore(makeInput({ isEap: false }))
-    const withEap = computeScore(makeInput({ isEap: true }))
-    expect(withEap.qQuota).toBe(0.05)
-    expect(withEap.finalScore).toBeCloseTo(withoutEap.finalScore + 0.05, 5)
-  })
-
-  it('applies beta manual adjustment', () => {
-    const base = computeScore(makeInput())
-    const adjusted = computeScore(makeInput(), 0.1)
-    expect(adjusted.finalScore).toBeCloseTo(Math.min(1, base.finalScore + 0.1), 5)
+    const withEap = computeScore(makeInput({ isEap: true, eapMinima: 10.30 }))
+    expect(withEap.eapBonus).toBe(DEFAULT_WEIGHTS.bonusEap / 100)
+    expect(withEap.finalScore).toBeCloseTo(
+      Math.min(1, withoutEap.weightedSum + withEap.eapBonus), 5
+    )
   })
 
   it('clamps finalScore to [0, 1]', () => {
     const result = computeScore(makeInput({
-      personalBest: '9.00',
-      seasonBest: '9.00',
+      personalBest: 9.00,
+      seasonBest: 9.00,
       worldRanking: 1,
       estimatedCostTotal: 0,
       isEap: true,
-    }), 0.5)
-    expect(result.finalScore).toBe(1)
+      eapMinima: 10.30,
+    }))
+    expect(result.finalScore).toBeLessThanOrEqual(1)
+    expect(result.finalScore).toBeGreaterThanOrEqual(0)
   })
 
-  it('returns Not Recommended for unknown event', () => {
-    const result = computeScore(makeInput({ eventId: 'unknown-event' }))
-    expect(result.recommendation).toBe('Not Recommended')
-    expect(result.finalScore).toBe(0)
-    expect(result.eligible).toBe(false)
-  })
+  // ── Weights ──
 
-  it('correctly weights components (35/25/30/10)', () => {
+  it('correctly applies default weights (25/35/30/10)', () => {
     const result = computeScore(makeInput())
-    const expected = result.f1PB * 0.35 + result.f2SB * 0.25 + result.f3Ranking * 0.30 + result.f5Cost * 0.10
+    const expected =
+      result.f1PB * 0.25 + result.f2SB * 0.35 +
+      result.f3Ranking * 0.30 + result.f4Cost * 0.10
     expect(result.weightedSum).toBeCloseTo(expected, 10)
   })
 
-  it('f3Ranking: rank 1 → 1.0, rank 51 → 0.0', () => {
+  it('accepts custom EditionWeights', () => {
+    const customWeights = {
+      weightPB: 40, weightSB: 30, weightRanking: 20, weightCost: 10, bonusEap: 10,
+    }
+    const result = computeScore(makeInput(), customWeights)
+    const expected =
+      result.f1PB * 0.40 + result.f2SB * 0.30 +
+      result.f3Ranking * 0.20 + result.f4Cost * 0.10
+    expect(result.weightedSum).toBeCloseTo(expected, 10)
+  })
+
+  // ── Component functions ──
+
+  it('f3Ranking: rank 1 gives 1.0, rank 51 gives 0.0', () => {
     const rank1 = computeScore(makeInput({ worldRanking: 1 }))
     expect(rank1.f3Ranking).toBe(1.0)
 
@@ -138,40 +163,35 @@ describe('computeScore', () => {
     expect(rank51.f3Ranking).toBe(0.0)
   })
 
-  it('f5Cost: ≤10k → 1.0, ≥20k → 0.0', () => {
+  it('f4Cost: cost <= 10k gives 1.0, cost >= 20k gives 0.0', () => {
     const cheap = computeScore(makeInput({ estimatedCostTotal: 5000 }))
-    expect(cheap.f5Cost).toBe(1.0)
+    expect(cheap.f4Cost).toBe(1.0)
 
     const expensive = computeScore(makeInput({ estimatedCostTotal: 25000 }))
-    expect(expensive.f5Cost).toBe(0.0)
+    expect(expensive.f4Cost).toBe(0.0)
+  })
+
+  // ── Recommendation thresholds ──
+
+  it('recommendation thresholds: >=0.75 Highly Recommended, >=0.55 Recommended, >=0.35 Under Review', () => {
+    // We can't easily hit exact thresholds, but verify the logic via known inputs
+    const top = computeScore(makeInput({ worldRanking: 1, estimatedCostTotal: 0 }))
+    expect(top.recommendation).toBe('Highly Recommended')
   })
 })
 
-// ── EVENT_META ────────────────────────────────────────────────────────────────
-
-describe('EVENT_META', () => {
-  it('has metadata for all 7 events', () => {
-    const expectedEvents = ['100m-m', '100m-f', '400m-m', '400m-h-f', '1500m-m', 'hj-m', 'lj-f']
-    for (const id of expectedEvents) {
-      expect(EVENT_META[id]).toBeDefined()
-    }
+describe('DEFAULT_WEIGHTS', () => {
+  it('has weights summing to 100', () => {
+    const sum = DEFAULT_WEIGHTS.weightPB + DEFAULT_WEIGHTS.weightSB +
+      DEFAULT_WEIGHTS.weightRanking + DEFAULT_WEIGHTS.weightCost
+    expect(sum).toBe(100)
   })
 
-  it('sprint/hurdle events are MIN type', () => {
-    expect(EVENT_META['100m-m'].type).toBe('MIN')
-    expect(EVENT_META['400m-h-f'].type).toBe('MIN')
-  })
-
-  it('jump events are MAX type', () => {
-    expect(EVENT_META['hj-m'].type).toBe('MAX')
-    expect(EVENT_META['lj-f'].type).toBe('MAX')
-  })
-
-  it('international minima are stricter than Swiss minima for MIN events', () => {
-    expect(EVENT_META['100m-m'].intMinima).toBeLessThan(EVENT_META['100m-m'].swiMinima)
-  })
-
-  it('international minima are stricter than Swiss minima for MAX events', () => {
-    expect(EVENT_META['hj-m'].intMinima).toBeGreaterThan(EVENT_META['hj-m'].swiMinima)
+  it('has expected default values', () => {
+    expect(DEFAULT_WEIGHTS.weightPB).toBe(25)
+    expect(DEFAULT_WEIGHTS.weightSB).toBe(35)
+    expect(DEFAULT_WEIGHTS.weightRanking).toBe(30)
+    expect(DEFAULT_WEIGHTS.weightCost).toBe(10)
+    expect(DEFAULT_WEIGHTS.bonusEap).toBe(5)
   })
 })

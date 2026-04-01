@@ -3,7 +3,8 @@ import {
   athleteRegistrationSchema,
   batchAthleteRegistrationSchema,
   managerRegistrationSchema,
-  eventConfigSchema,
+  eventCreateSchema,
+  eventUpdateSchema,
 } from '@shared/validation'
 
 describe('athleteRegistrationSchema', () => {
@@ -36,6 +37,7 @@ describe('athleteRegistrationSchema', () => {
       dopingFree: true,
       participantNotes: 'Ground floor preferred',
       additionalNotes: 'Arriving from Rome',
+      eapCity: 'Rome',
     })
     expect(result.success).toBe(true)
   })
@@ -130,50 +132,61 @@ describe('managerRegistrationSchema', () => {
   })
 })
 
-describe('eventConfigSchema', () => {
+describe('eventCreateSchema', () => {
   const validEvent = {
-    name: '200m Men',
-    discipline: 'Sprint',
-    gender: 'M' as const,
-    perfType: 'MIN' as const,
+    catalogId: 'cat-100m-m',
     maxSlots: 8,
-    intMinima: 20.00,
-    swissMinima: 20.50,
+    intMinima: 10.05,
+    swissMinima: 10.15,
   }
 
-  it('accepts valid event config', () => {
-    expect(eventConfigSchema.safeParse(validEvent).success).toBe(true)
+  it('accepts valid event create', () => {
+    expect(eventCreateSchema.safeParse(validEvent).success).toBe(true)
   })
 
   it('accepts with all optional fields', () => {
-    expect(eventConfigSchema.safeParse({
+    expect(eventCreateSchema.safeParse({
       ...validEvent,
-      eapMinima: 20.80,
-      meetRecord: '19.95',
-      targetPerf: '20.10',
+      eapMinima: 10.30,
+      meetRecord: 9.58,
+      targetPerf: 9.90,
       swissQuota: 2,
       eapQuota: 1,
-      prize1st: 5000,
-      prize2nd: 3000,
-      prize3rd: 1000,
+      prizeMoney1st: 5000,
+      prizeMoney2nd: 3000,
+      prizeMoney3rd: 1000,
     }).success).toBe(true)
   })
 
   it('rejects maxSlots < 1', () => {
-    expect(eventConfigSchema.safeParse({ ...validEvent, maxSlots: 0 }).success).toBe(false)
+    expect(eventCreateSchema.safeParse({ ...validEvent, maxSlots: 0 }).success).toBe(false)
   })
 
   it('rejects negative minima', () => {
-    expect(eventConfigSchema.safeParse({ ...validEvent, intMinima: -1 }).success).toBe(false)
+    expect(eventCreateSchema.safeParse({ ...validEvent, intMinima: -1 }).success).toBe(false)
   })
 
-  it('rejects invalid perfType', () => {
-    expect(eventConfigSchema.safeParse({ ...validEvent, perfType: 'FAST' }).success).toBe(false)
+  it('defaults swissQuota and eapQuota', () => {
+    const result = eventCreateSchema.parse(validEvent)
+    expect(result.swissQuota).toBe(1)
+    expect(result.eapQuota).toBe(1)
+  })
+})
+
+describe('eventUpdateSchema', () => {
+  it('accepts partial update', () => {
+    expect(eventUpdateSchema.safeParse({ maxSlots: 10 }).success).toBe(true)
   })
 
-  it('partial schema works for PATCH', () => {
-    const partial = eventConfigSchema.partial()
-    expect(partial.safeParse({ maxSlots: 10 }).success).toBe(true)
-    expect(partial.safeParse({}).success).toBe(true)
+  it('accepts empty object', () => {
+    expect(eventUpdateSchema.safeParse({}).success).toBe(true)
+  })
+
+  it('accepts nullable fields', () => {
+    expect(eventUpdateSchema.safeParse({
+      eapMinima: null,
+      meetRecord: null,
+      targetPerf: null,
+    }).success).toBe(true)
   })
 })

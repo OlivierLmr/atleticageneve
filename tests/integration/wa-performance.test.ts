@@ -46,10 +46,8 @@ describe('WA Performance API', () => {
         body: JSON.stringify({
           athleteId,
           eventId,
-          personalBest: '10.05',
-          personalBestVal: 10.05,
-          seasonBest: '10.12',
-          seasonBestVal: 10.12,
+          personalBest: 10.05,
+          seasonBest: 10.12,
           worldRanking: 15,
         }),
       })
@@ -66,8 +64,7 @@ describe('WA Performance API', () => {
         body: JSON.stringify({
           athleteId,
           eventId,
-          personalBest: '9.98',
-          personalBestVal: 9.98,
+          personalBest: 9.98,
           worldRanking: 8,
         }),
       })
@@ -80,7 +77,7 @@ describe('WA Performance API', () => {
       const res = await ctx.request('/api/v1/wa-performance', {
         method: 'POST',
         headers: authHeaders(),
-        body: JSON.stringify({ eventId, personalBest: '10.00' }),
+        body: JSON.stringify({ eventId, personalBest: 10.00 }),
       })
       expect(res.status).toBe(400)
     })
@@ -89,7 +86,7 @@ describe('WA Performance API', () => {
       const res = await ctx.request('/api/v1/wa-performance', {
         method: 'POST',
         headers: authHeaders(),
-        body: JSON.stringify({ athleteId, personalBest: '10.00' }),
+        body: JSON.stringify({ athleteId, personalBest: 10.00 }),
       })
       expect(res.status).toBe(400)
     })
@@ -103,7 +100,7 @@ describe('WA Performance API', () => {
       expect(res.status).toBe(200)
       const body = await res.json() as any
       expect(body.length).toBe(1)
-      expect(body[0].personalBest).toBe('9.98') // updated value
+      expect(body[0].personalBest).toBe(9.98) // updated value (numeric now)
       expect(body[0].worldRanking).toBe(8)
       expect(body[0].event).toBeDefined()
       expect(body[0].event.id).toBe(eventId)

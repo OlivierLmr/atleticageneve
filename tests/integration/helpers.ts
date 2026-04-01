@@ -1,17 +1,20 @@
 /**
  * Integration test helpers — creates a Miniflare instance with a fresh D1 database
  * and provides the Hono app bound to it.
+ *
+ * SPEC v3: event_catalog, country, eap_city reference tables; agreement replaces contractOffer;
+ * event references catalog via catalogId; hotel split into hotel + hotel_room.
  */
 import { Miniflare } from 'miniflare'
 import { drizzle } from 'drizzle-orm/d1'
+import { eq } from 'drizzle-orm'
 import * as schema from '@api/db/schema'
 import app from '@api/index'
 import fs from 'fs'
 import path from 'path'
 
 const MIGRATION_PATHS = [
-  path.resolve(__dirname, '../../src/api/db/migrations/0001_initial.sql'),
-  path.resolve(__dirname, '../../src/api/db/migrations/0002_client_feedback_refactor.sql'),
+  path.resolve(__dirname, '../../src/api/db/migrations/0001_spec_v3.sql'),
 ]
 
 export interface TestContext {
@@ -31,11 +34,9 @@ export async function setupTestContext(): Promise<TestContext> {
   const d1 = await mf.getD1Database('DB') as unknown as D1Database
   const db = drizzle(d1, { schema })
 
-  // Run migrations — use batch with prepared statements
+  // Run migrations
   for (const migrationPath of MIGRATION_PATHS) {
     const migrationSql = fs.readFileSync(migrationPath, 'utf-8')
-    // Split on semicolons followed by newline (to avoid splitting inside CHECK constraints)
-    // then strip comments
     const statements = migrationSql
       .split(/;\s*\n/)
       .map((s) => s.replace(/--.*$/gm, '').trim())
@@ -45,11 +46,10 @@ export async function setupTestContext(): Promise<TestContext> {
     await d1.batch(batch)
   }
 
-  // Request helper — runs directly against the Hono app with a mocked env
+  // Request helper
   const request = async (urlPath: string, init?: RequestInit): Promise<Response> => {
     const url = `http://localhost${urlPath}`
     const req = new Request(url, init)
-    // Build the env and executionCtx that Hono expects
     const env = { DB: d1 }
     return app.fetch(req, env as any, { waitUntil: () => {}, passThroughOnException: () => {} } as any)
   }
@@ -106,30 +106,55 @@ export async function createEdition(ctx: TestContext, id = 'ed-test'): Promise<s
     startDate: '2026-06-01',
     endDate: '2026-06-03',
     totalBudget: 250000,
+    notificationEmail: 'test@atleticageneve.ch',
   })
   return id
 }
 
-/** Helper to create a test event */
+/** Helper to seed a catalog entry (required before creating events) */
+export async function createEventCatalog(
+  ctx: TestContext,
+  overrides: Partial<typeof schema.eventCatalog.$inferInsert> & { id: string } = { id: 'cat-100m-M' }
+): Promise<string> {
+  const id = overrides.id
+  // Check if already exists to allow re-use
+  const existing = await ctx.db.select().from(schema.eventCatalog).where(
+    eq(schema.eventCatalog.id, id)
+  )
+  if (existing.length > 0) return id
+
+  await ctx.db.insert(schema.eventCatalog).values({
+    id,
+    name: overrides.name ?? '100m',
+    discipline: overrides.discipline ?? 'Course',
+    gender: overrides.gender ?? 'M',
+  })
+  return id
+}
+
+/** Helper to create a test event (requires edition + event_catalog to exist) */
 export async function createEvent(
   ctx: TestContext,
   editionId: string,
-  overrides: Partial<typeof schema.event.$inferInsert> = {}
+  overrides: Partial<typeof schema.event.$inferInsert> & { catalogId?: string } = {}
 ): Promise<string> {
   const id = overrides.id ?? `evt-${crypto.randomUUID().slice(0, 8)}`
+  const catalogId = overrides.catalogId ?? 'cat-100m-M'
+
+  // Ensure catalog entry exists
+  await createEventCatalog(ctx, { id: catalogId })
+
   await ctx.db.insert(schema.event).values({
     id,
     editionId,
-    name: '100m Men',
-    discipline: '100m',
-    gender: 'M',
-    perfType: 'MIN',
+    catalogId,
     maxSlots: 8,
     intMinima: 10.2,
     swissMinima: 10.5,
     swissQuota: 1,
     eapQuota: 1,
     ...overrides,
+    catalogId, // override any catalogId from overrides with the resolved one
   })
   return id
 }
@@ -163,8 +188,36 @@ export async function createApplication(
   const id = overrides.id ?? `app-${crypto.randomUUID().slice(0, 8)}`
   await ctx.db.insert(schema.application).values({
     id,
-    status: 'to_review',
+    participationStatus: 'pending',
     ...overrides,
   })
   return id
+}
+
+/** Helper to create a test hotel + room */
+export async function createHotelAndRoom(
+  ctx: TestContext,
+  editionId: string,
+  roomOverrides: Partial<typeof schema.hotelRoom.$inferInsert> = {}
+): Promise<{ hotelId: string; roomId: string }> {
+  const hotelId = `htl-${crypto.randomUUID().slice(0, 8)}`
+  const roomId = roomOverrides.id ?? `rm-${crypto.randomUUID().slice(0, 8)}`
+
+  await ctx.db.insert(schema.hotel).values({
+    id: hotelId,
+    editionId,
+    name: 'Test Hotel',
+  })
+
+  await ctx.db.insert(schema.hotelRoom).values({
+    id: roomId,
+    hotelId,
+    roomType: 'Single',
+    costPerNight: 150,
+    dinnerCost: 40,
+    reservedRooms: 10,
+    ...roomOverrides,
+  })
+
+  return { hotelId, roomId }
 }

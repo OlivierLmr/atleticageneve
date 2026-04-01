@@ -8,7 +8,7 @@ test.describe('Authentication', () => {
     await expect(page.getByText(/admin.*selector/i)).toBeVisible()
   })
 
-  test('admin login with valid credentials redirects to portal', async ({ page }) => {
+  test('admin login with valid credentials redirects to dashboard', async ({ page }) => {
     await page.goto('/')
     await page.getByText(/admin.*selector/i).click()
     await page.locator('input[type="text"]').fill('admin')

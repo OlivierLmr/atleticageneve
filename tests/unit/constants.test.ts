@@ -1,43 +1,52 @@
 import { describe, it, expect } from 'vitest'
-import { VALID_TRANSITIONS, EVENT_META, DEFAULT_TOTAL_BUDGET, NIGHT_LABELS } from '@shared/constants'
+import { NEGOTIATION_TRANSITIONS, PARTICIPATION_TRANSITIONS, NIGHT_LABELS, DINNER_LABELS } from '@shared/constants'
 
-describe('VALID_TRANSITIONS', () => {
-  it('to_review can move to contract_sent or rejected', () => {
-    expect(VALID_TRANSITIONS.to_review).toContain('contract_sent')
-    expect(VALID_TRANSITIONS.to_review).toContain('rejected')
-    expect(VALID_TRANSITIONS.to_review).not.toContain('accepted')
+describe('NEGOTIATION_TRANSITIONS', () => {
+  it('to_review can move to agreement_sent or rejected', () => {
+    expect(NEGOTIATION_TRANSITIONS.to_review).toContain('agreement_sent')
+    expect(NEGOTIATION_TRANSITIONS.to_review).toContain('rejected')
+    expect(NEGOTIATION_TRANSITIONS.to_review).not.toContain('confirmed')
   })
 
-  it('contract_sent can move to accepted, rejected, counter_offer, or withdrawn', () => {
-    expect(VALID_TRANSITIONS.contract_sent).toContain('accepted')
-    expect(VALID_TRANSITIONS.contract_sent).toContain('rejected')
-    expect(VALID_TRANSITIONS.contract_sent).toContain('counter_offer')
-    expect(VALID_TRANSITIONS.contract_sent).toContain('withdrawn')
+  it('agreement_sent can move to confirmed, rejected, counter_offer_sent, or withdrawn', () => {
+    expect(NEGOTIATION_TRANSITIONS.agreement_sent).toContain('confirmed')
+    expect(NEGOTIATION_TRANSITIONS.agreement_sent).toContain('rejected')
+    expect(NEGOTIATION_TRANSITIONS.agreement_sent).toContain('counter_offer_sent')
+    expect(NEGOTIATION_TRANSITIONS.agreement_sent).toContain('withdrawn')
   })
 
-  it('counter_offer can move to contract_sent, rejected, or withdrawn', () => {
-    expect(VALID_TRANSITIONS.counter_offer).toContain('contract_sent')
-    expect(VALID_TRANSITIONS.counter_offer).toContain('rejected')
-    expect(VALID_TRANSITIONS.counter_offer).toContain('withdrawn')
-    expect(VALID_TRANSITIONS.counter_offer).not.toContain('accepted')
+  it('counter_offer_sent can move to agreement_sent, rejected, or withdrawn', () => {
+    expect(NEGOTIATION_TRANSITIONS.counter_offer_sent).toContain('agreement_sent')
+    expect(NEGOTIATION_TRANSITIONS.counter_offer_sent).toContain('rejected')
+    expect(NEGOTIATION_TRANSITIONS.counter_offer_sent).toContain('withdrawn')
+    expect(NEGOTIATION_TRANSITIONS.counter_offer_sent).not.toContain('confirmed')
   })
 
-  it('accepted can only be withdrawn', () => {
-    expect(VALID_TRANSITIONS.accepted).toEqual(['withdrawn'])
+  it('confirmed can only be withdrawn', () => {
+    expect(NEGOTIATION_TRANSITIONS.confirmed).toEqual(['withdrawn'])
   })
 
   it('rejected is a terminal state', () => {
-    expect(VALID_TRANSITIONS.rejected).toEqual([])
+    expect(NEGOTIATION_TRANSITIONS.rejected).toEqual([])
   })
 
   it('withdrawn is a terminal state', () => {
-    expect(VALID_TRANSITIONS.withdrawn).toEqual([])
+    expect(NEGOTIATION_TRANSITIONS.withdrawn).toEqual([])
   })
 })
 
-describe('DEFAULT_TOTAL_BUDGET', () => {
-  it('is 250,000 CHF', () => {
-    expect(DEFAULT_TOTAL_BUDGET).toBe(250_000)
+describe('PARTICIPATION_TRANSITIONS', () => {
+  it('pending can move to selected or not_selected', () => {
+    expect(PARTICIPATION_TRANSITIONS.pending).toContain('selected')
+    expect(PARTICIPATION_TRANSITIONS.pending).toContain('not_selected')
+  })
+
+  it('selected can move to not_selected', () => {
+    expect(PARTICIPATION_TRANSITIONS.selected).toContain('not_selected')
+  })
+
+  it('not_selected can move to selected', () => {
+    expect(PARTICIPATION_TRANSITIONS.not_selected).toContain('selected')
   })
 })
 
@@ -47,11 +56,8 @@ describe('NIGHT_LABELS', () => {
   })
 })
 
-describe('EVENT_META completeness', () => {
-  it('all events have positive minima values', () => {
-    for (const [id, meta] of Object.entries(EVENT_META)) {
-      expect(meta.intMinima).toBeGreaterThan(0)
-      expect(meta.swiMinima).toBeGreaterThan(0)
-    }
+describe('DINNER_LABELS', () => {
+  it('matches NIGHT_LABELS', () => {
+    expect(DINNER_LABELS).toEqual(NIGHT_LABELS)
   })
 })

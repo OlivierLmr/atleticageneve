@@ -20,3 +20,8 @@ export async function loginAsCollaborator(page: Page, username = 'pierre', passw
   await page.locator('button[type="submit"]').click()
   await page.waitForURL(/\/collaborator\//)
 }
+
+/** Wait for the candidates table to load */
+export async function waitForCandidatesTable(page: Page) {
+  await expect(page.locator('table tbody tr').first()).toBeVisible({ timeout: 10_000 })
+}

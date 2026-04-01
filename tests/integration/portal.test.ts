@@ -79,22 +79,20 @@ describe('Portal API', () => {
     })
   })
 
-  // ── Athlete respond (now by athleteId) ─────────────────────────────────────
+  // ── Athlete respond (v3: athlete-level negotiation) ─────────────────────
 
   describe('POST /api/v1/portal/athlete/:athleteId/respond', () => {
-    it('allows athlete to accept an offer', async () => {
+    it('allows athlete to accept from agreement_sent', async () => {
       const { userId, token } = await createUserWithSession(ctx, {
         role: 'athlete',
         firstName: 'Accept',
         lastName: 'Test',
       })
-      const athleteId = await createAthlete(ctx, { userId, negotiationStatus: 'contract_sent' })
-      await createApplication(ctx, {
-        athleteId,
-        eventId,
-        editionId,
-        status: 'contract_sent',
+      const athleteId = await createAthlete(ctx, {
+        userId,
+        negotiationStatus: 'agreement_sent',
       })
+      await createApplication(ctx, { athleteId, eventId, editionId })
 
       const res = await ctx.request(`/api/v1/portal/athlete/${athleteId}/respond`, {
         method: 'POST',
@@ -106,22 +104,45 @@ describe('Portal API', () => {
       })
       expect(res.status).toBe(200)
       const body = await res.json() as any
-      expect(body.status).toBe('accepted')
+      expect(body.status).toBe('confirmed')
     })
 
-    it('allows athlete to withdraw', async () => {
+    it('allows athlete to reject from agreement_sent', async () => {
+      const { userId, token } = await createUserWithSession(ctx, {
+        role: 'athlete',
+        firstName: 'Reject',
+        lastName: 'Test',
+      })
+      const athleteId = await createAthlete(ctx, {
+        userId,
+        negotiationStatus: 'agreement_sent',
+      })
+      await createApplication(ctx, { athleteId, eventId, editionId })
+
+      const res = await ctx.request(`/api/v1/portal/athlete/${athleteId}/respond`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ action: 'reject' }),
+      })
+      expect(res.status).toBe(200)
+      const body = await res.json() as any
+      expect(body.status).toBe('rejected')
+    })
+
+    it('allows athlete to withdraw from agreement_sent', async () => {
       const { userId, token } = await createUserWithSession(ctx, {
         role: 'athlete',
         firstName: 'Withdraw',
         lastName: 'Test',
       })
-      const athleteId = await createAthlete(ctx, { userId, negotiationStatus: 'contract_sent' })
-      await createApplication(ctx, {
-        athleteId,
-        eventId,
-        editionId,
-        status: 'contract_sent',
+      const athleteId = await createAthlete(ctx, {
+        userId,
+        negotiationStatus: 'agreement_sent',
       })
+      await createApplication(ctx, { athleteId, eventId, editionId })
 
       const res = await ctx.request(`/api/v1/portal/athlete/${athleteId}/respond`, {
         method: 'POST',
@@ -142,13 +163,11 @@ describe('Portal API', () => {
         firstName: 'Owner',
         lastName: 'Ath',
       })
-      const athleteId = await createAthlete(ctx, { userId: ownerId, negotiationStatus: 'contract_sent' })
-      await createApplication(ctx, {
-        athleteId,
-        eventId,
-        editionId,
-        status: 'contract_sent',
+      const athleteId = await createAthlete(ctx, {
+        userId: ownerId,
+        negotiationStatus: 'agreement_sent',
       })
+      await createApplication(ctx, { athleteId, eventId, editionId })
 
       const { token: otherToken } = await createUserWithSession(ctx, {
         role: 'athlete',
@@ -167,19 +186,17 @@ describe('Portal API', () => {
       expect(res.status).toBe(403)
     })
 
-    it('rejects invalid transition', async () => {
+    it('rejects invalid transition (accept from to_review)', async () => {
       const { userId, token } = await createUserWithSession(ctx, {
         role: 'athlete',
         firstName: 'Invalid',
         lastName: 'Trans',
       })
-      const athleteId = await createAthlete(ctx, { userId, negotiationStatus: 'to_review' })
-      await createApplication(ctx, {
-        athleteId,
-        eventId,
-        editionId,
-        status: 'to_review',
+      const athleteId = await createAthlete(ctx, {
+        userId,
+        negotiationStatus: 'to_review',
       })
+      await createApplication(ctx, { athleteId, eventId, editionId })
 
       const res = await ctx.request(`/api/v1/portal/athlete/${athleteId}/respond`, {
         method: 'POST',
@@ -202,10 +219,16 @@ describe('Portal API', () => {
         firstName: 'KPI',
         lastName: 'Manager',
       })
-      const ath1 = await createAthlete(ctx, { managerId, firstName: 'A1', lastName: 'Test', negotiationStatus: 'to_review' })
-      const ath2 = await createAthlete(ctx, { managerId, firstName: 'A2', lastName: 'Test', negotiationStatus: 'accepted' })
-      await createApplication(ctx, { athleteId: ath1, eventId, editionId, status: 'to_review' })
-      await createApplication(ctx, { athleteId: ath2, eventId, editionId, status: 'accepted' })
+      const ath1 = await createAthlete(ctx, {
+        managerId, firstName: 'A1', lastName: 'Test',
+        negotiationStatus: 'to_review',
+      })
+      const ath2 = await createAthlete(ctx, {
+        managerId, firstName: 'A2', lastName: 'Test',
+        negotiationStatus: 'confirmed',
+      })
+      await createApplication(ctx, { athleteId: ath1, eventId, editionId })
+      await createApplication(ctx, { athleteId: ath2, eventId, editionId })
 
       const res = await ctx.request('/api/v1/portal/manager', {
         headers: { Authorization: `Bearer ${token}` },
