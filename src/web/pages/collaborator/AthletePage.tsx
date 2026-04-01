@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useParams, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from '@web/lib/api'
 import { useAuth } from '@web/lib/auth'
@@ -116,6 +116,7 @@ export default function AthletePage() {
   const { t } = useTranslation()
   const { id } = useParams<{ id: string }>()
   const { user } = useAuth()
+  const navigate = useNavigate()
   const queryClient = useQueryClient()
 
   const { data: app, isLoading } = useQuery<ApplicationDetail>({
@@ -233,6 +234,11 @@ export default function AthletePage() {
       queryClient.invalidateQueries({ queryKey: ['application', id] })
       setEditingPerf(false)
     },
+  })
+
+  const archiveMutation = useMutation({
+    mutationFn: () => api.delete(`/api/v1/athletes/${app?.athleteId}`),
+    onSuccess: () => navigate(user?.role === 'committee' ? '/committee/candidates' : '/collaborator/candidates'),
   })
 
   // ── Render ───────────────────────────────────────────────────────────────
@@ -989,6 +995,26 @@ export default function AthletePage() {
             </div>
           </div>
         </div>
+
+        {/* Archive button — committee only */}
+        {user?.role === 'committee' && !app.athlete.archivedAt && (
+          <div className="mt-6 text-right">
+            <button
+              onClick={() => {
+                if (confirm(`Archive ${app.athlete.firstName} ${app.athlete.lastName}? This will hide them from all lists.`)) {
+                  archiveMutation.mutate()
+                }
+              }}
+              disabled={archiveMutation.isPending}
+              className="text-xs text-red-500 hover:text-red-700 border border-red-200 rounded px-3 py-1.5 hover:bg-red-50 disabled:opacity-50"
+            >
+              Archive athlete
+            </button>
+            {archiveMutation.isError && (
+              <p className="text-xs text-red-600 mt-1">{(archiveMutation.error as Error)?.message || t('common.error')}</p>
+            )}
+          </div>
+        )}
       </div>
     </div>
   )
