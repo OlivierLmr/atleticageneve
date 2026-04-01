@@ -117,9 +117,9 @@ export default function AthleteRegisterPage() {
           <div className="bg-white rounded-lg border p-6">
             <div className="text-3xl mb-3">&#10003;</div>
             <p className="font-semibold text-sm mb-1">{t('athlete.registration')} — {form.firstName} {form.lastName}</p>
-            <p className="text-xs text-gray-500 mb-2">Your application has been submitted successfully.</p>
+            <p className="text-xs text-gray-500 mb-2">{t('athlete.applicationSubmitted')}</p>
             <p className="text-xs text-blue-600">
-              A login link has been sent to {form.email} — use it to track your application.
+              {t('athlete.loginLinkSent', { email: form.email })}
             </p>
           </div>
           <Link to="/" className="text-xs text-gray-400 underline mt-4 inline-block">{t('common.back')}</Link>
@@ -237,7 +237,7 @@ export default function AthleteRegisterPage() {
               </div>
               <h2 className="font-semibold text-sm mt-4 mb-2">{t('athlete.event')}(s) *</h2>
               {!form.gender ? (
-                <p className="text-xs text-gray-400">Please select a gender first.</p>
+                <p className="text-xs text-gray-400">{t('athlete.selectGenderFirst')}</p>
               ) : (
                 <div className="space-y-2">
                   {events.map(e => (
@@ -252,7 +252,7 @@ export default function AthleteRegisterPage() {
                     </label>
                   ))}
                   {events.length === 0 && (
-                    <p className="text-xs text-gray-400">No events available for this gender.</p>
+                    <p className="text-xs text-gray-400">{t('athlete.noEventsForGender')}</p>
                   )}
                 </div>
               )}

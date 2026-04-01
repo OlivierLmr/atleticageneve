@@ -384,14 +384,14 @@ export default function AthletePage() {
                       }}
                       className="text-[10px] text-blue-600 hover:text-blue-800 mt-1"
                     >
-                      Edit performance
+                      {t('selection.editPerformance')}
                     </button>
                   </>
                 )}
                 {app.athlete.waProfileUrl && (
                   <Row label={t('athlete.waProfile')} value={
                     <a href={app.athlete.waProfileUrl} target="_blank" rel="noreferrer" className="text-blue-600 underline text-xs">
-                      Profile
+                      {t('athlete.profile')}
                     </a>
                   } />
                 )}
@@ -409,7 +409,7 @@ export default function AthletePage() {
                   disabled={scoreMutation.isPending}
                   className="text-xs text-gray-500 hover:text-gray-700 border rounded px-2 py-0.5"
                 >
-                  {scoreMutation.isPending ? '...' : 'Re-score'}
+                  {scoreMutation.isPending ? '...' : t('selection.rescore')}
                 </button>
               </div>
               <div className="flex items-center gap-3 mb-3">
@@ -439,7 +439,7 @@ export default function AthletePage() {
             {/* ── Collapsible editor sections ──────────────────────────── */}
 
             {/* Personal data */}
-            <CollapsibleSection title="Personal Data" isOpen={openSection === 'personal'} onToggle={() => toggleSection('personal')}>
+            <CollapsibleSection title={t('collaborator.personalData')} isOpen={openSection === 'personal'} onToggle={() => toggleSection('personal')}>
               <AthleteFieldEditor
                 athlete={app.athlete}
                 fields={[
@@ -453,11 +453,11 @@ export default function AthletePage() {
                   { key: 'athletePhone', label: t('athlete.phone'), type: 'text' },
                   { key: 'waProfileUrl', label: t('athlete.waProfile'), type: 'text' },
                   { key: 'swiLicence', label: t('athlete.swissLicence'), type: 'text' },
-                  { key: 'honours', label: 'Honours', type: 'text' },
-                  { key: 'distanceFromGva', label: 'Distance from GVA (km)', type: 'number' },
+                  { key: 'honours', label: t('athlete.honours'), type: 'text' },
+                  { key: 'distanceFromGva', label: t('athlete.distanceFromGva'), type: 'number' },
                   { key: 'isEap', label: t('athlete.eapMember'), type: 'checkbox' },
-                  { key: 'isSwiss', label: 'Swiss', type: 'checkbox' },
-                  { key: 'eapCity', label: 'EAP City', type: 'text' },
+                  { key: 'isSwiss', label: t('athlete.swiss'), type: 'checkbox' },
+                  { key: 'eapCity', label: t('athlete.eapCity'), type: 'text' },
                 ]}
                 onSave={(data) => athleteUpdateMutation.mutate(data)}
                 isPending={athleteUpdateMutation.isPending}
@@ -472,11 +472,11 @@ export default function AthletePage() {
                 athlete={app.athlete}
                 fields={[
                   { key: 'iRunClean', label: t('compliance.iRunClean'), type: 'select', options: [
-                    { value: 'yes', label: 'Yes' }, { value: 'no', label: 'No' },
-                    { value: 'in_progress', label: 'In progress' }, { value: 'unknown', label: 'Unknown' },
+                    { value: 'yes', label: t('common.yes') }, { value: 'no', label: t('common.no') },
+                    { value: 'in_progress', label: t('common.inProgress') }, { value: 'unknown', label: t('common.unknown') },
                   ]},
                   { key: 'dopingFree', label: t('compliance.dopingFree'), type: 'select', options: [
-                    { value: 'yes', label: 'Yes' }, { value: 'no', label: 'No' }, { value: 'unknown', label: 'Unknown' },
+                    { value: 'yes', label: t('common.yes') }, { value: 'no', label: t('common.no') }, { value: 'unknown', label: t('common.unknown') },
                   ]},
                 ]}
                 onSave={(data) => athleteUpdateMutation.mutate(data)}
@@ -513,16 +513,16 @@ export default function AthletePage() {
               <AthleteFieldEditor
                 athlete={app.athlete}
                 fields={[
-                  { key: 'estTravel', label: 'Est. travel (CHF)', type: 'number' },
-                  { key: 'estAccommodation', label: 'Est. accommodation (CHF)', type: 'number' },
-                  { key: 'estAppearance', label: 'Est. appearance (CHF)', type: 'number' },
+                  { key: 'estTravel', label: t('collaborator.estTravel'), type: 'number' },
+                  { key: 'estAccommodation', label: t('collaborator.estAccommodation'), type: 'number' },
+                  { key: 'estAppearance', label: t('collaborator.estAppearance'), type: 'number' },
                 ]}
                 onSave={(data) => athleteUpdateMutation.mutate(data)}
                 isPending={athleteUpdateMutation.isPending}
                 error={athleteUpdateMutation.error}
                 t={t}
               />
-              <p className="text-xs text-gray-400 mt-1">Total auto-computed as sum of the three fields.</p>
+              <p className="text-xs text-gray-400 mt-1">{t('collaborator.estTotalHint')}</p>
             </CollapsibleSection>
 
             {/* Assigned selector */}
@@ -537,19 +537,19 @@ export default function AthletePage() {
             </CollapsibleSection>
 
             {/* Payment */}
-            <CollapsibleSection title="Payment" isOpen={openSection === 'payment'} onToggle={() => toggleSection('payment')}>
+            <CollapsibleSection title={t('collaborator.payment')} isOpen={openSection === 'payment'} onToggle={() => toggleSection('payment')}>
               <AthleteFieldEditor
                 athlete={app.athlete}
                 fields={[
-                  { key: 'bankIban', label: 'IBAN', type: 'text' },
-                  { key: 'paymentStatus', label: 'Payment status', type: 'select', options: [
-                    { value: 'pending', label: 'Pending' }, { value: 'done', label: 'Done' },
+                  { key: 'bankIban', label: t('collaborator.iban'), type: 'text' },
+                  { key: 'paymentStatus', label: t('collaborator.paymentStatus'), type: 'select', options: [
+                    { value: 'pending', label: t('common.pending') }, { value: 'done', label: t('common.done') },
                   ]},
-                  { key: 'paymentAmount', label: 'Amount (CHF)', type: 'number' },
-                  { key: 'paymentDate', label: 'Payment date', type: 'date' },
-                  { key: 'paymentMethod', label: 'Method', type: 'select', options: [
-                    { value: '', label: '—' }, { value: 'cash', label: 'Cash' }, { value: 'bank', label: 'Bank' },
-                    { value: 'western_union', label: 'Western Union' }, { value: 'paypal', label: 'PayPal' }, { value: 'other', label: 'Other' },
+                  { key: 'paymentAmount', label: t('collaborator.paymentAmount'), type: 'number' },
+                  { key: 'paymentDate', label: t('collaborator.paymentDate'), type: 'date' },
+                  { key: 'paymentMethod', label: t('collaborator.paymentMethod'), type: 'select', options: [
+                    { value: '', label: '—' }, { value: 'cash', label: t('collaborator.cash') }, { value: 'bank', label: t('collaborator.bank') },
+                    { value: 'western_union', label: t('collaborator.westernUnion') }, { value: 'paypal', label: t('collaborator.paypal') }, { value: 'other', label: t('collaborator.other') },
                   ]},
                 ]}
                 onSave={(data) => athleteUpdateMutation.mutate(data)}
@@ -563,15 +563,15 @@ export default function AthletePage() {
             <CollapsibleSection title={t('common.notes')} isOpen={openSection === 'notes'} onToggle={() => toggleSection('notes')}>
               <div className="space-y-3">
                 <div>
-                  <label className="block text-xs font-medium text-gray-500 mb-1">Participant notes</label>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">{t('collaborator.participantNotes')}</label>
                   <p className="text-xs text-gray-600 bg-gray-50 p-2 rounded min-h-[2rem]">{app.athlete.participantNotes || '—'}</p>
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-gray-500 mb-1">Additional notes</label>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">{t('collaborator.additionalNotes')}</label>
                   <p className="text-xs text-gray-600 bg-gray-50 p-2 rounded min-h-[2rem]">{app.athlete.additionalNotes || '—'}</p>
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-gray-500 mb-1">Internal notes (staff only)</label>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">{t('collaborator.internalNotes')}</label>
                   <textarea
                     className={inputCls}
                     rows={3}
@@ -628,7 +628,7 @@ export default function AthletePage() {
                   )
                 })}
                 {allowedTransitions.length === 0 && (
-                  <span className="text-xs text-gray-400">No available actions</span>
+                  <span className="text-xs text-gray-400">{t('selection.noActions')}</span>
                 )}
               </div>
               {statusMutation.isError && (
@@ -681,7 +681,7 @@ export default function AthletePage() {
                     <div key={sib.id} className={`flex items-center justify-between text-sm p-2 rounded ${isCurrent ? 'bg-gray-50 border border-gray-200' : ''}`}>
                       <div className="flex items-center gap-2">
                         <span className="font-medium text-xs">{sib.event.catalog.name}</span>
-                        {isCurrent && <span className="text-[10px] text-gray-400">(current)</span>}
+                        {isCurrent && <span className="text-[10px] text-gray-400">({t('common.current')})</span>}
                       </div>
                       <div className="flex gap-1">
                         {(['pending', 'selected', 'not_selected'] as const).map((status) => (
@@ -703,7 +703,7 @@ export default function AthletePage() {
                                 : 'border-gray-200 text-gray-400 hover:bg-gray-50'
                             }`}
                           >
-                            {status === 'not_selected' ? 'Not selected' : status.charAt(0).toUpperCase() + status.slice(1)}
+                            {t(`participation.${status}`)}
                           </button>
                         ))}
                       </div>
@@ -715,10 +715,10 @@ export default function AthletePage() {
                 <p className="text-xs text-red-600 mt-2">{(participationMutation.error as Error)?.message || t('common.error')}</p>
               )}
               {allDecided && (
-                <p className="text-xs text-green-600 mt-2">All events decided — ready to send agreement</p>
+                <p className="text-xs text-green-600 mt-2">{t('selection.allDecided')}</p>
               )}
               {app.siblingApplications?.length > 0 && !allDecided && (
-                <p className="text-xs text-gray-400 mt-2">Decide all events before sending an agreement</p>
+                <p className="text-xs text-gray-400 mt-2">{t('selection.decideAllFirst')}</p>
               )}
             </div>
 
@@ -732,7 +732,7 @@ export default function AthletePage() {
                     disabled={!allDecided}
                     className={`text-xs ${allDecided ? 'text-blue-600 hover:text-blue-800' : 'text-gray-300 cursor-not-allowed'}`}
                   >
-                    {latestAgreement ? 'New version' : t('contract.sendOffer')}
+                    {latestAgreement ? t('contract.newVersion') : t('contract.sendOffer')}
                   </button>
                 )}
               </div>
@@ -783,14 +783,14 @@ export default function AthletePage() {
                       />
                     </div>
                     <div>
-                      <label className={labelCls}>Description</label>
+                      <label className={labelCls}>{t('contract.description')}</label>
                       <input
                         className={inputCls}
                         value={agreement.otherCompensationDesc}
                         onChange={(e) =>
                           setAgreement((p) => ({ ...p, otherCompensationDesc: e.target.value }))
                         }
-                        placeholder="e.g. pacemaker fee"
+                        placeholder={t('contract.otherCompensationDesc')}
                       />
                     </div>
                   </div>
@@ -814,7 +814,7 @@ export default function AthletePage() {
                           setAgreement((p) => ({ ...p, transportAirportHotel: e.target.checked }))
                         }
                       />
-                      Airport &rarr; Hotel
+                      {t('contract.transportAirportHotel')}
                     </label>
                     <label className="flex items-center gap-2 text-sm cursor-pointer">
                       <input
@@ -824,19 +824,19 @@ export default function AthletePage() {
                           setAgreement((p) => ({ ...p, transportHotelStadium: e.target.checked }))
                         }
                       />
-                      Hotel &rarr; Stadium
+                      {t('contract.transportHotelStadium')}
                     </label>
                   </div>
 
                   {/* Hotel room */}
                   <div>
-                    <label className={labelCls}>{t('logistics.hotel')} Room</label>
+                    <label className={labelCls}>{t('logistics.hotel')}</label>
                     <select
                       className={inputCls}
                       value={agreement.hotelRoomId}
                       onChange={(e) => setAgreement((p) => ({ ...p, hotelRoomId: e.target.value }))}
                     >
-                      <option value="">— No hotel room —</option>
+                      <option value="">— {t('contract.noHotelRoom')} —</option>
                       {allRooms.map(r => (
                         <option key={r.id} value={r.id}>{r.hotelName} — {r.roomType} (CHF {r.costPerNight}/night)</option>
                       ))}
@@ -873,7 +873,7 @@ export default function AthletePage() {
 
                   {/* Dinners */}
                   <div>
-                    <label className={labelCls}>Dinners</label>
+                    <label className={labelCls}>{t('contract.dinners')}</label>
                     <div className="flex gap-2">
                       {DINNER_LABELS.map((day) => {
                         const key = `dinner${day.charAt(0).toUpperCase() + day.slice(1)}` as keyof typeof agreement
@@ -908,7 +908,7 @@ export default function AthletePage() {
                         setAgreement((p) => ({ ...p, stadiumMeals: e.target.checked }))
                       }
                     />
-                    Stadium meals
+                    {t('contract.stadiumMeals')}
                   </label>
 
                   <div>
@@ -977,20 +977,20 @@ export default function AthletePage() {
           <div className="space-y-4">
             {/* Add interaction */}
             <div className="bg-white rounded-lg border p-4">
-              <h3 className="font-semibold text-sm mb-3">Add note</h3>
+              <h3 className="font-semibold text-sm mb-3">{t('collaborator.addNote')}</h3>
               <select
                 className={`${inputCls} mb-2`}
                 value={noteType}
                 onChange={(e) => setNoteType(e.target.value as typeof noteType)}
               >
-                <option value="note">Note</option>
-                <option value="call">Phone call</option>
-                <option value="email">Email</option>
+                <option value="note">{t('collaborator.note')}</option>
+                <option value="call">{t('collaborator.phoneCall')}</option>
+                <option value="email">{t('athlete.email')}</option>
               </select>
               <textarea
                 className={inputCls}
                 rows={3}
-                placeholder="Enter note..."
+                placeholder={t('collaborator.enterNote')}
                 value={noteContent}
                 onChange={(e) => setNoteContent(e.target.value)}
               />
@@ -1009,9 +1009,9 @@ export default function AthletePage() {
 
             {/* Timeline */}
             <div className="bg-white rounded-lg border p-4">
-              <h3 className="font-semibold text-sm mb-3">Timeline</h3>
+              <h3 className="font-semibold text-sm mb-3">{t('collaborator.timeline')}</h3>
               {app.interactions.length === 0 ? (
-                <p className="text-xs text-gray-400">No interactions yet</p>
+                <p className="text-xs text-gray-400">{t('collaborator.noInteractions')}</p>
               ) : (
                 <div className="space-y-3">
                   {app.interactions.map((interaction) => (
@@ -1028,14 +1028,14 @@ export default function AthletePage() {
           <div className="mt-6 text-right">
             <button
               onClick={() => {
-                if (confirm(`Archive ${app.athlete.firstName} ${app.athlete.lastName}? This will hide them from all lists.`)) {
+                if (confirm(t('confirm.archiveAthlete', { athlete: `${app.athlete.firstName} ${app.athlete.lastName}` }))) {
                   archiveMutation.mutate()
                 }
               }}
               disabled={archiveMutation.isPending}
               className="text-xs text-red-500 hover:text-red-700 border border-red-200 rounded px-3 py-1.5 hover:bg-red-50 disabled:opacity-50"
             >
-              Archive athlete
+              {t('collaborator.archiveAthlete')}
             </button>
             {archiveMutation.isError && (
               <p className="text-xs text-red-600 mt-1">{(archiveMutation.error as Error)?.message || t('common.error')}</p>
@@ -1157,7 +1157,7 @@ function SelectorAssign({ currentValue, staffUsers, onSave, isPending, t }: {
         value={value}
         onChange={e => setValue(e.target.value)}
       >
-        <option value="">— Unassigned —</option>
+        <option value="">— {t('common.unassigned')} —</option>
         {staffUsers.map(u => (
           <option key={u.id} value={u.id}>{u.firstName} {u.lastName}</option>
         ))}
@@ -1190,7 +1190,7 @@ function AgreementCard({ agreement: c, t }: { agreement: Agreement; t: (key: str
     }`}>
       <div className="flex justify-between mb-1">
         <span className="font-semibold">
-          v{c.version} — {c.direction === 'to_athlete' ? 'To athlete' : 'Counter-offer'}
+          v{c.version} — {c.direction === 'to_athlete' ? t('contract.toAthlete') : t('contract.counterOffer')}
         </span>
         <span className="text-gray-500">{new Date(c.sentAt).toLocaleDateString()}</span>
       </div>
@@ -1198,7 +1198,7 @@ function AgreementCard({ agreement: c, t }: { agreement: Agreement; t: (key: str
         <span>{t('contract.bonus')}: CHF {c.appearanceFee}</span>
         <span>{t('contract.transport')}: CHF {c.transport}</span>
         <span>{t('contract.hotelNights')}: {nights}</span>
-        <span>Dinners: {dinners}</span>
+        <span>{t('contract.dinners')}: {dinners}</span>
       </div>
       <div className="mt-1 font-semibold text-gray-900">
         {t('contract.totalCost')}: CHF {c.totalCost.toLocaleString()}

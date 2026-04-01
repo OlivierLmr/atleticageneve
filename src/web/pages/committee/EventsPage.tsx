@@ -203,7 +203,7 @@ export default function EventsPage() {
 
           <div className="grid grid-cols-3 gap-3">
             <div>
-              <label className={labelCls}>Max slots</label>
+              <label className={labelCls}>{t('selection.maxSlots')}</label>
               <input type="number" className={inputCls} value={form.maxSlots}
                 onChange={e => setNum('maxSlots', e.target.value)} />
             </div>
@@ -278,7 +278,7 @@ export default function EventsPage() {
             <thead>
               <tr className="border-b bg-gray-50 text-xs text-gray-500">
                 <th className="px-3 py-2 text-left font-medium">{t('athlete.event')}</th>
-                <th className="px-3 py-2 text-center font-medium">Slots</th>
+                <th className="px-3 py-2 text-center font-medium">{t('selection.maxSlots')}</th>
                 <th className="px-3 py-2 text-center font-medium">{t('selection.minima')} (Int)</th>
                 <th className="px-3 py-2 text-center font-medium">{t('selection.minima')} (SUI)</th>
                 <th className="px-3 py-2 text-center font-medium">{t('dashboard.swissQuota')}</th>

@@ -130,11 +130,11 @@ export default function HotelRoomsPage() {
   return (
     <div className="max-w-4xl mx-auto py-8 px-6">
       {/* Hotels section */}
-      <h1 className="text-lg font-bold mb-4">Hotels</h1>
+      <h1 className="text-lg font-bold mb-4">{t('admin.hotels')}</h1>
       <div className="bg-white rounded-lg border p-4 mb-8">
         <form onSubmit={handleHotelSubmit} className="flex items-end gap-3 mb-4">
           <div className="flex-1">
-            <label className="block text-xs text-gray-500 mb-1">Hotel name</label>
+            <label className="block text-xs text-gray-500 mb-1">{t('admin.hotelName')}</label>
             <input
               type="text"
               value={hotelName_}
@@ -158,7 +158,7 @@ export default function HotelRoomsPage() {
           )}
         </form>
         {hotels.length === 0 ? (
-          <p className="text-xs text-gray-400">No hotels yet</p>
+          <p className="text-xs text-gray-400">{t('admin.noHotelsYet')}</p>
         ) : (
           <div className="space-y-1">
             {hotels.map((h) => (

@@ -125,7 +125,7 @@ export default function ManagerRegisterPage() {
           <div className="bg-white rounded-lg border p-6">
             <div className="text-3xl mb-3">&#10003;</div>
             <p className="font-semibold text-sm mb-1">{registeredCount} athletes registered</p>
-            <p className="text-xs text-gray-500">Applications have been submitted for review.</p>
+            <p className="text-xs text-gray-500">{t('manager.applicationsSubmitted')}</p>
           </div>
           <div className="flex gap-3 justify-center mt-4">
             <Link to="/manager/portal" className="text-xs text-gray-600 underline">{t('manager.portal')}</Link>
@@ -220,7 +220,7 @@ export default function ManagerRegisterPage() {
                             </label>
                           ))}
                           {filteredEvents.length === 0 && (
-                            <p className="text-xs text-gray-400 p-1">No events</p>
+                            <p className="text-xs text-gray-400 p-1">{t('athlete.noEvents')}</p>
                           )}
                         </div>
                       )}

@@ -23,7 +23,17 @@
     "actions": "Actions",
     "details": "Details",
     "notes": "Notes",
-    "language": "Language"
+    "language": "Language",
+    "statuses": "statuses",
+    "managers": "managers",
+    "athletes": "athletes",
+    "noResults": "No results found",
+    "current": "current",
+    "unassigned": "Unassigned",
+    "unknown": "Unknown",
+    "inProgress": "In progress",
+    "pending": "Pending",
+    "done": "Done"
   },
   "auth": {
     "login": "Log in",
@@ -48,7 +58,15 @@
     "athletePortal": "Athlete Portal",
     "managerPortal": "Manager Portal",
     "selectionConsole": "Selection Console",
-    "dashboard": "Dashboard"
+    "dashboard": "Dashboard",
+    "edition": "Edition",
+    "events": "Events",
+    "eventCatalog": "Event Catalog",
+    "countries": "Countries",
+    "eapCities": "EAP Cities",
+    "hotelRooms": "Hotel Rooms",
+    "emailLog": "Email Log",
+    "candidates": "Candidates"
   },
   "status": {
     "to_review": "Under review",
@@ -68,7 +86,10 @@
     "sendLoginLink": "Send login link"
   },
   "confirm": {
-    "statusChange": "Are you sure you want to set {{athlete}} to \"{{status}}\"? This action cannot be easily undone."
+    "statusChange": "Are you sure you want to set {{athlete}} to \"{{status}}\"? This action cannot be easily undone.",
+    "withdraw": "Are you sure you want to withdraw?",
+    "withdrawAthlete": "Withdraw {{athlete}}?",
+    "archiveAthlete": "Archive {{athlete}}? This will hide them from all lists."
   },
   "signup": {
     "title": "Welcome to Atletica Geneve",
@@ -101,7 +122,18 @@
     "event": "Event",
     "primaryEvent": "Primary event",
     "secondaryEvent": "Secondary event",
-    "waProfile": "World Athletics profile URL"
+    "waProfile": "World Athletics profile URL",
+    "noApplications": "No applications found for your account.",
+    "registerForEvent": "Register for an event",
+    "noEvents": "No events",
+    "honours": "Honours",
+    "distanceFromGva": "Distance from GVA (km)",
+    "swiss": "Swiss",
+    "profile": "Profile",
+    "applicationSubmitted": "Your application has been submitted successfully.",
+    "selectGenderFirst": "Please select a gender first.",
+    "noEventsForGender": "No events available for this gender.",
+    "loginLinkSent": "A login link has been sent to {{email}} — use it to track your application."
   },
   "manager": {
     "registration": "Manager Registration",
@@ -110,7 +142,8 @@
     "registerAthletes": "Register Athletes",
     "myAthletes": "My Athletes",
     "addAthlete": "Add athlete",
-    "batchRegister": "Batch Registration"
+    "batchRegister": "Batch Registration",
+    "applicationsSubmitted": "Applications have been submitted for review."
   },
   "contract": {
     "title": "Contract",
@@ -137,7 +170,15 @@
     "offerAccepted": "Offer accepted",
     "notesToAthlete": "Notes to athlete",
     "notesToOrganizer": "Message to organisation",
-    "version": "Version"
+    "version": "Version",
+    "offerHistory": "Offer history",
+    "fromOrganizer": "From organizer",
+    "yourCounterOffer": "Your counter-offer",
+    "toAthlete": "To athlete",
+    "newVersion": "New version",
+    "noHotelRoom": "No hotel room",
+    "dinnersLockedHint": "Greyed-out dinners were not included in the offer",
+    "description": "Description"
   },
   "compliance": {
     "title": "Clean & Fair",
@@ -188,7 +229,43 @@
     "meetRecord": "Meet record",
     "assignedSelector": "Assigned selector",
     "estimatedCost": "Estimated cost",
-    "participation": "Event Selection"
+    "participation": "Event Selection",
+    "rescore": "Re-score",
+    "editPerformance": "Edit performance",
+    "negotiation": "Negotiation",
+    "noActions": "No available actions",
+    "allDecided": "All events decided — ready to send agreement",
+    "decideAllFirst": "Decide all events before sending an agreement",
+    "maxSlots": "Max slots"
+  },
+  "collaborator": {
+    "personalData": "Personal Data",
+    "payment": "Payment",
+    "iban": "IBAN",
+    "paymentStatus": "Payment status",
+    "paymentAmount": "Amount (CHF)",
+    "paymentDate": "Payment date",
+    "paymentMethod": "Method",
+    "cash": "Cash",
+    "bank": "Bank",
+    "westernUnion": "Western Union",
+    "paypal": "PayPal",
+    "other": "Other",
+    "participantNotes": "Participant notes",
+    "additionalNotes": "Additional notes",
+    "internalNotes": "Internal notes (staff only)",
+    "estTravel": "Est. travel (CHF)",
+    "estAccommodation": "Est. accommodation (CHF)",
+    "estAppearance": "Est. appearance (CHF)",
+    "estTotalHint": "Total auto-computed as sum of the three fields.",
+    "addNote": "Add note",
+    "note": "Note",
+    "phoneCall": "Phone call",
+    "enterNote": "Enter note...",
+    "timeline": "Timeline",
+    "noInteractions": "No interactions yet",
+    "archiveAthlete": "Archive athlete",
+    "activity": "Activity"
   },
   "dashboard": {
     "title": "Committee Dashboard",
@@ -256,6 +333,9 @@
     "sentAt": "Sent at",
     "emailTo": "To",
     "subject": "Subject",
-    "lang": "Language"
+    "lang": "Language",
+    "hotels": "Hotels",
+    "hotelName": "Hotel name",
+    "noHotelsYet": "No hotels yet"
   }
 }

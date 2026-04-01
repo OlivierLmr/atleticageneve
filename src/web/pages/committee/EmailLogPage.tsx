@@ -37,7 +37,7 @@ export default function EmailLogPage() {
                 <th className="px-3 py-2 text-left font-medium">{t('admin.sentAt')}</th>
                 <th className="px-3 py-2 text-left font-medium">{t('admin.emailTo')}</th>
                 <th className="px-3 py-2 text-left font-medium">{t('admin.subject')}</th>
-                <th className="px-3 py-2 text-left font-medium w-10">Lang</th>
+                <th className="px-3 py-2 text-left font-medium w-10">{t('admin.lang')}</th>
               </tr>
             </thead>
             <tbody>

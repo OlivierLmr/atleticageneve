@@ -23,7 +23,17 @@
     "actions": "Actions",
     "details": "Détails",
     "notes": "Notes",
-    "language": "Langue"
+    "language": "Langue",
+    "statuses": "statuts",
+    "managers": "managers",
+    "athletes": "athlètes",
+    "noResults": "Aucun résultat",
+    "current": "actuel",
+    "unassigned": "Non assigné",
+    "unknown": "Inconnu",
+    "inProgress": "En cours",
+    "pending": "En attente",
+    "done": "Terminé"
   },
   "auth": {
     "login": "Se connecter",
@@ -48,7 +58,15 @@
     "athletePortal": "Portail Athlète",
     "managerPortal": "Portail Manager",
     "selectionConsole": "Console de Sélection",
-    "dashboard": "Tableau de Bord"
+    "dashboard": "Tableau de Bord",
+    "edition": "Édition",
+    "events": "Épreuves",
+    "eventCatalog": "Catalogue des épreuves",
+    "countries": "Pays",
+    "eapCities": "Villes EAP",
+    "hotelRooms": "Chambres d'hôtel",
+    "emailLog": "Journal des emails",
+    "candidates": "Candidats"
   },
   "status": {
     "to_review": "En cours d'examen",
@@ -68,7 +86,10 @@
     "sendLoginLink": "Envoyer le lien de connexion"
   },
   "confirm": {
-    "statusChange": "Voulez-vous vraiment passer {{athlete}} à « {{status}} » ? Cette action ne peut pas être facilement annulée."
+    "statusChange": "Voulez-vous vraiment passer {{athlete}} à « {{status}} » ? Cette action ne peut pas être facilement annulée.",
+    "withdraw": "Voulez-vous vraiment vous retirer ?",
+    "withdrawAthlete": "Retirer {{athlete}} ?",
+    "archiveAthlete": "Archiver {{athlete}} ? Cela le masquera de toutes les listes."
   },
   "signup": {
     "title": "Bienvenue à Atletica Genève",
@@ -96,12 +117,23 @@
     "eapCity": "Ville EAP",
     "swissLicence": "Numéro de licence suisse",
     "personalBest": "Record personnel",
-    "seasonBest": "Meilleure performance de la saison",
+    "seasonBest": "Meilleure perf. de la saison",
     "worldRanking": "Classement mondial",
     "event": "Épreuve",
     "primaryEvent": "Épreuve principale",
     "secondaryEvent": "Épreuve secondaire",
-    "waProfile": "URL du profil World Athletics"
+    "waProfile": "URL du profil World Athletics",
+    "noApplications": "Aucune candidature trouvée pour votre compte.",
+    "registerForEvent": "S'inscrire à une épreuve",
+    "noEvents": "Aucune épreuve",
+    "honours": "Palmarès",
+    "distanceFromGva": "Distance de GVA (km)",
+    "swiss": "Suisse",
+    "profile": "Profil",
+    "applicationSubmitted": "Votre candidature a été soumise avec succès.",
+    "selectGenderFirst": "Veuillez d'abord sélectionner une catégorie.",
+    "noEventsForGender": "Aucune épreuve disponible pour cette catégorie.",
+    "loginLinkSent": "Un lien de connexion a été envoyé à {{email}} — utilisez-le pour suivre votre candidature."
   },
   "manager": {
     "registration": "Inscription Manager",
@@ -110,7 +142,8 @@
     "registerAthletes": "Inscrire des athlètes",
     "myAthletes": "Mes athlètes",
     "addAthlete": "Ajouter un athlète",
-    "batchRegister": "Inscription groupée"
+    "batchRegister": "Inscription groupée",
+    "applicationsSubmitted": "Les candidatures ont été soumises pour examen."
   },
   "contract": {
     "title": "Contrat",
@@ -137,7 +170,15 @@
     "offerAccepted": "Offre acceptée",
     "notesToAthlete": "Notes pour l'athlète",
     "notesToOrganizer": "Message à l'organisation",
-    "version": "Version"
+    "version": "Version",
+    "offerHistory": "Historique des offres",
+    "fromOrganizer": "De l'organisateur",
+    "yourCounterOffer": "Votre contre-proposition",
+    "toAthlete": "À l'athlète",
+    "newVersion": "Nouvelle version",
+    "noHotelRoom": "Pas de chambre",
+    "dinnersLockedHint": "Les dîners grisés n'étaient pas inclus dans l'offre",
+    "description": "Description"
   },
   "compliance": {
     "title": "Intégrité sportive",
@@ -188,7 +229,43 @@
     "meetRecord": "Record du meeting",
     "assignedSelector": "Sélectionneur assigné",
     "estimatedCost": "Coût estimé",
-    "participation": "Sélection par épreuve"
+    "participation": "Sélection par épreuve",
+    "rescore": "Recalculer",
+    "editPerformance": "Modifier les performances",
+    "negotiation": "Négociation",
+    "noActions": "Aucune action disponible",
+    "allDecided": "Toutes les épreuves décidées — prêt à envoyer l'offre",
+    "decideAllFirst": "Décidez toutes les épreuves avant d'envoyer une offre",
+    "maxSlots": "Places max"
+  },
+  "collaborator": {
+    "personalData": "Données personnelles",
+    "payment": "Paiement",
+    "iban": "IBAN",
+    "paymentStatus": "Statut du paiement",
+    "paymentAmount": "Montant (CHF)",
+    "paymentDate": "Date de paiement",
+    "paymentMethod": "Méthode",
+    "cash": "Espèces",
+    "bank": "Virement",
+    "westernUnion": "Western Union",
+    "paypal": "PayPal",
+    "other": "Autre",
+    "participantNotes": "Notes du participant",
+    "additionalNotes": "Notes supplémentaires",
+    "internalNotes": "Notes internes (staff uniquement)",
+    "estTravel": "Est. voyage (CHF)",
+    "estAccommodation": "Est. hébergement (CHF)",
+    "estAppearance": "Est. apparition (CHF)",
+    "estTotalHint": "Le total est calculé automatiquement.",
+    "addNote": "Ajouter une note",
+    "note": "Note",
+    "phoneCall": "Appel téléphonique",
+    "enterNote": "Saisir une note...",
+    "timeline": "Chronologie",
+    "noInteractions": "Aucune interaction",
+    "archiveAthlete": "Archiver l'athlète",
+    "activity": "Activité"
   },
   "dashboard": {
     "title": "Tableau de bord du Comité",
@@ -256,6 +333,9 @@
     "sentAt": "Envoyé le",
     "emailTo": "À",
     "subject": "Sujet",
-    "lang": "Langue"
+    "lang": "Langue",
+    "hotels": "Hôtels",
+    "hotelName": "Nom de l'hôtel",
+    "noHotelsYet": "Aucun hôtel pour l'instant"
   }
 }
