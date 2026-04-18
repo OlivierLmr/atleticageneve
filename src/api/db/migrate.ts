@@ -1,6 +1,16 @@
 // Auto-migration runner for Cloudflare D1.
 // Called on Worker startup so `wrangler deploy` alone is enough to keep the
 // schema up to date — no separate `wrangler d1 migrations apply` step needed.
+//
+// ⚠️  IMPORTANT notes for future migration authors:
+//
+// 1. Use `d1.prepare(sql).run()` for single statements.
+//    `d1.exec()` is for multi-statement batches only — it can misparse single
+//    statements and fail with "incomplete input: SQLITE_ERROR".
+//
+// 2. Wrangler stores migration names WITH a `.sql` suffix (e.g. "0001_spec_v3.sql")
+//    but this code uses bare names (e.g. "0001_spec_v3"). The lookup normalizes
+//    by stripping `.sql` — keep this in mind when adding new migrations.
 
 const MIGRATION_0001 = `
 CREATE TABLE IF NOT EXISTS edition (
@@ -266,18 +276,15 @@ export async function ensureMigrated(d1: D1Database): Promise<void> {
   if (migrated) return
 
   // Tracking table — compatible with wrangler d1 migrations apply format.
-  await d1.exec(
-    `CREATE TABLE IF NOT EXISTS d1_migrations (
-       id INTEGER PRIMARY KEY AUTOINCREMENT,
-       name TEXT UNIQUE NOT NULL,
-       applied_at TEXT NOT NULL DEFAULT (datetime('now'))
-     )`
-  )
+  await d1.prepare(
+    `CREATE TABLE IF NOT EXISTS d1_migrations (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT UNIQUE NOT NULL, applied_at TEXT NOT NULL DEFAULT (datetime('now')))`
+  ).run()
 
   const { results } = await d1
     .prepare('SELECT name FROM d1_migrations')
     .all<{ name: string }>()
-  const applied = new Set(results.map((r) => r.name))
+  // Normalize: wrangler stores names with .sql suffix, our code uses bare names.
+  const applied = new Set(results.map((r) => r.name.replace(/\.sql$/, '')))
 
   if (!applied.has('0001_spec_v3')) {
     await d1.exec(MIGRATION_0001)
