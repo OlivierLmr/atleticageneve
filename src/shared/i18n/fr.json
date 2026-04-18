@@ -78,7 +78,8 @@
     "withdrawn": "Retiré",
     "contract_sent": "Offre envoyée",
     "counter_offer": "Contre-proposition",
-    "accepted": "Confirmé"
+    "accepted": "Confirmé",
+    "rattraper": "Rattraper"
   },
   "home": {
     "iAmAthleteManager": "Je suis athlète ou manager",
@@ -112,6 +113,7 @@
     "male": "Homme",
     "female": "Femme",
     "federation": "Club / Équipe nationale",
+    "club": "Club / Équipe",
     "phone": "Téléphone portable",
     "email": "Email",
     "confirmEmail": "Confirmer l'email",
@@ -232,6 +234,8 @@
     "meetRecord": "Record du meeting",
     "assignedSelector": "Sélectionneur assigné",
     "estimatedCost": "Coût estimé",
+    "estimatedCostLabel": "Estimé",
+    "confirmedCostLabel": "Confirmé",
     "participation": "Sélection par épreuve",
     "rescore": "Recalculer",
     "editPerformance": "Modifier les performances",
@@ -239,10 +243,19 @@
     "noActions": "Aucune action disponible",
     "allDecided": "Toutes les épreuves décidées — prêt à envoyer l'offre",
     "decideAllFirst": "Décidez toutes les épreuves avant d'envoyer une offre",
-    "maxSlots": "Places max"
+    "maxSlots": "Places max",
+    "confirmedAthletes": "Athlètes confirmés sur cette épreuve",
+    "noConfirmedAthletes": "Aucun athlète confirmé pour l'instant",
+    "scoringBreakdown": "Détail du scoring",
+    "acceptedAtMeeting": "Accepté au meeting (sans accord formel)",
+    "costInNegotiation": "En négociation",
+    "rattraper": "Rattraper (remettre en examen)"
   },
   "collaborator": {
     "personalData": "Données personnelles",
+    "tabPersonal": "Données personne",
+    "tabNegotiation": "Accord & négociation",
+    "identity": "Identité",
     "payment": "Paiement",
     "iban": "IBAN",
     "paymentStatus": "Statut du paiement",

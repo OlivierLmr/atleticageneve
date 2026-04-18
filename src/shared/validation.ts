@@ -83,6 +83,7 @@ export const athleteUpdateSchema = z.object({
   nationality: z.string().min(2).max(3).optional(),
   gender: z.enum(['M', 'F']).optional(),
   federation: z.string().optional().nullable(),
+  club: z.string().optional().nullable(),
   isEap: z.boolean().optional(),
   isSwiss: z.boolean().optional(),
   distanceFromGva: z.number().int().min(0).optional(),

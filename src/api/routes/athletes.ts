@@ -1,9 +1,9 @@
 import { Hono } from 'hono'
 import { zValidator } from '@hono/zod-validator'
-import { eq } from 'drizzle-orm'
+import { eq, sql } from 'drizzle-orm'
 import * as schema from '../db/schema'
 import { athleteRegistrationSchema, batchAthleteRegistrationSchema, athleteUpdateSchema, negotiationStatusChangeSchema } from '@shared/validation'
-import { NEGOTIATION_TRANSITIONS } from '@shared/constants'
+import { NEGOTIATION_TRANSITIONS, COMMITTEE_EXTRA_TRANSITIONS } from '@shared/constants'
 import { requireAuth } from '../middleware/auth'
 import { sendEmail, sendMagicLinkEmail, sendStatusChangeEmail } from '../services/email'
 import { generateToken, magicLinkExpiresAt } from '../services/auth'
@@ -231,18 +231,78 @@ athletes.post('/batch', requireAuth('manager'), zValidator('json', batchAthleteR
   return c.json({ registered: results }, 201)
 })
 
-// ── GET /athletes/:id — get athlete profile ──────────────────────────────────
+// ── GET /athletes/:id — full athlete profile with applications, agreements, interactions ─
 
 athletes.get('/:id', requireAuth('collaborator', 'committee'), async (c) => {
   const db = c.get('db')
   const id = c.req.param('id')!
 
-  const results = await db.select().from(schema.athlete).where(eq(schema.athlete.id, id)).limit(1)
-  if (results.length === 0) {
+  const athRows = await db.select().from(schema.athlete).where(eq(schema.athlete.id, id)).limit(1)
+  if (athRows.length === 0) {
     return c.json({ error: 'Athlete not found' }, 404)
   }
+  const ath = athRows[0]
 
-  return c.json(results[0])
+  // Fetch all applications for this athlete with event + catalog
+  const appRows = await db
+    .select({
+      application: schema.application,
+      event: schema.event,
+      catalog: schema.eventCatalog,
+    })
+    .from(schema.application)
+    .innerJoin(schema.event, eq(schema.application.eventId, schema.event.id))
+    .innerJoin(schema.eventCatalog, eq(schema.event.catalogId, schema.eventCatalog.id))
+    .where(eq(schema.application.athleteId, id))
+
+  // Fetch WA performances for all applications
+  const waPerfs = await db
+    .select()
+    .from(schema.waPerformance)
+    .where(eq(schema.waPerformance.athleteId, id))
+
+  const waPerfMap = new Map(waPerfs.map(wp => [wp.eventId, wp]))
+
+  const applications = appRows.map(r => ({
+    ...r.application,
+    event: { ...r.event, catalog: r.catalog },
+    waPerformance: waPerfMap.get(r.application.eventId) ?? null,
+  }))
+
+  // Fetch agreements
+  const agreements = await db
+    .select()
+    .from(schema.agreement)
+    .where(eq(schema.agreement.athleteId, id))
+    .orderBy(schema.agreement.version)
+
+  // Fetch interactions (ordered most recent first)
+  const interactions = await db
+    .select()
+    .from(schema.interaction)
+    .where(eq(schema.interaction.athleteId, id))
+    .orderBy(sql`${schema.interaction.createdAt} DESC`)
+
+  // Fetch current edition
+  const editions = await db.select().from(schema.edition).limit(1)
+  const edition = editions[0] ?? null
+
+  return c.json({
+    ...ath,
+    applications,
+    agreements,
+    interactions,
+    edition: edition ? {
+      weightPB: edition.weightPB,
+      weightSB: edition.weightSB,
+      weightRanking: edition.weightRanking,
+      weightCost: edition.weightCost,
+      bonusEap: edition.bonusEap,
+      stadiumMealCost: edition.stadiumMealCost,
+      transportAirportHotelCost: edition.transportAirportHotelCost,
+      transportHotelStadiumCost: edition.transportHotelStadiumCost,
+    } : null,
+  })
 })
 
 // ── PATCH /athletes/:id — update athlete data ────────────────────────────────
@@ -307,9 +367,11 @@ athletes.patch('/:id/negotiation-status', requireAuth('collaborator', 'committee
   const ath = athRows[0]
   const currentStatus = ath.negotiationStatus as NegotiationStatus
 
-  // Validate transition
-  const allowed = NEGOTIATION_TRANSITIONS[currentStatus]
-  if (!allowed || !allowed.includes(newStatus)) {
+  // Validate transition (committee users have extra transitions)
+  const baseAllowed = NEGOTIATION_TRANSITIONS[currentStatus] ?? []
+  const extraAllowed = user.role === 'committee' ? (COMMITTEE_EXTRA_TRANSITIONS[currentStatus] ?? []) : []
+  const allowed = [...baseAllowed, ...extraAllowed]
+  if (!allowed.includes(newStatus)) {
     return c.json({
       error: `Cannot transition from "${currentStatus}" to "${newStatus}"`,
       allowedTransitions: allowed,
@@ -324,7 +386,7 @@ athletes.patch('/:id/negotiation-status', requireAuth('collaborator', 'committee
     .set({
       negotiationStatus: newStatus,
       updatedAt: now,
-      ...(terminalStates.includes(newStatus) ? { decidedAt: now } : {}),
+      ...(terminalStates.includes(newStatus) ? { decidedAt: now } : { decidedAt: null }),
     })
     .where(eq(schema.athlete.id, id))
 

@@ -9,6 +9,16 @@ export const NEGOTIATION_TRANSITIONS: Record<NegotiationStatus, NegotiationStatu
   withdrawn:           [],
 }
 
+// Committee-only extra transitions (Rattraper + admin override)
+export const COMMITTEE_EXTRA_TRANSITIONS: Record<NegotiationStatus, NegotiationStatus[]> = {
+  to_review:           [],
+  agreement_sent:      [],
+  counter_offer_sent:  [],
+  confirmed:           ['rejected'],
+  rejected:            ['to_review'],
+  withdrawn:           ['to_review'],
+}
+
 export const PARTICIPATION_TRANSITIONS: Record<ParticipationStatus, ParticipationStatus[]> = {
   pending:      ['selected', 'not_selected'],
   selected:     ['not_selected'],

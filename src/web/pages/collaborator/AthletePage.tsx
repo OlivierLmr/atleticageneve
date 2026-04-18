@@ -5,8 +5,9 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from '@web/lib/api'
 import { useAuth } from '@web/lib/auth'
 import { LanguageSwitcher } from '@web/App'
-import { NEGOTIATION_TRANSITIONS, NIGHT_LABELS, DINNER_LABELS } from '@shared/constants'
-import { STATUS_COLORS } from '@web/lib/ui-constants'
+import { NEGOTIATION_TRANSITIONS, COMMITTEE_EXTRA_TRANSITIONS, NIGHT_LABELS, DINNER_LABELS } from '@shared/constants'
+import { STATUS_COLORS, formatPerf } from '@web/lib/ui-constants'
+import { computeScore } from '@shared/scoring'
 import type {
   NegotiationStatus,
   Agreement,
@@ -18,24 +19,11 @@ import type {
   Athlete,
   Application,
   WaPerformance,
+  AthleteDetail,
+  ApplicationForAthlete,
+  EditionCosts,
 } from '@shared/types'
 
-// Sibling application (same athlete, different event)
-interface SiblingApplication extends Application {
-  event: Event & { catalog: EventCatalog }
-}
-
-// The application detail API returns event with nested catalog
-interface ApplicationDetail extends Application {
-  athlete: Athlete
-  event: Event & { catalog: EventCatalog }
-  agreements: Agreement[]
-  interactions: Interaction[]
-  waPerformance?: WaPerformance | null
-  siblingApplications: SiblingApplication[]
-}
-
-// Hotels API returns hotels with rooms sub-items
 interface HotelWithRooms extends Hotel {
   rooms: HotelRoom[]
 }
@@ -47,7 +35,13 @@ interface StaffUser {
   role: string
 }
 
-// ── Agreement editor defaults ────────────────────────────────────────────────
+interface ApplicationRow extends Application {
+  athlete: Athlete
+  event: Event & { catalog: EventCatalog }
+  waPerformance: WaPerformance | null
+}
+
+// ── Agreement form defaults ──────────────────────────────────────────────────
 
 function defaultAgreement(existing?: Agreement) {
   if (existing) {
@@ -100,963 +94,7 @@ function defaultAgreement(existing?: Agreement) {
   }
 }
 
-// ── Main page ────────────────────────────────────────────────────────────────
-
-export default function AthletePage() {
-  const { t } = useTranslation()
-  const { id } = useParams<{ id: string }>()
-  const { user } = useAuth()
-  const navigate = useNavigate()
-  const queryClient = useQueryClient()
-
-  const { data: app, isLoading } = useQuery<ApplicationDetail>({
-    queryKey: ['application', id],
-    queryFn: () => api.get(`/api/v1/applications/${id}`),
-    enabled: !!id,
-  })
-
-  const { data: hotels = [] } = useQuery<HotelWithRooms[]>({
-    queryKey: ['hotels'],
-    queryFn: () => api.get('/api/v1/hotels'),
-  })
-
-  const { data: staffUsers = [] } = useQuery<StaffUser[]>({
-    queryKey: ['staff-users'],
-    queryFn: () => api.get('/api/v1/users?role=collaborator,committee'),
-  })
-
-  const { data: edition } = useQuery<{
-    stadiumMealCost: number
-    transportAirportHotelCost: number
-    transportHotelStadiumCost: number
-  }>({
-    queryKey: ['edition-current'],
-    queryFn: () => api.get('/api/v1/editions/current'),
-  })
-
-  // Flatten hotel rooms for the dropdown
-  const allRooms = hotels.flatMap(h => h.rooms.map(r => ({ ...r, hotelName: h.name })))
-
-  // Agreement form state
-  const latestAgreement = app?.agreements?.length
-    ? app.agreements[app.agreements.length - 1]
-    : undefined
-  const [agreement, setAgreement] = useState(() => defaultAgreement(latestAgreement))
-  const [showAgreementForm, setShowAgreementForm] = useState(false)
-
-  // Confirmation dialog
-  const [confirmAction, setConfirmAction] = useState<NegotiationStatus | null>(null)
-
-  // Note form
-  const [noteType, setNoteType] = useState<'note' | 'call' | 'email'>('note')
-  const [noteContent, setNoteContent] = useState('')
-
-  // Internal notes (on athlete)
-  const [internalNotes, setInternalNotes] = useState('')
-  const [notesInitialized, setNotesInitialized] = useState(false)
-
-  // Collapsible sections
-  const [openSection, setOpenSection] = useState<string | null>(null)
-
-  // WA Performance edit
-  const [editingPerf, setEditingPerf] = useState(false)
-  const [perfForm, setPerfForm] = useState({ personalBest: '', seasonBest: '', worldRanking: '' })
-
-  // Initialize from fetched data
-  if (app && !notesInitialized) {
-    setInternalNotes(app.athlete.internalNotes ?? '')
-    if (latestAgreement) {
-      setAgreement(defaultAgreement(latestAgreement))
-    }
-    setNotesInitialized(true)
-  }
-
-  // ── Mutations ────────────────────────────────────────────────────────────
-
-  const statusMutation = useMutation({
-    mutationFn: (status: NegotiationStatus) =>
-      api.patch(`/api/v1/athletes/${app?.athleteId}/negotiation-status`, { status }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['application', id] }),
-  })
-
-  const agreementMutation = useMutation({
-    mutationFn: (data: ReturnType<typeof defaultAgreement>) =>
-      api.post(`/api/v1/athletes/${app?.athleteId}/agreements`, {
-        ...data,
-        hotelRoomId: data.hotelRoomId || undefined,
-      }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['application', id] })
-      setShowAgreementForm(false)
-    },
-  })
-
-  const noteMutation = useMutation({
-    mutationFn: (data: { type: string; content: string }) =>
-      api.post(`/api/v1/athletes/${app?.athleteId}/interactions`, {
-        ...data,
-        applicationId: id,
-      }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['application', id] })
-      setNoteContent('')
-    },
-  })
-
-  const internalNotesMutation = useMutation({
-    mutationFn: (notes: string) =>
-      api.patch(`/api/v1/athletes/${app?.athleteId}`, { internalNotes: notes }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['application', id] }),
-  })
-
-  const participationMutation = useMutation({
-    mutationFn: ({ appId, status }: { appId: string; status: string }) =>
-      api.patch(`/api/v1/applications/${appId}/participation-status`, { participationStatus: status }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['application', id] }),
-  })
-
-  const scoreMutation = useMutation({
-    mutationFn: () => api.post(`/api/v1/applications/${id}/score`, {}),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['application', id] }),
-  })
-
-  const athleteUpdateMutation = useMutation({
-    mutationFn: (data: Record<string, unknown>) =>
-      api.patch(`/api/v1/athletes/${app?.athleteId}`, data),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['application', id] }),
-  })
-
-  const waPerfMutation = useMutation({
-    mutationFn: (data: { athleteId: string; eventId: string; personalBest?: number; seasonBest?: number; worldRanking?: number }) =>
-      api.post('/api/v1/wa-performance', data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['application', id] })
-      setEditingPerf(false)
-    },
-  })
-
-  const archiveMutation = useMutation({
-    mutationFn: () => api.delete(`/api/v1/athletes/${app?.athleteId}`),
-    onSuccess: () => navigate(user?.role === 'committee' ? '/committee/candidates' : '/collaborator/candidates'),
-  })
-
-  // ── Render ───────────────────────────────────────────────────────────────
-
-  if (isLoading || !app) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 text-gray-400 text-sm">
-        {t('common.loading')}
-      </div>
-    )
-  }
-
-  const currentStatus = app.athlete.negotiationStatus as NegotiationStatus
-  const allowedTransitions = NEGOTIATION_TRANSITIONS[currentStatus] ?? []
-  const allDecided = app.siblingApplications?.length > 0 && app.siblingApplications.every(s => s.participationStatus !== 'pending')
-
-  const inputCls =
-    'w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-gray-900'
-  const labelCls = 'block text-xs font-medium text-gray-500 mb-1'
-
-  const toggleSection = (name: string) => setOpenSection(openSection === name ? null : name)
-
-  return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white border-b px-6 py-3">
-        <div className="max-w-7xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Link to={user?.role === 'committee' ? '/committee/candidates' : '/collaborator/candidates'} className="text-sm text-gray-400 hover:text-gray-600">
-              &larr; {t('selection.candidates')}
-            </Link>
-            <span className="text-lg font-bold">
-              {app.athlete.lastName}, {app.athlete.firstName}
-            </span>
-            <span
-              className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                STATUS_COLORS[currentStatus]
-              }`}
-            >
-              {t(`status.${currentStatus}`)}
-            </span>
-          </div>
-          <div className="flex items-center gap-3">
-            <LanguageSwitcher />
-          </div>
-        </div>
-      </div>
-
-      <div className="max-w-7xl mx-auto px-6 py-6">
-        <div className="grid grid-cols-3 gap-6">
-          {/* ── Left column: Athlete info + Scoring + Editors ─────────── */}
-          <div className="space-y-4">
-            {/* Athlete info */}
-            <div className="bg-white rounded-lg border p-4">
-              <h3 className="font-semibold text-sm mb-3">{t('common.details')}</h3>
-              <div className="space-y-2 text-sm">
-                <Row label={t('athlete.event')} value={app.event.catalog.name} />
-                <Row label={t('athlete.nationality')} value={
-                  <span className={app.athlete.isSwiss ? 'text-red-600 font-semibold' : app.athlete.isEap ? 'text-blue-600 font-semibold' : ''}>
-                    {app.athlete.nationality}
-                    {app.athlete.isSwiss && ' (SUI)'}
-                    {app.athlete.isEap && ' (EAP)'}
-                  </span>
-                } />
-                <Row label={t('athlete.federation')} value={app.athlete.federation ?? '—'} />
-                {/* Performance with edit toggle */}
-                {editingPerf ? (
-                  <div className="space-y-1 pt-1 border-t">
-                    <div>
-                      <label className={labelCls}>{t('athlete.personalBest')}</label>
-                      <input type="number" step="0.01" className={inputCls} value={perfForm.personalBest}
-                        onChange={e => setPerfForm(p => ({ ...p, personalBest: e.target.value }))} />
-                    </div>
-                    <div>
-                      <label className={labelCls}>{t('athlete.seasonBest')}</label>
-                      <input type="number" step="0.01" className={inputCls} value={perfForm.seasonBest}
-                        onChange={e => setPerfForm(p => ({ ...p, seasonBest: e.target.value }))} />
-                    </div>
-                    <div>
-                      <label className={labelCls}>{t('athlete.worldRanking')}</label>
-                      <input type="number" className={inputCls} value={perfForm.worldRanking}
-                        onChange={e => setPerfForm(p => ({ ...p, worldRanking: e.target.value }))} />
-                    </div>
-                    <div className="flex gap-2 pt-1">
-                      <button
-                        onClick={() => {
-                          waPerfMutation.mutate({
-                            athleteId: app.athleteId,
-                            eventId: app.eventId,
-                            ...(perfForm.personalBest ? { personalBest: parseFloat(perfForm.personalBest) } : {}),
-                            ...(perfForm.seasonBest ? { seasonBest: parseFloat(perfForm.seasonBest) } : {}),
-                            ...(perfForm.worldRanking ? { worldRanking: parseInt(perfForm.worldRanking) } : {}),
-                          })
-                        }}
-                        disabled={waPerfMutation.isPending}
-                        className="text-xs bg-gray-900 text-white px-3 py-1 rounded hover:bg-gray-800 disabled:opacity-50"
-                      >
-                        {t('common.save')}
-                      </button>
-                      <button onClick={() => setEditingPerf(false)} className="text-xs text-gray-400 hover:text-gray-600">
-                        {t('common.cancel')}
-                      </button>
-                    </div>
-                    {waPerfMutation.isError && (
-                      <p className="text-xs text-red-600">{(waPerfMutation.error as Error)?.message || t('common.error')}</p>
-                    )}
-                  </div>
-                ) : (
-                  <>
-                    {app.waPerformance ? (
-                      <>
-                        <Row label={t('athlete.personalBest')} value={
-                          <span className="font-mono">{app.waPerformance.personalBest ?? '—'}</span>
-                        } />
-                        <Row label={t('athlete.seasonBest')} value={
-                          <span className="font-mono">{app.waPerformance.seasonBest ?? '—'}</span>
-                        } />
-                        <Row label={t('athlete.worldRanking')} value={
-                          app.waPerformance.worldRanking != null ? `#${app.waPerformance.worldRanking}` : '—'
-                        } />
-                      </>
-                    ) : (
-                      <>
-                        <Row label={t('athlete.personalBest')} value={
-                          <span className="font-mono">{app.personalBest ?? '—'}</span>
-                        } />
-                        <Row label={t('athlete.seasonBest')} value={
-                          <span className="font-mono">{app.seasonBest ?? '—'}</span>
-                        } />
-                        <Row label={t('athlete.worldRanking')} value={
-                          app.worldRanking != null ? `#${app.worldRanking}` : '—'
-                        } />
-                      </>
-                    )}
-                    <button
-                      onClick={() => {
-                        const wp = app.waPerformance
-                        setPerfForm({
-                          personalBest: wp?.personalBest != null ? String(wp.personalBest) : '',
-                          seasonBest: wp?.seasonBest != null ? String(wp.seasonBest) : '',
-                          worldRanking: wp?.worldRanking != null ? String(wp.worldRanking) : '',
-                        })
-                        setEditingPerf(true)
-                      }}
-                      className="text-[10px] text-blue-600 hover:text-blue-800 mt-1"
-                    >
-                      {t('selection.editPerformance')}
-                    </button>
-                  </>
-                )}
-                {app.athlete.waProfileUrl && (
-                  <Row label={t('athlete.waProfile')} value={
-                    <a href={app.athlete.waProfileUrl} target="_blank" rel="noreferrer" className="text-blue-600 underline text-xs">
-                      {t('athlete.profile')}
-                    </a>
-                  } />
-                )}
-                <Row label={t('athlete.email')} value={app.athlete.athleteEmail ?? '—'} />
-                <Row label={t('athlete.phone')} value={app.athlete.athletePhone ?? '—'} />
-              </div>
-            </div>
-
-            {/* Scoring */}
-            <div className="bg-white rounded-lg border p-4">
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="font-semibold text-sm">{t('selection.scoring')}</h3>
-                <button
-                  onClick={() => scoreMutation.mutate()}
-                  disabled={scoreMutation.isPending}
-                  className="text-xs text-gray-500 hover:text-gray-700 border rounded px-2 py-0.5"
-                >
-                  {scoreMutation.isPending ? '...' : t('selection.rescore')}
-                </button>
-              </div>
-              <div className="flex items-center gap-3 mb-3">
-                <span className="text-3xl font-bold">
-                  {app.score != null ? (app.score * 100).toFixed(0) : '—'}
-                </span>
-                {app.recommendation && (
-                  <span
-                    className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                      {
-                        'Highly Recommended': 'bg-green-100 text-green-800',
-                        Recommended: 'bg-blue-100 text-blue-700',
-                        'Under Review': 'bg-yellow-100 text-yellow-800',
-                        'Not Recommended': 'bg-red-100 text-red-800',
-                      }[app.recommendation] ?? ''
-                    }`}
-                  >
-                    {app.recommendation}
-                  </span>
-                )}
-              </div>
-              <div className="text-xs text-gray-400">
-                {t('selection.estimatedCost')}: CHF {(app.athlete.estTotal ?? 0).toLocaleString()}
-              </div>
-            </div>
-
-            {/* ── Collapsible editor sections ──────────────────────────── */}
-
-            {/* Personal data */}
-            <CollapsibleSection title={t('collaborator.personalData')} isOpen={openSection === 'personal'} onToggle={() => toggleSection('personal')}>
-              <AthleteFieldEditor
-                athlete={app.athlete}
-                fields={[
-                  { key: 'firstName', label: t('athlete.firstName'), type: 'text' },
-                  { key: 'lastName', label: t('athlete.lastName'), type: 'text' },
-                  { key: 'dateOfBirth', label: t('athlete.dateOfBirth'), type: 'date' },
-                  { key: 'nationality', label: t('athlete.nationality'), type: 'text' },
-                  { key: 'gender', label: t('athlete.gender'), type: 'select', options: [{ value: 'M', label: t('athlete.male') }, { value: 'F', label: t('athlete.female') }] },
-                  { key: 'federation', label: t('athlete.federation'), type: 'text' },
-                  { key: 'athleteEmail', label: t('athlete.email'), type: 'text' },
-                  { key: 'athletePhone', label: t('athlete.phone'), type: 'text' },
-                  { key: 'waProfileUrl', label: t('athlete.waProfile'), type: 'text' },
-                  { key: 'swiLicence', label: t('athlete.swissLicence'), type: 'text' },
-                  { key: 'honours', label: t('athlete.honours'), type: 'text' },
-                  { key: 'distanceFromGva', label: t('athlete.distanceFromGva'), type: 'number' },
-                  { key: 'isEap', label: t('athlete.eapMember'), type: 'checkbox' },
-                  { key: 'isSwiss', label: t('athlete.swiss'), type: 'checkbox' },
-                  { key: 'eapCity', label: t('athlete.eapCity'), type: 'text' },
-                ]}
-                onSave={(data) => athleteUpdateMutation.mutate(data)}
-                isPending={athleteUpdateMutation.isPending}
-                error={athleteUpdateMutation.error}
-                t={t}
-              />
-            </CollapsibleSection>
-
-            {/* Compliance */}
-            <CollapsibleSection title={t('compliance.title')} isOpen={openSection === 'compliance'} onToggle={() => toggleSection('compliance')}>
-              <AthleteFieldEditor
-                athlete={app.athlete}
-                fields={[
-                  { key: 'iRunClean', label: t('compliance.iRunClean'), type: 'select', options: [
-                    { value: 'yes', label: t('common.yes') }, { value: 'no', label: t('common.no') },
-                    { value: 'in_progress', label: t('common.inProgress') }, { value: 'unknown', label: t('common.unknown') },
-                  ]},
-                  { key: 'dopingFree', label: t('compliance.dopingFree'), type: 'select', options: [
-                    { value: 'yes', label: t('common.yes') }, { value: 'no', label: t('common.no') }, { value: 'unknown', label: t('common.unknown') },
-                  ]},
-                ]}
-                onSave={(data) => athleteUpdateMutation.mutate(data)}
-                isPending={athleteUpdateMutation.isPending}
-                error={athleteUpdateMutation.error}
-                t={t}
-              />
-            </CollapsibleSection>
-
-            {/* Logistics */}
-            <CollapsibleSection title={t('logistics.title')} isOpen={openSection === 'logistics'} onToggle={() => toggleSection('logistics')}>
-              <AthleteFieldEditor
-                athlete={app.athlete}
-                fields={[
-                  { key: 'arrivalDate', label: `${t('logistics.arrival')} ${t('logistics.date')}`, type: 'date' },
-                  { key: 'arrivalFlight', label: `${t('logistics.arrival')} ${t('logistics.flightNumber')}`, type: 'text' },
-                  { key: 'arrivalFrom', label: `${t('logistics.arrival')} ${t('logistics.from')}`, type: 'text' },
-                  { key: 'arrivalTime', label: `${t('logistics.arrival')} ${t('logistics.time')}`, type: 'text' },
-                  { key: 'departureDate', label: `${t('logistics.departure')} ${t('logistics.date')}`, type: 'date' },
-                  { key: 'departureFlight', label: `${t('logistics.departure')} ${t('logistics.flightNumber')}`, type: 'text' },
-                  { key: 'departureTo', label: `${t('logistics.departure')} ${t('logistics.to')}`, type: 'text' },
-                  { key: 'departureTime', label: `${t('logistics.departure')} ${t('logistics.time')}`, type: 'text' },
-                  { key: 'accommodationReqs', label: t('logistics.specialRequests'), type: 'textarea' },
-                ]}
-                onSave={(data) => athleteUpdateMutation.mutate(data)}
-                isPending={athleteUpdateMutation.isPending}
-                error={athleteUpdateMutation.error}
-                t={t}
-              />
-            </CollapsibleSection>
-
-            {/* Cost estimates */}
-            <CollapsibleSection title={t('selection.estimatedCost')} isOpen={openSection === 'costs'} onToggle={() => toggleSection('costs')}>
-              <AthleteFieldEditor
-                athlete={app.athlete}
-                fields={[
-                  { key: 'estTravel', label: t('collaborator.estTravel'), type: 'number' },
-                  { key: 'estAccommodation', label: t('collaborator.estAccommodation'), type: 'number' },
-                  { key: 'estAppearance', label: t('collaborator.estAppearance'), type: 'number' },
-                ]}
-                onSave={(data) => athleteUpdateMutation.mutate(data)}
-                isPending={athleteUpdateMutation.isPending}
-                error={athleteUpdateMutation.error}
-                t={t}
-              />
-              <p className="text-xs text-gray-400 mt-1">{t('collaborator.estTotalHint')}</p>
-            </CollapsibleSection>
-
-            {/* Assigned selector */}
-            <CollapsibleSection title={t('selection.assignedSelector')} isOpen={openSection === 'selector'} onToggle={() => toggleSection('selector')}>
-              <SelectorAssign
-                currentValue={app.athlete.assignedSelector}
-                staffUsers={staffUsers}
-                onSave={(val) => athleteUpdateMutation.mutate({ assignedSelector: val || null })}
-                isPending={athleteUpdateMutation.isPending}
-                t={t}
-              />
-            </CollapsibleSection>
-
-            {/* Payment */}
-            <CollapsibleSection title={t('collaborator.payment')} isOpen={openSection === 'payment'} onToggle={() => toggleSection('payment')}>
-              <AthleteFieldEditor
-                athlete={app.athlete}
-                fields={[
-                  { key: 'bankIban', label: t('collaborator.iban'), type: 'text' },
-                  { key: 'paymentStatus', label: t('collaborator.paymentStatus'), type: 'select', options: [
-                    { value: 'pending', label: t('common.pending') }, { value: 'done', label: t('common.done') },
-                  ]},
-                  { key: 'paymentAmount', label: t('collaborator.paymentAmount'), type: 'number' },
-                  { key: 'paymentDate', label: t('collaborator.paymentDate'), type: 'date' },
-                  { key: 'paymentMethod', label: t('collaborator.paymentMethod'), type: 'select', options: [
-                    { value: '', label: '—' }, { value: 'cash', label: t('collaborator.cash') }, { value: 'bank', label: t('collaborator.bank') },
-                    { value: 'western_union', label: t('collaborator.westernUnion') }, { value: 'paypal', label: t('collaborator.paypal') }, { value: 'other', label: t('collaborator.other') },
-                  ]},
-                ]}
-                onSave={(data) => athleteUpdateMutation.mutate(data)}
-                isPending={athleteUpdateMutation.isPending}
-                error={athleteUpdateMutation.error}
-                t={t}
-              />
-            </CollapsibleSection>
-
-            {/* Notes */}
-            <CollapsibleSection title={t('common.notes')} isOpen={openSection === 'notes'} onToggle={() => toggleSection('notes')}>
-              <div className="space-y-3">
-                <div>
-                  <label className="block text-xs font-medium text-gray-500 mb-1">{t('collaborator.participantNotes')}</label>
-                  <p className="text-xs text-gray-600 bg-gray-50 p-2 rounded min-h-[2rem]">{app.athlete.participantNotes || '—'}</p>
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-500 mb-1">{t('collaborator.additionalNotes')}</label>
-                  <p className="text-xs text-gray-600 bg-gray-50 p-2 rounded min-h-[2rem]">{app.athlete.additionalNotes || '—'}</p>
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-500 mb-1">{t('collaborator.internalNotes')}</label>
-                  <textarea
-                    className={inputCls}
-                    rows={3}
-                    value={internalNotes}
-                    onChange={(e) => setInternalNotes(e.target.value)}
-                  />
-                  <button
-                    onClick={() => internalNotesMutation.mutate(internalNotes)}
-                    disabled={internalNotesMutation.isPending}
-                    className="mt-2 text-xs bg-gray-900 text-white px-3 py-1 rounded hover:bg-gray-800 disabled:opacity-50"
-                  >
-                    {t('common.save')}
-                  </button>
-                </div>
-              </div>
-            </CollapsibleSection>
-          </div>
-
-          {/* ── Center column: Agreement ──────────────────────────────── */}
-          <div className="space-y-4">
-            {/* Status actions */}
-            <div className="bg-white rounded-lg border p-4">
-              <h3 className="font-semibold text-sm mb-3">{t('common.actions')}</h3>
-              <div className="flex flex-wrap gap-2">
-                {allowedTransitions.map((status) => {
-                  const needsConfirm = ['confirmed', 'rejected', 'withdrawn'].includes(status)
-                  return (
-                    <button
-                      key={status}
-                      onClick={() => {
-                        if (status === 'agreement_sent') {
-                          setShowAgreementForm(true)
-                        } else if (needsConfirm) {
-                          setConfirmAction(status as NegotiationStatus)
-                        } else {
-                          statusMutation.mutate(status as NegotiationStatus)
-                        }
-                      }}
-                      disabled={statusMutation.isPending}
-                      className={`text-xs px-3 py-1.5 rounded font-medium border ${
-                        status === 'confirmed'
-                          ? 'bg-green-600 text-white border-green-600 hover:bg-green-700'
-                          : status === 'rejected'
-                          ? 'bg-red-50 text-red-600 border-red-200 hover:bg-red-100'
-                          : status === 'withdrawn'
-                          ? 'bg-gray-50 text-gray-500 border-gray-200 hover:bg-gray-100'
-                          : status === 'agreement_sent'
-                          ? 'bg-blue-600 text-white border-blue-600 hover:bg-blue-700'
-                          : 'bg-gray-100 text-gray-700 border-gray-200 hover:bg-gray-200'
-                      }`}
-                    >
-                      {t(`status.${status}`)}
-                    </button>
-                  )
-                })}
-                {allowedTransitions.length === 0 && (
-                  <span className="text-xs text-gray-400">{t('selection.noActions')}</span>
-                )}
-              </div>
-              {statusMutation.isError && (
-                <p className="text-xs text-red-600 mt-2">{(statusMutation.error as Error)?.message || t('common.error')}</p>
-              )}
-
-              {/* Confirmation dialog */}
-              {confirmAction && (
-                <div className="mt-3 p-3 rounded border border-yellow-300 bg-yellow-50">
-                  <p className="text-sm text-gray-900 mb-3">
-                    {t('confirm.statusChange', {
-                      athlete: `${app.athlete.firstName} ${app.athlete.lastName}`,
-                      status: t(`status.${confirmAction}`),
-                    })}
-                  </p>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => {
-                        statusMutation.mutate(confirmAction)
-                        setConfirmAction(null)
-                      }}
-                      className={`text-xs px-3 py-1.5 rounded font-medium ${
-                        confirmAction === 'confirmed'
-                          ? 'bg-green-600 text-white hover:bg-green-700'
-                          : confirmAction === 'rejected'
-                          ? 'bg-red-600 text-white hover:bg-red-700'
-                          : 'bg-gray-600 text-white hover:bg-gray-700'
-                      }`}
-                    >
-                      {t('common.confirm')}
-                    </button>
-                    <button
-                      onClick={() => setConfirmAction(null)}
-                      className="text-xs px-3 py-1.5 rounded border border-gray-300 hover:bg-gray-50"
-                    >
-                      {t('common.cancel')}
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Participation status per event */}
-            <div className="bg-white rounded-lg border p-4">
-              <h3 className="font-semibold text-sm mb-3">{t('selection.participation')}</h3>
-              <div className="space-y-2">
-                {(app.siblingApplications ?? []).map((sib) => {
-                  const isCurrent = sib.id === id
-                  return (
-                    <div key={sib.id} className={`flex items-center justify-between text-sm p-2 rounded ${isCurrent ? 'bg-gray-50 border border-gray-200' : ''}`}>
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium text-xs">{sib.event.catalog.name}</span>
-                        {isCurrent && <span className="text-[10px] text-gray-400">({t('common.current')})</span>}
-                      </div>
-                      <div className="flex gap-1">
-                        {(['pending', 'selected', 'not_selected'] as const).map((status) => (
-                          <button
-                            key={status}
-                            onClick={() => {
-                              if (sib.participationStatus !== status) {
-                                participationMutation.mutate({ appId: sib.id, status })
-                              }
-                            }}
-                            disabled={participationMutation.isPending || sib.participationStatus === status}
-                            className={`text-[10px] px-2 py-0.5 rounded font-medium border ${
-                              sib.participationStatus === status
-                                ? status === 'selected'
-                                  ? 'bg-green-600 text-white border-green-600'
-                                  : status === 'not_selected'
-                                  ? 'bg-red-100 text-red-700 border-red-200'
-                                  : 'bg-yellow-100 text-yellow-800 border-yellow-200'
-                                : 'border-gray-200 text-gray-400 hover:bg-gray-50'
-                            }`}
-                          >
-                            {t(`participation.${status}`)}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-              {participationMutation.isError && (
-                <p className="text-xs text-red-600 mt-2">{(participationMutation.error as Error)?.message || t('common.error')}</p>
-              )}
-              {allDecided && (
-                <p className="text-xs text-green-600 mt-2">{t('selection.allDecided')}</p>
-              )}
-              {app.siblingApplications?.length > 0 && !allDecided && (
-                <p className="text-xs text-gray-400 mt-2">{t('selection.decideAllFirst')}</p>
-              )}
-            </div>
-
-            {/* Agreement history */}
-            <div className="bg-white rounded-lg border p-4">
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="font-semibold text-sm">{t('contract.title')}</h3>
-                {!showAgreementForm && currentStatus !== 'confirmed' && currentStatus !== 'rejected' && currentStatus !== 'withdrawn' && (
-                  <button
-                    onClick={() => setShowAgreementForm(true)}
-                    disabled={!allDecided}
-                    className={`text-xs ${allDecided ? 'text-blue-600 hover:text-blue-800' : 'text-gray-300 cursor-not-allowed'}`}
-                  >
-                    {latestAgreement ? t('contract.newVersion') : t('contract.sendOffer')}
-                  </button>
-                )}
-              </div>
-
-              {app.agreements.length === 0 && !showAgreementForm ? (
-                <p className="text-xs text-gray-400">{t('contract.noOfferYet')}</p>
-              ) : (
-                <div className="space-y-3">
-                  {app.agreements.map((c) => (
-                    <AgreementCard key={c.id} agreement={c} t={t} />
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Agreement form */}
-            {showAgreementForm && (
-              <div className="bg-white rounded-lg border p-4">
-                <h3 className="font-semibold text-sm mb-3">
-                  {t('contract.sendOffer')} — v{(app.agreements.length || 0) + 1}
-                </h3>
-
-                <div className="space-y-3">
-                  <div>
-                    <label className={labelCls}>{t('contract.bonus')} (CHF)</label>
-                    <input
-                      type="number"
-                      className={inputCls}
-                      value={agreement.appearanceFee}
-                      onChange={(e) =>
-                        setAgreement((p) => ({ ...p, appearanceFee: parseInt(e.target.value) || 0 }))
-                      }
-                    />
-                  </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className={labelCls}>{t('contract.otherCompensation')} (CHF)</label>
-                      <input
-                        type="number"
-                        className={inputCls}
-                        value={agreement.otherCompensation}
-                        onChange={(e) =>
-                          setAgreement((p) => ({
-                            ...p,
-                            otherCompensation: parseInt(e.target.value) || 0,
-                          }))
-                        }
-                      />
-                    </div>
-                    <div>
-                      <label className={labelCls}>{t('contract.description')}</label>
-                      <input
-                        className={inputCls}
-                        value={agreement.otherCompensationDesc}
-                        onChange={(e) =>
-                          setAgreement((p) => ({ ...p, otherCompensationDesc: e.target.value }))
-                        }
-                        placeholder={t('contract.otherCompensationDesc')}
-                      />
-                    </div>
-                  </div>
-                  <div>
-                    <label className={labelCls}>{t('contract.transport')} (CHF)</label>
-                    <input
-                      type="number"
-                      className={inputCls}
-                      value={agreement.transport}
-                      onChange={(e) =>
-                        setAgreement((p) => ({ ...p, transport: parseInt(e.target.value) || 0 }))
-                      }
-                    />
-                  </div>
-                  <div className="flex items-center gap-4">
-                    <label className="flex items-center gap-2 text-sm cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={agreement.transportAirportHotel}
-                        onChange={(e) =>
-                          setAgreement((p) => ({ ...p, transportAirportHotel: e.target.checked }))
-                        }
-                      />
-                      {t('contract.transportAirportHotel')}
-                    </label>
-                    <label className="flex items-center gap-2 text-sm cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={agreement.transportHotelStadium}
-                        onChange={(e) =>
-                          setAgreement((p) => ({ ...p, transportHotelStadium: e.target.checked }))
-                        }
-                      />
-                      {t('contract.transportHotelStadium')}
-                    </label>
-                  </div>
-
-                  {/* Hotel room */}
-                  <div>
-                    <label className={labelCls}>{t('logistics.hotel')}</label>
-                    <select
-                      className={inputCls}
-                      value={agreement.hotelRoomId}
-                      onChange={(e) => setAgreement((p) => ({ ...p, hotelRoomId: e.target.value }))}
-                    >
-                      <option value="">— {t('contract.noHotelRoom')} —</option>
-                      {allRooms.map(r => (
-                        <option key={r.id} value={r.id}>{r.hotelName} — {r.roomType} (CHF {r.costPerNight}/night)</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  {/* Hotel nights */}
-                  <div>
-                    <label className={labelCls}>{t('contract.hotelNights')}</label>
-                    <div className="flex gap-2">
-                      {NIGHT_LABELS.map((night) => {
-                        const key = `hotelNight${night.charAt(0).toUpperCase() + night.slice(1)}` as keyof typeof agreement
-                        return (
-                          <label
-                            key={night}
-                            className={`flex flex-col items-center text-xs cursor-pointer px-2 py-1 rounded border ${
-                              agreement[key] ? 'bg-gray-900 text-white border-gray-900' : 'border-gray-300'
-                            }`}
-                          >
-                            <input
-                              type="checkbox"
-                              className="sr-only"
-                              checked={agreement[key] as boolean}
-                              onChange={(e) =>
-                                setAgreement((p) => ({ ...p, [key]: e.target.checked }))
-                              }
-                            />
-                            {t(`night.${night}`)}
-                          </label>
-                        )
-                      })}
-                    </div>
-                  </div>
-
-                  {/* Dinners */}
-                  <div>
-                    <label className={labelCls}>{t('contract.dinners')}</label>
-                    <div className="flex gap-2">
-                      {DINNER_LABELS.map((day) => {
-                        const key = `dinner${day.charAt(0).toUpperCase() + day.slice(1)}` as keyof typeof agreement
-                        return (
-                          <label
-                            key={day}
-                            className={`flex flex-col items-center text-xs cursor-pointer px-2 py-1 rounded border ${
-                              agreement[key] ? 'bg-gray-900 text-white border-gray-900' : 'border-gray-300'
-                            }`}
-                          >
-                            <input
-                              type="checkbox"
-                              className="sr-only"
-                              checked={agreement[key] as boolean}
-                              onChange={(e) =>
-                                setAgreement((p) => ({ ...p, [key]: e.target.checked }))
-                              }
-                            />
-                            {t(`night.${day}`)}
-                          </label>
-                        )
-                      })}
-                    </div>
-                  </div>
-
-                  {/* Stadium meals */}
-                  <label className="flex items-center gap-2 text-sm cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={agreement.stadiumMeals}
-                      onChange={(e) =>
-                        setAgreement((p) => ({ ...p, stadiumMeals: e.target.checked }))
-                      }
-                    />
-                    {t('contract.stadiumMeals')}
-                  </label>
-
-                  <div>
-                    <label className={labelCls}>{t('contract.notesToAthlete')}</label>
-                    <textarea
-                      className={inputCls}
-                      rows={2}
-                      value={agreement.notes}
-                      onChange={(e) => setAgreement((p) => ({ ...p, notes: e.target.value }))}
-                    />
-                  </div>
-
-                  {/* Live total cost preview */}
-                  {(() => {
-                    const room = allRooms.find(r => r.id === agreement.hotelRoomId)
-                    const nights = [
-                      agreement.hotelNightTue, agreement.hotelNightWed, agreement.hotelNightThu,
-                      agreement.hotelNightFri, agreement.hotelNightSat, agreement.hotelNightSun,
-                    ].filter(Boolean).length
-                    const dinners = [
-                      agreement.dinnerTue, agreement.dinnerWed, agreement.dinnerThu,
-                      agreement.dinnerFri, agreement.dinnerSat, agreement.dinnerSun,
-                    ].filter(Boolean).length
-                    let total = agreement.appearanceFee + agreement.otherCompensation + agreement.transport
-                    total += nights * (room?.costPerNight ?? 0)
-                    total += dinners * (room?.dinnerCost ?? 0)
-                    if (agreement.stadiumMeals) total += edition?.stadiumMealCost ?? 0
-                    if (agreement.transportAirportHotel) total += edition?.transportAirportHotelCost ?? 0
-                    if (agreement.transportHotelStadium) total += edition?.transportHotelStadiumCost ?? 0
-                    return (
-                      <div className="bg-gray-50 rounded p-3 text-sm">
-                        <div className="flex justify-between font-semibold">
-                          <span>{t('contract.totalCost')}</span>
-                          <span>CHF {total.toLocaleString()}</span>
-                        </div>
-                      </div>
-                    )
-                  })()}
-
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => agreementMutation.mutate(agreement)}
-                      disabled={agreementMutation.isPending}
-                      className="flex-1 py-2 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
-                    >
-                      {agreementMutation.isPending
-                        ? t('common.loading')
-                        : t('contract.sendOffer')}
-                    </button>
-                    <button
-                      onClick={() => setShowAgreementForm(false)}
-                      className="px-4 py-2 text-sm border rounded hover:bg-gray-50"
-                    >
-                      {t('common.cancel')}
-                    </button>
-                  </div>
-                  {agreementMutation.isError && (
-                    <p className="text-xs text-red-600">{(agreementMutation.error as Error)?.message || t('common.error')}</p>
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* ── Right column: Interactions timeline ──────────────────── */}
-          <div className="space-y-4">
-            {/* Add interaction */}
-            <div className="bg-white rounded-lg border p-4">
-              <h3 className="font-semibold text-sm mb-3">{t('collaborator.addNote')}</h3>
-              <select
-                className={`${inputCls} mb-2`}
-                value={noteType}
-                onChange={(e) => setNoteType(e.target.value as typeof noteType)}
-              >
-                <option value="note">{t('collaborator.note')}</option>
-                <option value="call">{t('collaborator.phoneCall')}</option>
-                <option value="email">{t('athlete.email')}</option>
-              </select>
-              <textarea
-                className={inputCls}
-                rows={3}
-                placeholder={t('collaborator.enterNote')}
-                value={noteContent}
-                onChange={(e) => setNoteContent(e.target.value)}
-              />
-              <button
-                onClick={() => {
-                  if (noteContent.trim()) {
-                    noteMutation.mutate({ type: noteType, content: noteContent })
-                  }
-                }}
-                disabled={noteMutation.isPending || !noteContent.trim()}
-                className="mt-2 text-xs bg-gray-900 text-white px-3 py-1.5 rounded hover:bg-gray-800 disabled:opacity-50"
-              >
-                {t('common.add')}
-              </button>
-            </div>
-
-            {/* Timeline */}
-            <div className="bg-white rounded-lg border p-4">
-              <h3 className="font-semibold text-sm mb-3">{t('collaborator.timeline')}</h3>
-              {app.interactions.length === 0 ? (
-                <p className="text-xs text-gray-400">{t('collaborator.noInteractions')}</p>
-              ) : (
-                <div className="space-y-3">
-                  {app.interactions.map((interaction) => (
-                    <InteractionCard key={interaction.id} interaction={interaction} />
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Archive button — committee only */}
-        {user?.role === 'committee' && !app.athlete.archivedAt && (
-          <div className="mt-6 text-right">
-            <button
-              onClick={() => {
-                if (confirm(t('confirm.archiveAthlete', { athlete: `${app.athlete.firstName} ${app.athlete.lastName}` }))) {
-                  archiveMutation.mutate()
-                }
-              }}
-              disabled={archiveMutation.isPending}
-              className="text-xs text-red-500 hover:text-red-700 border border-red-200 rounded px-3 py-1.5 hover:bg-red-50 disabled:opacity-50"
-            >
-              {t('collaborator.archiveAthlete')}
-            </button>
-            {archiveMutation.isError && (
-              <p className="text-xs text-red-600 mt-1">{(archiveMutation.error as Error)?.message || t('common.error')}</p>
-            )}
-          </div>
-        )}
-      </div>
-    </div>
-  )
-}
-
 // ── Sub-components ───────────────────────────────────────────────────────────
-
-function Row({ label, value }: { label: string; value: React.ReactNode }) {
-  return (
-    <div className="flex justify-between">
-      <span className="text-gray-500 text-xs">{label}</span>
-      <span className="text-xs text-right">{value}</span>
-    </div>
-  )
-}
 
 function CollapsibleSection({ title, isOpen, onToggle, children }: {
   title: string; isOpen: boolean; onToggle: () => void; children: React.ReactNode
@@ -1210,12 +248,12 @@ function AgreementCard({ agreement: c, t }: { agreement: Agreement; t: (key: str
 
 function InteractionCard({ interaction }: { interaction: Interaction }) {
   const typeIcons: Record<string, string> = {
-    status_change: '\u25CF',
-    agreement: '\u25A0',
-    counter_offer: '\u25C6',
-    note: '\u270E',
-    call: '\u260E',
-    email: '\u2709',
+    status_change: '●',
+    agreement: '■',
+    counter_offer: '◆',
+    note: '✎',
+    call: '☎',
+    email: '✉',
   }
 
   const typeColors: Record<string, string> = {
@@ -1229,14 +267,1065 @@ function InteractionCard({ interaction }: { interaction: Interaction }) {
 
   return (
     <div className="flex gap-2">
-      <span className={`${typeColors[interaction.type] ?? 'text-gray-400'} mt-0.5`}>
-        {typeIcons[interaction.type] ?? '\u25CF'}
+      <span className={`${typeColors[interaction.type] ?? 'text-gray-400'} mt-0.5 shrink-0`}>
+        {typeIcons[interaction.type] ?? '●'}
       </span>
       <div className="flex-1 min-w-0">
         <p className="text-xs text-gray-900">{interaction.content}</p>
         <p className="text-[10px] text-gray-400 mt-0.5">
           {interaction.authorName} — {new Date(interaction.createdAt).toLocaleString()}
         </p>
+      </div>
+    </div>
+  )
+}
+
+// ── Scoring popup (hover over score) ─────────────────────────────────────────
+
+function ScoringPopup({ app, athlete, edition, t }: {
+  app: ApplicationForAthlete
+  athlete: AthleteDetail
+  edition: EditionCosts
+  t: (key: string, opts?: Record<string, unknown>) => string
+}) {
+  const wp = app.waPerformance
+  if (!wp || wp.personalBest == null || !edition) return null
+
+  const perfType = app.event.catalog.discipline === 'Course' ? 'MIN' as const : 'MAX' as const
+
+  const breakdown = computeScore({
+    personalBest: wp.personalBest ?? 0,
+    seasonBest: wp.seasonBest ?? 0,
+    worldRanking: wp.worldRanking ?? 100,
+    estimatedCostTotal: athlete.estTotal ?? 0,
+    isEap: athlete.isEap,
+    isSwiss: athlete.isSwiss,
+    perfType,
+    intMinima: app.event.intMinima,
+    swissMinima: app.event.swissMinima,
+    eapMinima: app.event.eapMinima,
+  }, edition)
+
+  return (
+    <div className="absolute z-20 left-0 top-6 bg-white border rounded-lg shadow-lg p-3 text-xs w-52">
+      <p className="font-semibold mb-2">{t('selection.scoringBreakdown')}</p>
+      <div className="space-y-1 text-gray-600">
+        <div className="flex justify-between">
+          <span>PB ({edition.weightPB}%)</span>
+          <span className="font-mono">{(breakdown.f1PB * 100).toFixed(1)}</span>
+        </div>
+        <div className="flex justify-between">
+          <span>SB ({edition.weightSB}%)</span>
+          <span className="font-mono">{(breakdown.f2SB * 100).toFixed(1)}</span>
+        </div>
+        <div className="flex justify-between">
+          <span>Ranking ({edition.weightRanking}%)</span>
+          <span className="font-mono">{(breakdown.f3Ranking * 100).toFixed(1)}</span>
+        </div>
+        <div className="flex justify-between">
+          <span>Cost ({edition.weightCost}%)</span>
+          <span className="font-mono">{(breakdown.f4Cost * 100).toFixed(1)}</span>
+        </div>
+        {breakdown.eapBonus > 0 && (
+          <div className="flex justify-between">
+            <span>EAP bonus (+{edition.bonusEap}%)</span>
+            <span className="font-mono">+{(breakdown.eapBonus * 100).toFixed(1)}</span>
+          </div>
+        )}
+        <div className="border-t pt-1 mt-1 flex justify-between font-semibold text-gray-900">
+          <span>Total</span>
+          <span className="font-mono">{(breakdown.finalScore * 100).toFixed(0)}</span>
+        </div>
+        <div className="text-[10px] text-gray-400">
+          {breakdown.eligible ? t('selection.eligible') : t('selection.notEligible')}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Confirmed athletes popup (hover over event name) ──────────────────────────
+
+function ConfirmedAthletesPopup({ eventId, t }: {
+  eventId: string
+  t: (key: string) => string
+}) {
+  const { data: confirmed = [], isLoading } = useQuery<ApplicationRow[]>({
+    queryKey: ['confirmed-athletes', eventId],
+    queryFn: () => api.get(`/api/v1/applications?eventId=${eventId}&negotiationStatus=confirmed`),
+    staleTime: 60_000,
+  })
+
+  return (
+    <div className="absolute z-20 left-0 top-6 bg-white border rounded-lg shadow-lg p-3 text-xs w-56">
+      <p className="font-semibold mb-2">{t('selection.confirmedAthletes')}</p>
+      {isLoading ? (
+        <p className="text-gray-400">{t('common.loading')}</p>
+      ) : confirmed.length === 0 ? (
+        <p className="text-gray-400">{t('selection.noConfirmedAthletes')}</p>
+      ) : (
+        <div className="space-y-1">
+          {[...confirmed]
+            .sort((a, b) => {
+              const sb1 = a.waPerformance?.seasonBest ?? a.seasonBest ?? null
+              const sb2 = b.waPerformance?.seasonBest ?? b.seasonBest ?? null
+              if (sb1 == null && sb2 == null) return 0
+              if (sb1 == null) return 1
+              if (sb2 == null) return -1
+              return sb2 - sb1
+            })
+            .map(a => (
+              <div key={a.id} className="flex justify-between text-gray-700">
+                <span>{a.athlete.lastName}, {a.athlete.firstName}</span>
+                <span className="font-mono text-gray-500">
+                  {formatPerf(a.waPerformance?.seasonBest ?? a.seasonBest ?? null)}
+                </span>
+              </div>
+            ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Event row in Event Selection block ───────────────────────────────────────
+
+function EventRow({ app, athlete, edition, onParticipationChange, onRescore, onWaPerfSave, isPendingParticipation, t }: {
+  app: ApplicationForAthlete
+  athlete: AthleteDetail
+  edition: EditionCosts | null
+  onParticipationChange: (appId: string, status: string) => void
+  onRescore: (appId: string) => void
+  onWaPerfSave: (athleteId: string, eventId: string, data: { personalBest?: number; seasonBest?: number; worldRanking?: number }) => void
+  isPendingParticipation: boolean
+  t: (key: string) => string
+}) {
+  const [showEventPopup, setShowEventPopup] = useState(false)
+  const [showScorePopup, setShowScorePopup] = useState(false)
+  const [editingPerf, setEditingPerf] = useState(false)
+  const [perfForm, setPerfForm] = useState({
+    personalBest: app.waPerformance?.personalBest != null ? String(app.waPerformance.personalBest) : '',
+    seasonBest: app.waPerformance?.seasonBest != null ? String(app.waPerformance.seasonBest) : '',
+    worldRanking: app.waPerformance?.worldRanking != null ? String(app.waPerformance.worldRanking) : '',
+  })
+
+  const wp = app.waPerformance
+  const pb = wp?.personalBest ?? app.personalBest
+  const sb = wp?.seasonBest ?? app.seasonBest
+  const wr = wp?.worldRanking ?? app.worldRanking
+
+  const PARTICIPATION_COLORS: Record<string, string> = {
+    pending: 'bg-yellow-100 text-yellow-800',
+    selected: 'bg-green-100 text-green-800',
+    not_selected: 'bg-red-100 text-red-800',
+  }
+
+  const inputCls = 'w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-gray-900'
+
+  return (
+    <div className="border rounded-lg p-3 bg-white space-y-2">
+      {/* Event name + participation buttons */}
+      <div className="flex items-start justify-between gap-2">
+        <div className="relative">
+          <button
+            onMouseEnter={() => setShowEventPopup(true)}
+            onMouseLeave={() => setShowEventPopup(false)}
+            className="font-medium text-sm text-gray-900 hover:text-blue-700 text-left"
+          >
+            {app.event.catalog.name}
+          </button>
+          {showEventPopup && (
+            <ConfirmedAthletesPopup eventId={app.eventId} t={t} />
+          )}
+        </div>
+
+        <div className="flex gap-1 shrink-0">
+          {(['pending', 'selected', 'not_selected'] as const).map((status) => (
+            <button
+              key={status}
+              onClick={() => {
+                if (app.participationStatus !== status) {
+                  onParticipationChange(app.id, status)
+                }
+              }}
+              disabled={isPendingParticipation || app.participationStatus === status}
+              className={`text-[10px] px-2 py-0.5 rounded font-medium border ${
+                app.participationStatus === status
+                  ? PARTICIPATION_COLORS[status] ?? 'bg-gray-100 text-gray-500'
+                  : 'border-gray-200 text-gray-400 hover:bg-gray-50'
+              }`}
+            >
+              {t(`participation.${status}`)}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Performance row */}
+      {editingPerf ? (
+        <div className="grid grid-cols-3 gap-2">
+          <div>
+            <label className="block text-[10px] text-gray-500 mb-0.5">PB</label>
+            <input type="number" step="0.01" className={inputCls} value={perfForm.personalBest}
+              onChange={e => setPerfForm(p => ({ ...p, personalBest: e.target.value }))} />
+          </div>
+          <div>
+            <label className="block text-[10px] text-gray-500 mb-0.5">SB</label>
+            <input type="number" step="0.01" className={inputCls} value={perfForm.seasonBest}
+              onChange={e => setPerfForm(p => ({ ...p, seasonBest: e.target.value }))} />
+          </div>
+          <div>
+            <label className="block text-[10px] text-gray-500 mb-0.5">Ranking</label>
+            <input type="number" className={inputCls} value={perfForm.worldRanking}
+              onChange={e => setPerfForm(p => ({ ...p, worldRanking: e.target.value }))} />
+          </div>
+          <div className="col-span-3 flex gap-2">
+            <button
+              onClick={() => {
+                onWaPerfSave(athlete.id, app.eventId, {
+                  ...(perfForm.personalBest ? { personalBest: parseFloat(perfForm.personalBest) } : {}),
+                  ...(perfForm.seasonBest ? { seasonBest: parseFloat(perfForm.seasonBest) } : {}),
+                  ...(perfForm.worldRanking ? { worldRanking: parseInt(perfForm.worldRanking) } : {}),
+                })
+                setEditingPerf(false)
+              }}
+              className="text-xs bg-gray-900 text-white px-3 py-1 rounded hover:bg-gray-800"
+            >
+              {t('common.save')}
+            </button>
+            <button onClick={() => setEditingPerf(false)} className="text-xs text-gray-400 hover:text-gray-600">
+              {t('common.cancel')}
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="flex items-center gap-4 text-xs text-gray-600">
+          <span>PB: <span className="font-mono font-medium">{formatPerf(pb)}</span></span>
+          <span>SB: <span className="font-mono font-medium">{formatPerf(sb)}</span></span>
+          <span>#{wr ?? '—'}</span>
+
+          {/* Score with popup */}
+          {app.score != null && (
+            <div className="relative ml-auto">
+              <button
+                onMouseEnter={() => setShowScorePopup(true)}
+                onMouseLeave={() => setShowScorePopup(false)}
+                className="font-mono font-bold text-sm text-gray-900 hover:text-blue-700"
+              >
+                {(app.score * 100).toFixed(0)}
+              </button>
+              {showScorePopup && edition && (
+                <ScoringPopup app={app} athlete={athlete} edition={edition} t={t} />
+              )}
+            </div>
+          )}
+
+          <div className="flex gap-2 ml-auto">
+            <button
+              onClick={() => setEditingPerf(true)}
+              className="text-[10px] text-blue-600 hover:text-blue-800"
+            >
+              {t('selection.editPerformance')}
+            </button>
+            <button
+              onClick={() => onRescore(app.id)}
+              className="text-[10px] text-gray-400 hover:text-gray-600"
+            >
+              {t('selection.rescore')}
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Main page ────────────────────────────────────────────────────────────────
+
+export default function AthletePage() {
+  const { t } = useTranslation()
+  const { id } = useParams<{ id: string }>()
+  const { user } = useAuth()
+  const navigate = useNavigate()
+  const queryClient = useQueryClient()
+
+  const [activeTab, setActiveTab] = useState<'personal' | 'negotiation'>('personal')
+  const [openSection, setOpenSection] = useState<string | null>('identity')
+  const [confirmAction, setConfirmAction] = useState<NegotiationStatus | null>(null)
+  const [showAgreementForm, setShowAgreementForm] = useState(false)
+  const [noteType, setNoteType] = useState<'note' | 'call' | 'email'>('note')
+  const [noteContent, setNoteContent] = useState('')
+  const [internalNotes, setInternalNotes] = useState('')
+  const [notesInitialized, setNotesInitialized] = useState(false)
+  const [agreementForm, setAgreementForm] = useState(() => defaultAgreement())
+
+  const { data: athlete, isLoading } = useQuery<AthleteDetail>({
+    queryKey: ['athlete', id],
+    queryFn: () => api.get(`/api/v1/athletes/${id}`),
+    enabled: !!id,
+  })
+
+  const { data: hotels = [] } = useQuery<HotelWithRooms[]>({
+    queryKey: ['hotels'],
+    queryFn: () => api.get('/api/v1/hotels'),
+  })
+
+  const { data: staffUsers = [] } = useQuery<StaffUser[]>({
+    queryKey: ['staff-users'],
+    queryFn: () => api.get('/api/v1/users?role=collaborator,committee'),
+  })
+
+  const allRooms = hotels.flatMap(h => h.rooms.map(r => ({ ...r, hotelName: h.name })))
+
+  const latestAgreement = athlete?.agreements?.length
+    ? athlete.agreements[athlete.agreements.length - 1]
+    : undefined
+
+  if (athlete && !notesInitialized) {
+    setInternalNotes(athlete.internalNotes ?? '')
+    if (latestAgreement) {
+      setAgreementForm(defaultAgreement(latestAgreement))
+    }
+    setNotesInitialized(true)
+  }
+
+  // ── Mutations ──────────────────────────────────────────────────────────────
+
+  const statusMutation = useMutation({
+    mutationFn: (status: NegotiationStatus) =>
+      api.patch(`/api/v1/athletes/${id}/negotiation-status`, { status }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['athlete', id] }),
+  })
+
+  const agreementMutation = useMutation({
+    mutationFn: (data: ReturnType<typeof defaultAgreement>) =>
+      api.post(`/api/v1/athletes/${id}/agreements`, {
+        ...data,
+        hotelRoomId: data.hotelRoomId || undefined,
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['athlete', id] })
+      setShowAgreementForm(false)
+    },
+  })
+
+  const noteMutation = useMutation({
+    mutationFn: (data: { type: string; content: string }) =>
+      api.post(`/api/v1/athletes/${id}/interactions`, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['athlete', id] })
+      setNoteContent('')
+    },
+  })
+
+  const internalNotesMutation = useMutation({
+    mutationFn: (notes: string) =>
+      api.patch(`/api/v1/athletes/${id}`, { internalNotes: notes }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['athlete', id] }),
+  })
+
+  const participationMutation = useMutation({
+    mutationFn: ({ appId, status }: { appId: string; status: string }) =>
+      api.patch(`/api/v1/applications/${appId}/participation-status`, { participationStatus: status }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['athlete', id] }),
+  })
+
+  const scoreMutation = useMutation({
+    mutationFn: (appId: string) => api.post(`/api/v1/applications/${appId}/score`, {}),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['athlete', id] }),
+  })
+
+  const athleteUpdateMutation = useMutation({
+    mutationFn: (data: Record<string, unknown>) =>
+      api.patch(`/api/v1/athletes/${id}`, data),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['athlete', id] }),
+  })
+
+  const waPerfMutation = useMutation({
+    mutationFn: (data: { athleteId: string; eventId: string; personalBest?: number; seasonBest?: number; worldRanking?: number }) =>
+      api.post('/api/v1/wa-performance', data),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['athlete', id] }),
+  })
+
+  const archiveMutation = useMutation({
+    mutationFn: () => api.delete(`/api/v1/athletes/${id}`),
+    onSuccess: () => navigate(user?.role === 'committee' ? '/committee/candidates' : '/collaborator/candidates'),
+  })
+
+  // ── Render ─────────────────────────────────────────────────────────────────
+
+  if (isLoading || !athlete) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 text-gray-400 text-sm">
+        {t('common.loading')}
+      </div>
+    )
+  }
+
+  const currentStatus = athlete.negotiationStatus as NegotiationStatus
+  const baseTransitions = NEGOTIATION_TRANSITIONS[currentStatus] ?? []
+  const extraTransitions = user?.role === 'committee' ? (COMMITTEE_EXTRA_TRANSITIONS[currentStatus] ?? []) : []
+  const allowedTransitions = [...baseTransitions, ...extraTransitions]
+
+  const allDecided = athlete.applications.length > 0
+    && athlete.applications.every(a => a.participationStatus !== 'pending')
+
+  const inputCls = 'w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-gray-900'
+  const labelCls = 'block text-xs font-medium text-gray-500 mb-1'
+
+  const toggleSection = (name: string) => setOpenSection(openSection === name ? null : name)
+
+  // Cost display mode based on negotiation status
+  const costMode =
+    currentStatus === 'confirmed' ? 'confirmed' :
+    ['agreement_sent', 'counter_offer_sent'].includes(currentStatus) ? 'negotiating' :
+    'estimated'
+
+  const isCommitteeOnly = (status: NegotiationStatus) =>
+    !baseTransitions.includes(status) && extraTransitions.includes(status)
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      {/* ── Bandeau ──────────────────────────────────────────────────────── */}
+      <div className="bg-white border-b">
+        <div className="max-w-7xl mx-auto px-6 py-4">
+          {/* Top row: navigation + language */}
+          <div className="flex items-center justify-between mb-3">
+            <Link
+              to={user?.role === 'committee' ? '/committee/candidates' : '/collaborator/candidates'}
+              className="text-sm text-gray-400 hover:text-gray-600"
+            >
+              ← {t('selection.candidates')}
+            </Link>
+            <LanguageSwitcher />
+          </div>
+
+          {/* Athlete info row */}
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <div className="flex items-center gap-3 mb-1">
+                <h1 className="text-xl font-bold">
+                  {athlete.lastName}, {athlete.firstName}
+                </h1>
+                <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_COLORS[currentStatus]}`}>
+                  {t(`status.${currentStatus}`)}
+                </span>
+              </div>
+              <div className="flex items-center gap-3 text-sm text-gray-500">
+                <span className={
+                  athlete.isSwiss ? 'text-red-600 font-semibold' :
+                  athlete.isEap ? 'text-blue-600 font-semibold' : ''
+                }>
+                  {athlete.nationality}
+                  {athlete.isSwiss && ' (SUI)'}
+                  {athlete.isEap && ' (EAP)'}
+                </span>
+                {athlete.federation && <span>— {athlete.federation}</span>}
+                {athlete.club && <span>· {athlete.club}</span>}
+                {athlete.gender && (
+                  <span className="text-xs bg-gray-100 px-1.5 py-0.5 rounded">
+                    {athlete.gender}
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* Action buttons */}
+            <div className="flex flex-wrap gap-2 justify-end">
+              {allowedTransitions.map((status) => {
+                const needsConfirm = ['confirmed', 'rejected', 'withdrawn', 'to_review'].includes(status)
+                const committeeOnly = isCommitteeOnly(status as NegotiationStatus)
+                return (
+                  <button
+                    key={status}
+                    onClick={() => {
+                      if (status === 'agreement_sent') {
+                        setActiveTab('negotiation')
+                        setShowAgreementForm(true)
+                      } else if (needsConfirm) {
+                        setConfirmAction(status as NegotiationStatus)
+                      } else {
+                        statusMutation.mutate(status as NegotiationStatus)
+                      }
+                    }}
+                    disabled={statusMutation.isPending}
+                    title={committeeOnly ? t('selection.rattraper') : undefined}
+                    className={`text-xs px-3 py-1.5 rounded font-medium border ${
+                      status === 'confirmed'
+                        ? 'bg-green-600 text-white border-green-600 hover:bg-green-700'
+                        : status === 'rejected'
+                        ? 'bg-red-50 text-red-600 border-red-200 hover:bg-red-100'
+                        : status === 'withdrawn'
+                        ? 'bg-gray-50 text-gray-500 border-gray-200 hover:bg-gray-100'
+                        : status === 'agreement_sent'
+                        ? 'bg-blue-600 text-white border-blue-600 hover:bg-blue-700'
+                        : status === 'to_review' && committeeOnly
+                        ? 'bg-orange-50 text-orange-600 border-orange-200 hover:bg-orange-100'
+                        : 'bg-gray-100 text-gray-700 border-gray-200 hover:bg-gray-200'
+                    }`}
+                  >
+                    {committeeOnly && status === 'to_review'
+                      ? t('status.rattraper')
+                      : t(`status.${status}`)}
+                  </button>
+                )
+              })}
+              {allowedTransitions.length === 0 && (
+                <span className="text-xs text-gray-400 py-1.5">{t('selection.noActions')}</span>
+              )}
+            </div>
+          </div>
+
+          {/* Confirm dialog */}
+          {confirmAction && (
+            <div className="mt-3 p-3 rounded border border-yellow-300 bg-yellow-50">
+              <p className="text-sm text-gray-900 mb-3">
+                {t('confirm.statusChange', {
+                  athlete: `${athlete.firstName} ${athlete.lastName}`,
+                  status: confirmAction === 'to_review' ? t('status.rattraper') : t(`status.${confirmAction}`),
+                })}
+              </p>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => {
+                    statusMutation.mutate(confirmAction)
+                    setConfirmAction(null)
+                  }}
+                  className={`text-xs px-3 py-1.5 rounded font-medium ${
+                    confirmAction === 'confirmed'
+                      ? 'bg-green-600 text-white hover:bg-green-700'
+                      : confirmAction === 'rejected'
+                      ? 'bg-red-600 text-white hover:bg-red-700'
+                      : confirmAction === 'to_review'
+                      ? 'bg-orange-600 text-white hover:bg-orange-700'
+                      : 'bg-gray-600 text-white hover:bg-gray-700'
+                  }`}
+                >
+                  {t('common.confirm')}
+                </button>
+                <button
+                  onClick={() => setConfirmAction(null)}
+                  className="text-xs px-3 py-1.5 rounded border border-gray-300 hover:bg-gray-50"
+                >
+                  {t('common.cancel')}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {statusMutation.isError && (
+            <p className="text-xs text-red-600 mt-2">{(statusMutation.error as Error)?.message || t('common.error')}</p>
+          )}
+        </div>
+
+        {/* Tab navigation */}
+        <div className="max-w-7xl mx-auto px-6 flex gap-0 border-t">
+          {(['personal', 'negotiation'] as const).map(tab => (
+            <button
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              className={`px-5 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+                activeTab === tab
+                  ? 'border-gray-900 text-gray-900'
+                  : 'border-transparent text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              {tab === 'personal' ? t('collaborator.tabPersonal') : t('collaborator.tabNegotiation')}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* ── Tab content ──────────────────────────────────────────────────── */}
+      <div className="max-w-7xl mx-auto px-6 py-6">
+
+        {/* ── Tab 1: Personal Data ──────────────────────────────────────── */}
+        {activeTab === 'personal' && (
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-4">
+              {/* Identity */}
+              <CollapsibleSection title={t('collaborator.identity')} isOpen={openSection === 'identity'} onToggle={() => toggleSection('identity')}>
+                <AthleteFieldEditor
+                  athlete={athlete}
+                  fields={[
+                    { key: 'firstName', label: t('athlete.firstName'), type: 'text' },
+                    { key: 'lastName', label: t('athlete.lastName'), type: 'text' },
+                    { key: 'dateOfBirth', label: t('athlete.dateOfBirth'), type: 'date' },
+                    { key: 'nationality', label: t('athlete.nationality'), type: 'text' },
+                    { key: 'gender', label: t('athlete.gender'), type: 'select', options: [
+                      { value: 'M', label: t('athlete.male') }, { value: 'F', label: t('athlete.female') }
+                    ]},
+                    { key: 'federation', label: t('athlete.federation'), type: 'text' },
+                    { key: 'club', label: t('athlete.club'), type: 'text' },
+                    { key: 'athleteEmail', label: t('athlete.email'), type: 'text' },
+                    { key: 'athletePhone', label: t('athlete.phone'), type: 'text' },
+                    { key: 'waProfileUrl', label: t('athlete.waProfile'), type: 'text' },
+                    { key: 'swiLicence', label: t('athlete.swissLicence'), type: 'text' },
+                    { key: 'honours', label: t('athlete.honours'), type: 'text' },
+                    { key: 'distanceFromGva', label: t('athlete.distanceFromGva'), type: 'number' },
+                    { key: 'isEap', label: t('athlete.eapMember'), type: 'checkbox' },
+                    { key: 'isSwiss', label: t('athlete.swiss'), type: 'checkbox' },
+                    { key: 'eapCity', label: t('athlete.eapCity'), type: 'text' },
+                  ]}
+                  onSave={(data) => athleteUpdateMutation.mutate(data)}
+                  isPending={athleteUpdateMutation.isPending}
+                  error={athleteUpdateMutation.error}
+                  t={t}
+                />
+              </CollapsibleSection>
+
+              {/* Compliance */}
+              <CollapsibleSection title={t('compliance.title')} isOpen={openSection === 'compliance'} onToggle={() => toggleSection('compliance')}>
+                <AthleteFieldEditor
+                  athlete={athlete}
+                  fields={[
+                    { key: 'iRunClean', label: t('compliance.iRunClean'), type: 'select', options: [
+                      { value: 'yes', label: t('common.yes') }, { value: 'no', label: t('common.no') },
+                      { value: 'in_progress', label: t('common.inProgress') }, { value: 'unknown', label: t('common.unknown') },
+                    ]},
+                    { key: 'dopingFree', label: t('compliance.dopingFree'), type: 'select', options: [
+                      { value: 'yes', label: t('common.yes') }, { value: 'no', label: t('common.no') }, { value: 'unknown', label: t('common.unknown') },
+                    ]},
+                  ]}
+                  onSave={(data) => athleteUpdateMutation.mutate(data)}
+                  isPending={athleteUpdateMutation.isPending}
+                  error={athleteUpdateMutation.error}
+                  t={t}
+                />
+              </CollapsibleSection>
+
+              {/* Logistics */}
+              <CollapsibleSection title={t('logistics.title')} isOpen={openSection === 'logistics'} onToggle={() => toggleSection('logistics')}>
+                <AthleteFieldEditor
+                  athlete={athlete}
+                  fields={[
+                    { key: 'arrivalDate', label: `${t('logistics.arrival')} ${t('logistics.date')}`, type: 'date' },
+                    { key: 'arrivalFlight', label: `${t('logistics.arrival')} ${t('logistics.flightNumber')}`, type: 'text' },
+                    { key: 'arrivalFrom', label: `${t('logistics.arrival')} ${t('logistics.from')}`, type: 'text' },
+                    { key: 'arrivalTime', label: `${t('logistics.arrival')} ${t('logistics.time')}`, type: 'text' },
+                    { key: 'departureDate', label: `${t('logistics.departure')} ${t('logistics.date')}`, type: 'date' },
+                    { key: 'departureFlight', label: `${t('logistics.departure')} ${t('logistics.flightNumber')}`, type: 'text' },
+                    { key: 'departureTo', label: `${t('logistics.departure')} ${t('logistics.to')}`, type: 'text' },
+                    { key: 'departureTime', label: `${t('logistics.departure')} ${t('logistics.time')}`, type: 'text' },
+                    { key: 'accommodationReqs', label: t('logistics.specialRequests'), type: 'textarea' },
+                  ]}
+                  onSave={(data) => athleteUpdateMutation.mutate(data)}
+                  isPending={athleteUpdateMutation.isPending}
+                  error={athleteUpdateMutation.error}
+                  t={t}
+                />
+              </CollapsibleSection>
+            </div>
+
+            <div className="space-y-4">
+              {/* Assigned selector */}
+              <CollapsibleSection title={t('selection.assignedSelector')} isOpen={openSection === 'selector'} onToggle={() => toggleSection('selector')}>
+                <SelectorAssign
+                  currentValue={athlete.assignedSelector}
+                  staffUsers={staffUsers}
+                  onSave={(val) => athleteUpdateMutation.mutate({ assignedSelector: val || null })}
+                  isPending={athleteUpdateMutation.isPending}
+                  t={t}
+                />
+              </CollapsibleSection>
+
+              {/* Cost estimates */}
+              <CollapsibleSection title={t('selection.estimatedCost')} isOpen={openSection === 'costs'} onToggle={() => toggleSection('costs')}>
+                <AthleteFieldEditor
+                  athlete={athlete}
+                  fields={[
+                    { key: 'estTravel', label: t('collaborator.estTravel'), type: 'number' },
+                    { key: 'estAccommodation', label: t('collaborator.estAccommodation'), type: 'number' },
+                    { key: 'estAppearance', label: t('collaborator.estAppearance'), type: 'number' },
+                  ]}
+                  onSave={(data) => athleteUpdateMutation.mutate(data)}
+                  isPending={athleteUpdateMutation.isPending}
+                  error={athleteUpdateMutation.error}
+                  t={t}
+                />
+                <p className="text-xs text-gray-400 mt-1">{t('collaborator.estTotalHint')}</p>
+              </CollapsibleSection>
+
+              {/* Payment */}
+              <CollapsibleSection title={t('collaborator.payment')} isOpen={openSection === 'payment'} onToggle={() => toggleSection('payment')}>
+                <AthleteFieldEditor
+                  athlete={athlete}
+                  fields={[
+                    { key: 'bankIban', label: t('collaborator.iban'), type: 'text' },
+                    { key: 'paymentStatus', label: t('collaborator.paymentStatus'), type: 'select', options: [
+                      { value: 'pending', label: t('common.pending') }, { value: 'done', label: t('common.done') },
+                    ]},
+                    { key: 'paymentAmount', label: t('collaborator.paymentAmount'), type: 'number' },
+                    { key: 'paymentDate', label: t('collaborator.paymentDate'), type: 'date' },
+                    { key: 'paymentMethod', label: t('collaborator.paymentMethod'), type: 'select', options: [
+                      { value: '', label: '—' }, { value: 'cash', label: t('collaborator.cash') },
+                      { value: 'bank', label: t('collaborator.bank') }, { value: 'western_union', label: t('collaborator.westernUnion') },
+                      { value: 'paypal', label: t('collaborator.paypal') }, { value: 'other', label: t('collaborator.other') },
+                    ]},
+                  ]}
+                  onSave={(data) => athleteUpdateMutation.mutate(data)}
+                  isPending={athleteUpdateMutation.isPending}
+                  error={athleteUpdateMutation.error}
+                  t={t}
+                />
+              </CollapsibleSection>
+
+              {/* Notes */}
+              <CollapsibleSection title={t('common.notes')} isOpen={openSection === 'notes'} onToggle={() => toggleSection('notes')}>
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 mb-1">{t('collaborator.participantNotes')}</label>
+                    <p className="text-xs text-gray-600 bg-gray-50 p-2 rounded min-h-[2rem]">{athlete.participantNotes || '—'}</p>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 mb-1">{t('collaborator.additionalNotes')}</label>
+                    <p className="text-xs text-gray-600 bg-gray-50 p-2 rounded min-h-[2rem]">{athlete.additionalNotes || '—'}</p>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 mb-1">{t('collaborator.internalNotes')}</label>
+                    <textarea
+                      className={inputCls}
+                      rows={3}
+                      value={internalNotes}
+                      onChange={(e) => setInternalNotes(e.target.value)}
+                    />
+                    <button
+                      onClick={() => internalNotesMutation.mutate(internalNotes)}
+                      disabled={internalNotesMutation.isPending}
+                      className="mt-2 text-xs bg-gray-900 text-white px-3 py-1 rounded hover:bg-gray-800 disabled:opacity-50"
+                    >
+                      {t('common.save')}
+                    </button>
+                  </div>
+                </div>
+              </CollapsibleSection>
+            </div>
+          </div>
+        )}
+
+        {/* ── Tab 2: Agreement & Negotiation ───────────────────────────── */}
+        {activeTab === 'negotiation' && (
+          <div className="grid grid-cols-2 gap-6">
+            {/* Left: Event Selection + Cost + Agreements */}
+            <div className="space-y-4">
+              {/* Event Selection */}
+              <div className="bg-white rounded-lg border p-4">
+                <h3 className="font-semibold text-sm mb-3">{t('selection.participation')}</h3>
+                <div className="space-y-2">
+                  {athlete.applications.map(app => (
+                    <EventRow
+                      key={app.id}
+                      app={app}
+                      athlete={athlete}
+                      edition={athlete.edition}
+                      onParticipationChange={(appId, status) =>
+                        participationMutation.mutate({ appId, status })
+                      }
+                      onRescore={(appId) => scoreMutation.mutate(appId)}
+                      onWaPerfSave={(athleteId, eventId, data) =>
+                        waPerfMutation.mutate({ athleteId, eventId, ...data })
+                      }
+                      isPendingParticipation={participationMutation.isPending}
+                      t={t}
+                    />
+                  ))}
+                </div>
+                {!allDecided && athlete.applications.length > 0 && (
+                  <p className="text-xs text-gray-400 mt-2">{t('selection.decideAllFirst')}</p>
+                )}
+                {allDecided && (
+                  <p className="text-xs text-green-600 mt-2">{t('selection.allDecided')}</p>
+                )}
+              </div>
+
+              {/* Cost display based on status */}
+              <div className="bg-white rounded-lg border p-4">
+                <h3 className="font-semibold text-sm mb-3">
+                  {costMode === 'confirmed' ? t('selection.confirmedCostLabel') :
+                   costMode === 'negotiating' ? t('selection.costInNegotiation') :
+                   t('selection.estimatedCostLabel')}
+                </h3>
+                {costMode === 'confirmed' && athlete.agreements.length === 0 ? (
+                  <p className="text-sm text-green-700 italic">{t('selection.acceptedAtMeeting')}</p>
+                ) : costMode === 'confirmed' && latestAgreement ? (
+                  <div className="text-sm">
+                    <div className="flex justify-between font-semibold text-green-700">
+                      <span>{t('contract.totalCost')}</span>
+                      <span>CHF {latestAgreement.totalCost.toLocaleString()}</span>
+                    </div>
+                    <div className="text-xs text-gray-500 mt-1">
+                      v{latestAgreement.version} — {new Date(latestAgreement.sentAt).toLocaleDateString()}
+                    </div>
+                  </div>
+                ) : costMode === 'negotiating' && latestAgreement ? (
+                  <div className="text-sm">
+                    <div className="flex justify-between font-semibold text-blue-700">
+                      <span>{t('contract.totalCost')}</span>
+                      <span>CHF {latestAgreement.totalCost.toLocaleString()}</span>
+                    </div>
+                    <div className="text-xs text-gray-500 mt-1">
+                      v{latestAgreement.version} — {t(`status.${currentStatus}`)}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-sm text-gray-600">
+                    <div className="flex justify-between">
+                      <span>{t('collaborator.estTravel')}</span>
+                      <span className="font-mono">CHF {athlete.estTravel.toLocaleString()}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>{t('collaborator.estAccommodation')}</span>
+                      <span className="font-mono">CHF {athlete.estAccommodation.toLocaleString()}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>{t('collaborator.estAppearance')}</span>
+                      <span className="font-mono">CHF {athlete.estAppearance.toLocaleString()}</span>
+                    </div>
+                    <div className="flex justify-between font-semibold text-gray-900 border-t pt-1 mt-1">
+                      <span>{t('contract.totalCost')}</span>
+                      <span className="font-mono">CHF {athlete.estTotal.toLocaleString()}</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Agreement history */}
+              <div className="bg-white rounded-lg border p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="font-semibold text-sm">{t('contract.title')}</h3>
+                  {!showAgreementForm && !['confirmed', 'rejected', 'withdrawn'].includes(currentStatus) && (
+                    <button
+                      onClick={() => setShowAgreementForm(true)}
+                      disabled={!allDecided}
+                      className={`text-xs ${allDecided ? 'text-blue-600 hover:text-blue-800' : 'text-gray-300 cursor-not-allowed'}`}
+                    >
+                      {latestAgreement ? t('contract.newVersion') : t('contract.sendOffer')}
+                    </button>
+                  )}
+                </div>
+
+                {athlete.agreements.length === 0 && !showAgreementForm ? (
+                  <p className="text-xs text-gray-400">{t('contract.noOfferYet')}</p>
+                ) : (
+                  <div className="space-y-3">
+                    {athlete.agreements.map(c => (
+                      <AgreementCard key={c.id} agreement={c} t={t} />
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Agreement form */}
+              {showAgreementForm && (
+                <div className="bg-white rounded-lg border p-4">
+                  <h3 className="font-semibold text-sm mb-3">
+                    {t('contract.sendOffer')} — v{(athlete.agreements.length || 0) + 1}
+                  </h3>
+                  <div className="space-y-3">
+                    <div>
+                      <label className={labelCls}>{t('contract.bonus')} (CHF)</label>
+                      <input type="number" className={inputCls} value={agreementForm.appearanceFee}
+                        onChange={e => setAgreementForm(p => ({ ...p, appearanceFee: parseInt(e.target.value) || 0 }))} />
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className={labelCls}>{t('contract.otherCompensation')} (CHF)</label>
+                        <input type="number" className={inputCls} value={agreementForm.otherCompensation}
+                          onChange={e => setAgreementForm(p => ({ ...p, otherCompensation: parseInt(e.target.value) || 0 }))} />
+                      </div>
+                      <div>
+                        <label className={labelCls}>{t('contract.description')}</label>
+                        <input className={inputCls} value={agreementForm.otherCompensationDesc}
+                          onChange={e => setAgreementForm(p => ({ ...p, otherCompensationDesc: e.target.value }))}
+                          placeholder={t('contract.otherCompensationDesc')} />
+                      </div>
+                    </div>
+                    <div>
+                      <label className={labelCls}>{t('contract.transport')} (CHF)</label>
+                      <input type="number" className={inputCls} value={agreementForm.transport}
+                        onChange={e => setAgreementForm(p => ({ ...p, transport: parseInt(e.target.value) || 0 }))} />
+                    </div>
+                    <div className="flex items-center gap-4">
+                      <label className="flex items-center gap-2 text-sm cursor-pointer">
+                        <input type="checkbox" checked={agreementForm.transportAirportHotel}
+                          onChange={e => setAgreementForm(p => ({ ...p, transportAirportHotel: e.target.checked }))} />
+                        {t('contract.transportAirportHotel')}
+                      </label>
+                      <label className="flex items-center gap-2 text-sm cursor-pointer">
+                        <input type="checkbox" checked={agreementForm.transportHotelStadium}
+                          onChange={e => setAgreementForm(p => ({ ...p, transportHotelStadium: e.target.checked }))} />
+                        {t('contract.transportHotelStadium')}
+                      </label>
+                    </div>
+                    <div>
+                      <label className={labelCls}>{t('logistics.hotel')}</label>
+                      <select className={inputCls} value={agreementForm.hotelRoomId}
+                        onChange={e => setAgreementForm(p => ({ ...p, hotelRoomId: e.target.value }))}>
+                        <option value="">— {t('contract.noHotelRoom')} —</option>
+                        {allRooms.map(r => (
+                          <option key={r.id} value={r.id}>{r.hotelName} — {r.roomType} (CHF {r.costPerNight}/night)</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className={labelCls}>{t('contract.hotelNights')}</label>
+                      <div className="flex gap-2">
+                        {NIGHT_LABELS.map(night => {
+                          const key = `hotelNight${night.charAt(0).toUpperCase() + night.slice(1)}` as keyof typeof agreementForm
+                          return (
+                            <label key={night} className={`flex flex-col items-center text-xs cursor-pointer px-2 py-1 rounded border ${
+                              agreementForm[key] ? 'bg-gray-900 text-white border-gray-900' : 'border-gray-300'
+                            }`}>
+                              <input type="checkbox" className="sr-only" checked={agreementForm[key] as boolean}
+                                onChange={e => setAgreementForm(p => ({ ...p, [key]: e.target.checked }))} />
+                              {t(`night.${night}`)}
+                            </label>
+                          )
+                        })}
+                      </div>
+                    </div>
+                    <div>
+                      <label className={labelCls}>{t('contract.dinners')}</label>
+                      <div className="flex gap-2">
+                        {DINNER_LABELS.map(day => {
+                          const key = `dinner${day.charAt(0).toUpperCase() + day.slice(1)}` as keyof typeof agreementForm
+                          return (
+                            <label key={day} className={`flex flex-col items-center text-xs cursor-pointer px-2 py-1 rounded border ${
+                              agreementForm[key] ? 'bg-gray-900 text-white border-gray-900' : 'border-gray-300'
+                            }`}>
+                              <input type="checkbox" className="sr-only" checked={agreementForm[key] as boolean}
+                                onChange={e => setAgreementForm(p => ({ ...p, [key]: e.target.checked }))} />
+                              {t(`night.${day}`)}
+                            </label>
+                          )
+                        })}
+                      </div>
+                    </div>
+                    <label className="flex items-center gap-2 text-sm cursor-pointer">
+                      <input type="checkbox" checked={agreementForm.stadiumMeals}
+                        onChange={e => setAgreementForm(p => ({ ...p, stadiumMeals: e.target.checked }))} />
+                      {t('contract.stadiumMeals')}
+                    </label>
+                    <div>
+                      <label className={labelCls}>{t('contract.notesToAthlete')}</label>
+                      <textarea className={inputCls} rows={2} value={agreementForm.notes}
+                        onChange={e => setAgreementForm(p => ({ ...p, notes: e.target.value }))} />
+                    </div>
+
+                    {/* Live cost preview */}
+                    {(() => {
+                      const room = allRooms.find(r => r.id === agreementForm.hotelRoomId)
+                      const nights = NIGHT_LABELS.filter(n => agreementForm[`hotelNight${n.charAt(0).toUpperCase() + n.slice(1)}` as keyof typeof agreementForm]).length
+                      const dinners = DINNER_LABELS.filter(d => agreementForm[`dinner${d.charAt(0).toUpperCase() + d.slice(1)}` as keyof typeof agreementForm]).length
+                      let total = agreementForm.appearanceFee + agreementForm.otherCompensation + agreementForm.transport
+                      total += nights * (room?.costPerNight ?? 0)
+                      total += dinners * (room?.dinnerCost ?? 0)
+                      if (agreementForm.stadiumMeals) total += athlete.edition?.stadiumMealCost ?? 0
+                      if (agreementForm.transportAirportHotel) total += athlete.edition?.transportAirportHotelCost ?? 0
+                      if (agreementForm.transportHotelStadium) total += athlete.edition?.transportHotelStadiumCost ?? 0
+                      return (
+                        <div className="bg-gray-50 rounded p-3 text-sm">
+                          <div className="flex justify-between font-semibold">
+                            <span>{t('contract.totalCost')}</span>
+                            <span>CHF {total.toLocaleString()}</span>
+                          </div>
+                        </div>
+                      )
+                    })()}
+
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => agreementMutation.mutate(agreementForm)}
+                        disabled={agreementMutation.isPending}
+                        className="flex-1 py-2 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
+                      >
+                        {agreementMutation.isPending ? t('common.loading') : t('contract.sendOffer')}
+                      </button>
+                      <button
+                        onClick={() => setShowAgreementForm(false)}
+                        className="px-4 py-2 text-sm border rounded hover:bg-gray-50"
+                      >
+                        {t('common.cancel')}
+                      </button>
+                    </div>
+                    {agreementMutation.isError && (
+                      <p className="text-xs text-red-600">{(agreementMutation.error as Error)?.message || t('common.error')}</p>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Right: Timeline */}
+            <div className="space-y-4">
+              {/* Add interaction */}
+              <div className="bg-white rounded-lg border p-4">
+                <h3 className="font-semibold text-sm mb-3">{t('collaborator.addNote')}</h3>
+                <select
+                  className={`${inputCls} mb-2`}
+                  value={noteType}
+                  onChange={e => setNoteType(e.target.value as typeof noteType)}
+                >
+                  <option value="note">{t('collaborator.note')}</option>
+                  <option value="call">{t('collaborator.phoneCall')}</option>
+                  <option value="email">{t('athlete.email')}</option>
+                </select>
+                <textarea
+                  className={inputCls}
+                  rows={3}
+                  placeholder={t('collaborator.enterNote')}
+                  value={noteContent}
+                  onChange={e => setNoteContent(e.target.value)}
+                />
+                <button
+                  onClick={() => {
+                    if (noteContent.trim()) {
+                      noteMutation.mutate({ type: noteType, content: noteContent })
+                    }
+                  }}
+                  disabled={noteMutation.isPending || !noteContent.trim()}
+                  className="mt-2 text-xs bg-gray-900 text-white px-3 py-1.5 rounded hover:bg-gray-800 disabled:opacity-50"
+                >
+                  {t('common.add')}
+                </button>
+              </div>
+
+              {/* Timeline */}
+              <div className="bg-white rounded-lg border p-4">
+                <h3 className="font-semibold text-sm mb-3">{t('collaborator.timeline')}</h3>
+                {athlete.interactions.length === 0 ? (
+                  <p className="text-xs text-gray-400">{t('collaborator.noInteractions')}</p>
+                ) : (
+                  <div className="space-y-3">
+                    {athlete.interactions.map(interaction => (
+                      <InteractionCard key={interaction.id} interaction={interaction} />
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Archive button — committee only */}
+        {user?.role === 'committee' && !athlete.archivedAt && (
+          <div className="mt-6 text-right">
+            <button
+              onClick={() => {
+                if (confirm(t('confirm.archiveAthlete', { athlete: `${athlete.firstName} ${athlete.lastName}` }))) {
+                  archiveMutation.mutate()
+                }
+              }}
+              disabled={archiveMutation.isPending}
+              className="text-xs text-red-500 hover:text-red-700 border border-red-200 rounded px-3 py-1.5 hover:bg-red-50 disabled:opacity-50"
+            >
+              {t('collaborator.archiveAthlete')}
+            </button>
+            {archiveMutation.isError && (
+              <p className="text-xs text-red-600 mt-1">{(archiveMutation.error as Error)?.message || t('common.error')}</p>
+            )}
+          </div>
+        )}
       </div>
     </div>
   )
