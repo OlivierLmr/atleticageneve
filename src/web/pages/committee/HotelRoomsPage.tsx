@@ -22,6 +22,7 @@ export default function HotelRoomsPage() {
     queryFn: () => api.get('/api/v1/hotels'),
   })
 
+  // ── Room type form state ─────────────────────────────────────────────
   const [hotelId, setHotelId] = useState('')
   const [roomType, setRoomType] = useState('')
   const [costPerNight, setCostPerNight] = useState(0)
@@ -29,6 +30,11 @@ export default function HotelRoomsPage() {
   const [reservedRooms, setReservedRooms] = useState(0)
   const [editingId, setEditingId] = useState<string | null>(null)
 
+  // ── Hotel form state ────────────────────────────────────────────────
+  const [hotelName_, setHotelName_] = useState('')
+  const [editingHotelId, setEditingHotelId] = useState<string | null>(null)
+
+  // ── Mutations ───────────────────────────────────────────────────────
   const addMutation = useMutation({
     mutationFn: (data: Omit<HotelRoom, 'id'>) => api.post('/api/v1/hotel-rooms', data),
     onSuccess: () => {
@@ -51,6 +57,30 @@ export default function HotelRoomsPage() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['hotel-rooms'] }),
   })
 
+  const addHotelMutation = useMutation({
+    mutationFn: (data: { name: string }) => api.post('/api/v1/hotels', data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['hotels'] })
+      setHotelName_('')
+    },
+  })
+
+  const updateHotelMutation = useMutation({
+    mutationFn: ({ id, name }: { id: string; name: string }) =>
+      api.patch(`/api/v1/hotels/${id}`, { name }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['hotels'] })
+      setHotelName_('')
+      setEditingHotelId(null)
+    },
+  })
+
+  const deleteHotelMutation = useMutation({
+    mutationFn: (id: string) => api.delete(`/api/v1/hotels/${id}`),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['hotels', 'hotel-rooms'] }),
+  })
+
+  // ── Handlers ────────────────────────────────────────────────────────
   const resetForm = () => {
     setHotelId('')
     setRoomType('')
@@ -80,43 +110,6 @@ export default function HotelRoomsPage() {
     }
   }
 
-  const hotelName = (hid: string) => hotels.find((h) => h.id === hid)?.name ?? hid
-
-  if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 text-gray-400 text-sm">
-        {t('common.loading')}
-      </div>
-    )
-  }
-
-  // ── Hotel CRUD ──────────────────────────────────────────────────────────
-  const [hotelName_, setHotelName_] = useState('')
-  const [editingHotelId, setEditingHotelId] = useState<string | null>(null)
-
-  const addHotelMutation = useMutation({
-    mutationFn: (data: { name: string }) => api.post('/api/v1/hotels', data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['hotels'] })
-      setHotelName_('')
-    },
-  })
-
-  const updateHotelMutation = useMutation({
-    mutationFn: ({ id, name }: { id: string; name: string }) =>
-      api.patch(`/api/v1/hotels/${id}`, { name }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['hotels'] })
-      setHotelName_('')
-      setEditingHotelId(null)
-    },
-  })
-
-  const deleteHotelMutation = useMutation({
-    mutationFn: (id: string) => api.delete(`/api/v1/hotels/${id}`),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['hotels', 'hotel-rooms'] }),
-  })
-
   const handleHotelSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     if (!hotelName_.trim()) return
@@ -125,6 +118,17 @@ export default function HotelRoomsPage() {
     } else {
       addHotelMutation.mutate({ name: hotelName_.trim() })
     }
+  }
+
+  const hotelName = (hid: string) => hotels.find((h) => h.id === hid)?.name ?? hid
+
+  // ── Loading state ───────────────────────────────────────────────────
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 text-gray-400 text-sm">
+        {t('common.loading')}
+      </div>
+    )
   }
 
   return (
