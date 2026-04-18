@@ -269,6 +269,10 @@ const MIGRATION_0002_STMTS = [
   'ALTER TABLE email_log ADD COLUMN html_body TEXT',
 ]
 
+const MIGRATION_0003_STMTS = [
+  'ALTER TABLE interaction ADD COLUMN email_log_id TEXT REFERENCES email_log(id)',
+]
+
 // Global flag: Worker instances re-use this across requests within the same isolate.
 let migrated = false
 
@@ -305,6 +309,17 @@ export async function ensureMigrated(d1: D1Database): Promise<void> {
       }
     }
     await d1.prepare('INSERT OR IGNORE INTO d1_migrations (name) VALUES (?)').bind('0002_spec_v4').run()
+  }
+
+  if (!applied.has('0003_interaction_email')) {
+    for (const stmt of MIGRATION_0003_STMTS) {
+      try {
+        await d1.exec(stmt)
+      } catch {
+        // Column already exists — safe to ignore.
+      }
+    }
+    await d1.prepare('INSERT OR IGNORE INTO d1_migrations (name) VALUES (?)').bind('0003_interaction_email').run()
   }
 
   migrated = true

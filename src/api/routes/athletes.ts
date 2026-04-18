@@ -432,15 +432,6 @@ athletes.patch('/:id/negotiation-status', requireAuth('athlete', 'manager', 'col
     })
     .where(eq(schema.athlete.id, id))
 
-  // Log interaction
-  await db.insert(schema.interaction).values({
-    athleteId: id,
-    type: 'status_change',
-    content: `Negotiation status changed from "${currentStatus}" to "${newStatus}"`,
-    authorId: user.id,
-    authorName: `${user.firstName} ${user.lastName}`,
-  })
-
   // Send email notification to athlete and manager
   const editions = await db.select().from(schema.edition).limit(1)
   const edition = editions[0]
@@ -456,8 +447,9 @@ athletes.patch('/:id/negotiation-status', requireAuth('athlete', 'manager', 'col
     }
   }
 
+  let emailLogId: string | null = null
   if (ath.athleteEmail) {
-    await sendStatusChangeEmail(db, ath.athleteEmail, `${ath.firstName} ${ath.lastName}`, newStatus, portalUrl, athleteLang, undefined, id)
+    emailLogId = await sendStatusChangeEmail(db, ath.athleteEmail, `${ath.firstName} ${ath.lastName}`, newStatus, portalUrl, athleteLang, undefined, id)
   }
 
   if (ath.managerId) {
@@ -478,6 +470,16 @@ athletes.patch('/:id/negotiation-status', requireAuth('athlete', 'manager', 'col
       relatedAthleteId: id,
     })
   }
+
+  // Log interaction with email reference
+  await db.insert(schema.interaction).values({
+    athleteId: id,
+    type: 'status_change',
+    content: `Negotiation status changed from "${currentStatus}" to "${newStatus}"`,
+    authorId: user.id,
+    authorName: `${user.firstName} ${user.lastName}`,
+    emailLogId,
+  })
 
   return c.json({ id, status: newStatus, previousStatus: currentStatus })
 })

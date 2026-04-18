@@ -294,7 +294,7 @@ function AgreementCard({ agreement: c, t, isStaff }: { agreement: Agreement; t: 
   )
 }
 
-function InteractionCard({ interaction }: { interaction: Interaction }) {
+function InteractionCard({ interaction, onViewEmail }: { interaction: Interaction; onViewEmail?: (emailLogId: string) => void }) {
   const typeIcons: Record<string, string> = {
     status_change: '●',
     agreement: '■',
@@ -313,13 +313,22 @@ function InteractionCard({ interaction }: { interaction: Interaction }) {
     email: 'text-indigo-500',
   }
 
+  const hasEmail = !!interaction.emailLogId
+  const clickable = hasEmail && onViewEmail
+
   return (
-    <div className="flex gap-2">
+    <div
+      className={`flex gap-2 ${clickable ? 'cursor-pointer hover:bg-gray-50 rounded p-1 -m-1' : ''}`}
+      onClick={clickable ? () => onViewEmail(interaction.emailLogId!) : undefined}
+    >
       <span className={`${typeColors[interaction.type] ?? 'text-gray-400'} mt-0.5 shrink-0`}>
         {typeIcons[interaction.type] ?? '●'}
       </span>
       <div className="flex-1 min-w-0">
-        <p className="text-xs text-gray-900">{interaction.content}</p>
+        <p className="text-xs text-gray-900">
+          {interaction.content}
+          {hasEmail && <span className="ml-1 text-indigo-500" title="View email">✉</span>}
+        </p>
         <p className="text-[10px] text-gray-400 mt-0.5">
           {interaction.authorName} — {new Date(interaction.createdAt).toLocaleString()}
         </p>
@@ -660,6 +669,7 @@ export default function AthletePage() {
   const [counterOfferText, setCounterOfferText] = useState('')
   const [showMessageModal, setShowMessageModal] = useState(false)
   const [messageText, setMessageText] = useState('')
+  const [viewingEmailId, setViewingEmailId] = useState<string | null>(null)
 
   const { data: athlete, isLoading } = useQuery<AthleteDetail>({
     queryKey: ['athlete', id],
@@ -675,6 +685,13 @@ export default function AthletePage() {
   const { data: staffUsers = [] } = useQuery<StaffUser[]>({
     queryKey: ['staff-users'],
     queryFn: () => api.get('/api/v1/users?role=collaborator,committee'),
+  })
+
+  // Email popup query — only fetches when an email is being viewed
+  const { data: viewingEmail } = useQuery<{ subject: string; body: string; htmlBody?: string; to: string; sentAt: string }>({
+    queryKey: ['email', viewingEmailId],
+    queryFn: () => api.get(`/api/v1/emails/${viewingEmailId}`),
+    enabled: !!viewingEmailId,
   })
 
   const allRooms = hotels.flatMap(h => h.rooms.map(r => ({ ...r, hotelName: h.name })))
@@ -1546,7 +1563,7 @@ export default function AthletePage() {
                 ) : (
                   <div className="space-y-3 max-h-96 overflow-y-auto">
                     {athlete.interactions.map(interaction => (
-                      <InteractionCard key={interaction.id} interaction={interaction} />
+                      <InteractionCard key={interaction.id} interaction={interaction} onViewEmail={setViewingEmailId} />
                     ))}
                   </div>
                 )}
@@ -1575,6 +1592,40 @@ export default function AthletePage() {
           </div>
         )}
       </div>
+
+      {/* Email popup modal */}
+      {viewingEmailId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30" onClick={() => setViewingEmailId(null)}>
+          <div className="bg-white rounded-lg shadow-xl max-w-lg w-full mx-4 max-h-[80vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between p-4 border-b">
+              <h3 className="font-semibold text-sm">{t('collaborator.emailDetail')}</h3>
+              <button onClick={() => setViewingEmailId(null)} className="text-gray-400 hover:text-gray-600">✕</button>
+            </div>
+            {viewingEmail ? (
+              <div className="p-4 text-sm space-y-2">
+                <div className="text-xs text-gray-500">
+                  <span className="font-medium">{t('admin.emailTo')}:</span> {viewingEmail.to}
+                </div>
+                <div className="text-xs text-gray-500">
+                  <span className="font-medium">{t('admin.subject')}:</span> {viewingEmail.subject}
+                </div>
+                <div className="text-xs text-gray-400">
+                  {new Date(viewingEmail.sentAt).toLocaleString()}
+                </div>
+                <div className="border-t pt-3 mt-2">
+                  {viewingEmail.htmlBody ? (
+                    <div className="text-sm prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: viewingEmail.htmlBody }} />
+                  ) : (
+                    <pre className="text-xs text-gray-700 whitespace-pre-wrap">{viewingEmail.body}</pre>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div className="p-4 text-sm text-gray-400">{t('common.loading')}</div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

@@ -18,9 +18,11 @@ interface EmailParams {
   relatedAthleteId?: string
 }
 
-export async function sendEmail({ db, to, subject, body, htmlBody, lang = 'en', relatedAthleteId }: EmailParams): Promise<void> {
-  // Persist to email_log
+export async function sendEmail({ db, to, subject, body, htmlBody, lang = 'en', relatedAthleteId }: EmailParams): Promise<string> {
+  // Persist to email_log and return the ID
+  const emailId = crypto.randomUUID()
   await db.insert(schema.emailLog).values({
+    id: emailId,
     to,
     subject,
     body,
@@ -36,6 +38,8 @@ export async function sendEmail({ db, to, subject, body, htmlBody, lang = 'en', 
   console.log(`   Body:`)
   body.split('\n').forEach((line) => console.log(`   ${line}`))
   console.log('═══════════════════════════════════════════════════════════════')
+
+  return emailId
 }
 
 export async function sendMagicLinkEmail(db: DB, email: string, token: string, baseUrl: string, lang: 'en' | 'fr' = 'en'): Promise<void> {
@@ -61,7 +65,7 @@ export async function sendStatusChangeEmail(
   lang: 'en' | 'fr' = 'en',
   magicLinkUrl?: string,
   relatedAthleteId?: string,
-): Promise<void> {
+): Promise<string> {
   const statusLabels: Record<string, Record<string, string>> = {
     en: {
       to_review: 'Under review',
@@ -97,5 +101,5 @@ export async function sendStatusChangeEmail(
     ? `<p>Bonjour,</p><p>La candidature de <strong>${athleteName}</strong> a été mise à jour.</p><p>Nouveau statut : <strong>${label}</strong></p><p><a href="${linkUrl}">${linkLabel}</a></p><p>Atletica Genève</p>`
     : `<p>Hello,</p><p>The application for <strong>${athleteName}</strong> has been updated.</p><p>New status: <strong>${label}</strong></p><p><a href="${linkUrl}">${linkLabel}</a></p><p>Atletica Geneve</p>`
 
-  await sendEmail({ db, to: email, subject, body, htmlBody, lang, relatedAthleteId })
+  return sendEmail({ db, to: email, subject, body, htmlBody, lang, relatedAthleteId })
 }

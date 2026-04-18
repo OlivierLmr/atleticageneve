@@ -36,4 +36,19 @@ app.get('/athlete/:athleteId', requireAuth('committee', 'collaborator'), async (
   return c.json(items)
 })
 
+// GET /emails/:id — single email by ID (all authenticated roles)
+app.get('/:id', requireAuth('collaborator', 'committee', 'athlete', 'manager'), async (c) => {
+  const db = c.get('db')
+  const { id } = c.req.param()
+
+  const [email] = await db
+    .select()
+    .from(schema.emailLog)
+    .where(eq(schema.emailLog.id, id))
+    .limit(1)
+
+  if (!email) return c.json({ error: 'Email not found' }, 404)
+  return c.json(email)
+})
+
 export default app

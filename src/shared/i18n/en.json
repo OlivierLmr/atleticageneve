@@ -282,7 +282,8 @@
     "timeline": "Timeline",
     "noInteractions": "No interactions yet",
     "archiveAthlete": "Archive athlete",
-    "activity": "Activity"
+    "activity": "Activity",
+    "emailDetail": "Email detail"
   },
   "dashboard": {
     "title": "Committee Dashboard",

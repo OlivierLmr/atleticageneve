@@ -282,7 +282,8 @@
     "timeline": "Chronologie",
     "noInteractions": "Aucune interaction",
     "archiveAthlete": "Archiver l'athlète",
-    "activity": "Activité"
+    "activity": "Activité",
+    "emailDetail": "Détail de l'email"
   },
   "dashboard": {
     "title": "Tableau de bord du Comité",

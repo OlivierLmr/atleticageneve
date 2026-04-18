@@ -24,6 +24,10 @@ const MIGRATION_0002_STMTS = [
   'ALTER TABLE email_log ADD COLUMN html_body TEXT',
 ]
 
+const MIGRATION_0003_STMTS = [
+  'ALTER TABLE interaction ADD COLUMN email_log_id TEXT REFERENCES email_log(id)',
+]
+
 export interface TestContext {
   mf: Miniflare
   db: ReturnType<typeof drizzle<typeof schema>>
@@ -73,6 +77,16 @@ export async function setupTestContext(): Promise<TestContext> {
     }
   }
   await d1.prepare('INSERT OR IGNORE INTO d1_migrations (name) VALUES (?)').bind('0002_spec_v4').run()
+
+  // Run migration 0003 (ALTER TABLE statements)
+  for (const stmt of MIGRATION_0003_STMTS) {
+    try {
+      await d1.prepare(stmt).run()
+    } catch {
+      // Column already exists — safe to ignore
+    }
+  }
+  await d1.prepare('INSERT OR IGNORE INTO d1_migrations (name) VALUES (?)').bind('0003_interaction_email').run()
 
   // Request helper
   const request = async (urlPath: string, init?: RequestInit): Promise<Response> => {

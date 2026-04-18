@@ -247,6 +247,7 @@ export interface Interaction {
   content: string
   authorId: string | null
   authorName: string
+  emailLogId: string | null
   createdAt: string
 }
 
