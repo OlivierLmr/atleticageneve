@@ -626,7 +626,7 @@ function CostPopup({ athlete, latestAgreement, costMode, t }: {
           {latestAgreement.otherCompensation > 0 && <div className="flex justify-between"><span>{t('contract.otherCompensation')}</span><span>CHF {latestAgreement.otherCompensation}</span></div>}
           <div className="border-t pt-1 mt-1 flex justify-between font-semibold text-gray-900">
             <span>{t('contract.totalCost')}</span>
-            <span>CHF {latestAgreement.totalCost.toLocaleString()}</span>
+            <span>CHF {(latestAgreement.totalCost ?? 0).toLocaleString()}</span>
           </div>
           <div className="text-[10px] text-gray-400">v{latestAgreement.version} — {new Date(latestAgreement.sentAt).toLocaleDateString()}</div>
         </div>
@@ -637,7 +637,7 @@ function CostPopup({ athlete, latestAgreement, costMode, t }: {
           <div className="flex justify-between"><span>{t('collaborator.estAppearance')}</span><span>CHF {athlete.estAppearance}</span></div>
           <div className="border-t pt-1 mt-1 flex justify-between font-semibold text-gray-900">
             <span>{t('contract.totalCost')}</span>
-            <span>CHF {athlete.estTotal.toLocaleString()}</span>
+            <span>CHF {(athlete.estTotal ?? 0).toLocaleString()}</span>
           </div>
         </div>
       )}
@@ -842,11 +842,11 @@ export default function AthletePage() {
     return !base.includes(status) && extra.includes(status)
   }
 
-  // Cost summary text for banner
+  // Cost summary text for banner (estTotal and totalCost are undefined for athlete/manager roles)
   const costSummary = (() => {
     if (costMode === 'confirmed' && athlete.agreements.length === 0) return t('selection.acceptedAtMeeting')
-    if (costMode !== 'estimated' && latestAgreement) return `CHF ${latestAgreement.totalCost.toLocaleString()}`
-    return `CHF ${athlete.estTotal.toLocaleString()}`
+    if (costMode !== 'estimated' && latestAgreement) return latestAgreement.totalCost != null ? `CHF ${latestAgreement.totalCost.toLocaleString()}` : ''
+    return athlete.estTotal != null ? `CHF ${athlete.estTotal.toLocaleString()}` : ''
   })()
 
   const costLabel = costMode === 'confirmed' ? t('selection.confirmedCostLabel') :
