@@ -17,9 +17,9 @@ test.describe('Registration Flow', () => {
   test('athlete registration step 1 has required fields', async ({ page }) => {
     await page.goto('/athlete/register')
     // First name, last name, email, gender, nationality are required on step 1
-    await expect(page.getByText(/first name/i)).toBeVisible()
-    await expect(page.getByText(/last name/i)).toBeVisible()
-    await expect(page.getByText(/email/i)).toBeVisible()
+    await expect(page.getByText(/first name/i).first()).toBeVisible()
+    await expect(page.getByText(/last name/i).first()).toBeVisible()
+    await expect(page.getByText(/email/i).first()).toBeVisible()
     await expect(page.getByText(/category/i)).toBeVisible()
     await expect(page.getByText(/nationality/i)).toBeVisible()
   })
