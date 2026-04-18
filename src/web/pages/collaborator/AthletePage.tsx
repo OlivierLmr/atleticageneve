@@ -211,7 +211,7 @@ function SelectorAssign({ currentValue, staffUsers, onSave, isPending, t }: {
   )
 }
 
-function AgreementCard({ agreement: c, t }: { agreement: Agreement; t: (key: string) => string }) {
+function AgreementCard({ agreement: c, t, isStaff }: { agreement: Agreement; t: (key: string) => string; isStaff: boolean }) {
   const nights = [
     c.hotelNightTue, c.hotelNightWed, c.hotelNightThu,
     c.hotelNightFri, c.hotelNightSat, c.hotelNightSun,
@@ -221,6 +221,14 @@ function AgreementCard({ agreement: c, t }: { agreement: Agreement; t: (key: str
     c.dinnerTue, c.dinnerWed, c.dinnerThu,
     c.dinnerFri, c.dinnerSat, c.dinnerSun,
   ].filter(Boolean).length
+
+  // Only show non-empty fields (Phase 5.2 requirement)
+  const rows: Array<{ label: string; value: string }> = []
+  if (c.appearanceFee > 0) rows.push({ label: t('contract.bonus'), value: `CHF ${c.appearanceFee}` })
+  if (c.otherCompensation > 0) rows.push({ label: t('contract.otherCompensation'), value: `CHF ${c.otherCompensation}` })
+  if (c.transport > 0) rows.push({ label: t('contract.transport'), value: `CHF ${c.transport}` })
+  if (nights > 0) rows.push({ label: t('contract.hotelNights'), value: String(nights) })
+  if (dinners > 0) rows.push({ label: t('contract.dinners'), value: String(dinners) })
 
   return (
     <div className={`p-3 rounded border text-xs ${
@@ -232,15 +240,16 @@ function AgreementCard({ agreement: c, t }: { agreement: Agreement; t: (key: str
         </span>
         <span className="text-gray-500">{new Date(c.sentAt).toLocaleDateString()}</span>
       </div>
-      <div className="grid grid-cols-2 gap-1 text-gray-600">
-        <span>{t('contract.bonus')}: CHF {c.appearanceFee}</span>
-        <span>{t('contract.transport')}: CHF {c.transport}</span>
-        <span>{t('contract.hotelNights')}: {nights}</span>
-        <span>{t('contract.dinners')}: {dinners}</span>
-      </div>
-      <div className="mt-1 font-semibold text-gray-900">
-        {t('contract.totalCost')}: CHF {c.totalCost.toLocaleString()}
-      </div>
+      {rows.length > 0 && (
+        <div className="grid grid-cols-2 gap-1 text-gray-600">
+          {rows.map(r => <span key={r.label}>{r.label}: {r.value}</span>)}
+        </div>
+      )}
+      {isStaff && c.totalCost > 0 && (
+        <div className="mt-1 font-semibold text-gray-900">
+          {t('contract.totalCost')}: CHF {c.totalCost.toLocaleString()}
+        </div>
+      )}
       {c.notes && <p className="mt-1 text-gray-500 italic">{c.notes}</p>}
     </div>
   )
@@ -388,12 +397,26 @@ function ConfirmedAthletesPopup({ eventId, t }: {
   )
 }
 
-// ── Event row in Event Selection block ───────────────────────────────────────
+// ── SB color helper ──────────────────────────────────────────────────────────
 
-function EventRow({ app, athlete, edition, onParticipationChange, onRescore, onWaPerfSave, isPendingParticipation, t }: {
+function sbColorClass(sb: number | null, app: ApplicationForAthlete, athlete: AthleteDetail): string {
+  if (sb == null) return ''
+  const perfType = app.event.catalog.discipline === 'Course' ? 'MIN' : 'MAX'
+  const minima = [app.event.intMinima]
+  if (athlete.isSwiss) minima.push(app.event.swissMinima)
+  if (athlete.isEap && app.event.eapMinima != null) minima.push(app.event.eapMinima)
+
+  const meetsSome = minima.some(m => perfType === 'MIN' ? sb <= m : sb >= m)
+  return meetsSome ? 'text-green-600' : 'text-red-600'
+}
+
+// ── Banner event row ─────────────────────────────────────────────────────────
+
+function BannerEventRow({ app, athlete, edition, isStaff, onParticipationChange, onRescore, onWaPerfSave, isPendingParticipation, t }: {
   app: ApplicationForAthlete
   athlete: AthleteDetail
   edition: EditionCosts | null
+  isStaff: boolean
   onParticipationChange: (appId: string, status: string) => void
   onRescore: (appId: string) => void
   onWaPerfSave: (athleteId: string, eventId: string, data: { personalBest?: number; seasonBest?: number; worldRanking?: number }) => void
@@ -423,90 +446,47 @@ function EventRow({ app, athlete, edition, onParticipationChange, onRescore, onW
   const inputCls = 'w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-gray-900'
 
   return (
-    <div className="border rounded-lg p-3 bg-white space-y-2">
-      {/* Event name + participation buttons */}
-      <div className="flex items-start justify-between gap-2">
-        <div className="relative">
-          <button
-            onMouseEnter={() => setShowEventPopup(true)}
-            onMouseLeave={() => setShowEventPopup(false)}
-            className="font-medium text-sm text-gray-900 hover:text-blue-700 text-left"
-          >
-            {app.event.catalog.name}
-          </button>
-          {showEventPopup && (
-            <ConfirmedAthletesPopup eventId={app.eventId} t={t} />
-          )}
-        </div>
-
-        <div className="flex gap-1 shrink-0">
-          {(['pending', 'selected', 'not_selected'] as const).map((status) => (
-            <button
-              key={status}
-              onClick={() => {
-                if (app.participationStatus !== status) {
-                  onParticipationChange(app.id, status)
-                }
-              }}
-              disabled={isPendingParticipation || app.participationStatus === status}
-              className={`text-[10px] px-2 py-0.5 rounded font-medium border ${
-                app.participationStatus === status
-                  ? PARTICIPATION_COLORS[status] ?? 'bg-gray-100 text-gray-500'
-                  : 'border-gray-200 text-gray-400 hover:bg-gray-50'
-              }`}
-            >
-              {t(`participation.${status}`)}
-            </button>
-          ))}
-        </div>
+    <div className="flex items-center gap-3 py-1.5 border-b border-gray-100 last:border-0">
+      {/* Event name with hover popup */}
+      <div className="relative shrink-0 w-28">
+        <button
+          onMouseEnter={() => setShowEventPopup(true)}
+          onMouseLeave={() => setShowEventPopup(false)}
+          className="font-medium text-sm text-gray-900 hover:text-blue-700 text-left truncate block w-full"
+        >
+          {app.event.catalog.name}
+        </button>
+        {showEventPopup && <ConfirmedAthletesPopup eventId={app.eventId} t={t} />}
       </div>
 
-      {/* Performance row */}
+      {/* PB / SB (colored) / Ranking */}
       {editingPerf ? (
-        <div className="grid grid-cols-3 gap-2">
-          <div>
-            <label className="block text-[10px] text-gray-500 mb-0.5">PB</label>
-            <input type="number" step="0.01" className={inputCls} value={perfForm.personalBest}
-              onChange={e => setPerfForm(p => ({ ...p, personalBest: e.target.value }))} />
-          </div>
-          <div>
-            <label className="block text-[10px] text-gray-500 mb-0.5">SB</label>
-            <input type="number" step="0.01" className={inputCls} value={perfForm.seasonBest}
-              onChange={e => setPerfForm(p => ({ ...p, seasonBest: e.target.value }))} />
-          </div>
-          <div>
-            <label className="block text-[10px] text-gray-500 mb-0.5">Ranking</label>
-            <input type="number" className={inputCls} value={perfForm.worldRanking}
-              onChange={e => setPerfForm(p => ({ ...p, worldRanking: e.target.value }))} />
-          </div>
-          <div className="col-span-3 flex gap-2">
-            <button
-              onClick={() => {
-                onWaPerfSave(athlete.id, app.eventId, {
-                  ...(perfForm.personalBest ? { personalBest: parseFloat(perfForm.personalBest) } : {}),
-                  ...(perfForm.seasonBest ? { seasonBest: parseFloat(perfForm.seasonBest) } : {}),
-                  ...(perfForm.worldRanking ? { worldRanking: parseInt(perfForm.worldRanking) } : {}),
-                })
-                setEditingPerf(false)
-              }}
-              className="text-xs bg-gray-900 text-white px-3 py-1 rounded hover:bg-gray-800"
-            >
-              {t('common.save')}
-            </button>
-            <button onClick={() => setEditingPerf(false)} className="text-xs text-gray-400 hover:text-gray-600">
-              {t('common.cancel')}
-            </button>
-          </div>
+        <div className="flex gap-1 items-center flex-1">
+          <input type="number" step="0.01" placeholder="PB" className="w-20 px-1 py-0.5 border border-gray-300 rounded text-xs" value={perfForm.personalBest}
+            onChange={e => setPerfForm(p => ({ ...p, personalBest: e.target.value }))} />
+          <input type="number" step="0.01" placeholder="SB" className="w-20 px-1 py-0.5 border border-gray-300 rounded text-xs" value={perfForm.seasonBest}
+            onChange={e => setPerfForm(p => ({ ...p, seasonBest: e.target.value }))} />
+          <input type="number" placeholder="#" className="w-16 px-1 py-0.5 border border-gray-300 rounded text-xs" value={perfForm.worldRanking}
+            onChange={e => setPerfForm(p => ({ ...p, worldRanking: e.target.value }))} />
+          <button onClick={() => {
+            onWaPerfSave(athlete.id, app.eventId, {
+              ...(perfForm.personalBest ? { personalBest: parseFloat(perfForm.personalBest) } : {}),
+              ...(perfForm.seasonBest ? { seasonBest: parseFloat(perfForm.seasonBest) } : {}),
+              ...(perfForm.worldRanking ? { worldRanking: parseInt(perfForm.worldRanking) } : {}),
+            })
+            setEditingPerf(false)
+          }} className="text-[10px] text-green-600 hover:text-green-800">✓</button>
+          <button onClick={() => setEditingPerf(false)} className="text-[10px] text-gray-400 hover:text-gray-600">✕</button>
         </div>
       ) : (
-        <div className="flex items-center gap-4 text-xs text-gray-600">
+        <div className="flex items-center gap-3 text-xs text-gray-600 flex-1">
           <span>PB: <span className="font-mono font-medium">{formatPerf(pb)}</span></span>
-          <span>SB: <span className="font-mono font-medium">{formatPerf(sb)}</span></span>
+          <span>SB: <span className={`font-mono font-medium ${sbColorClass(sb, app, athlete)}`}>{formatPerf(sb)}</span></span>
           <span>#{wr ?? '—'}</span>
 
           {/* Score with popup */}
           {app.score != null && (
-            <div className="relative ml-auto">
+            <div className="relative">
               <button
                 onMouseEnter={() => setShowScorePopup(true)}
                 onMouseLeave={() => setShowScorePopup(false)}
@@ -520,19 +500,96 @@ function EventRow({ app, athlete, edition, onParticipationChange, onRescore, onW
             </div>
           )}
 
-          <div className="flex gap-2 ml-auto">
-            <button
-              onClick={() => setEditingPerf(true)}
-              className="text-[10px] text-blue-600 hover:text-blue-800"
-            >
-              {t('selection.editPerformance')}
-            </button>
-            <button
-              onClick={() => onRescore(app.id)}
-              className="text-[10px] text-gray-400 hover:text-gray-600"
-            >
-              {t('selection.rescore')}
-            </button>
+          {/* Recommendation */}
+          {app.recommendation && (
+            <span className={`text-[10px] px-1.5 py-0.5 rounded ${
+              app.recommendation === 'Highly Recommended' ? 'bg-green-100 text-green-700' :
+              app.recommendation === 'Recommended' ? 'bg-blue-100 text-blue-700' :
+              app.recommendation === 'Under Review' ? 'bg-yellow-100 text-yellow-700' :
+              'bg-red-100 text-red-700'
+            }`}>
+              {app.recommendation}
+            </span>
+          )}
+        </div>
+      )}
+
+      {/* Participation status — staff gets buttons, athlete/manager gets read-only badge */}
+      <div className="flex gap-1 shrink-0">
+        {isStaff ? (
+          <>
+            {(['pending', 'selected', 'not_selected'] as const).map((status) => (
+              <button
+                key={status}
+                onClick={() => {
+                  if (app.participationStatus !== status) {
+                    onParticipationChange(app.id, status)
+                  }
+                }}
+                disabled={isPendingParticipation || app.participationStatus === status}
+                className={`text-[10px] px-2 py-0.5 rounded font-medium border ${
+                  app.participationStatus === status
+                    ? PARTICIPATION_COLORS[status] ?? 'bg-gray-100 text-gray-500'
+                    : 'border-gray-200 text-gray-400 hover:bg-gray-50'
+                }`}
+              >
+                {t(`participation.${status}`)}
+              </button>
+            ))}
+          </>
+        ) : (
+          <span className={`text-[10px] px-2 py-0.5 rounded font-medium ${PARTICIPATION_COLORS[app.participationStatus] ?? 'bg-gray-100 text-gray-500'}`}>
+            {t(`participation.${app.participationStatus}`)}
+          </span>
+        )}
+      </div>
+
+      {/* Staff-only: edit perf + rescore */}
+      {isStaff && !editingPerf && (
+        <div className="flex gap-1 shrink-0">
+          <button onClick={() => setEditingPerf(true)} className="text-[10px] text-blue-600 hover:text-blue-800">
+            {t('selection.editPerformance')}
+          </button>
+          <button onClick={() => onRescore(app.id)} className="text-[10px] text-gray-400 hover:text-gray-600">
+            {t('selection.rescore')}
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Cost hover popup ─────────────────────────────────────────────────────────
+
+function CostPopup({ athlete, latestAgreement, costMode, t }: {
+  athlete: AthleteDetail
+  latestAgreement: Agreement | undefined
+  costMode: string
+  t: (key: string) => string
+}) {
+  return (
+    <div className="absolute z-20 right-0 top-6 bg-white border rounded-lg shadow-lg p-3 text-xs w-56">
+      {costMode === 'confirmed' && !latestAgreement ? (
+        <p className="text-green-700 italic">{t('selection.acceptedAtMeeting')}</p>
+      ) : costMode !== 'estimated' && latestAgreement ? (
+        <div className="space-y-1 text-gray-600">
+          {latestAgreement.appearanceFee > 0 && <div className="flex justify-between"><span>{t('contract.bonus')}</span><span>CHF {latestAgreement.appearanceFee}</span></div>}
+          {latestAgreement.transport > 0 && <div className="flex justify-between"><span>{t('contract.transport')}</span><span>CHF {latestAgreement.transport}</span></div>}
+          {latestAgreement.otherCompensation > 0 && <div className="flex justify-between"><span>{t('contract.otherCompensation')}</span><span>CHF {latestAgreement.otherCompensation}</span></div>}
+          <div className="border-t pt-1 mt-1 flex justify-between font-semibold text-gray-900">
+            <span>{t('contract.totalCost')}</span>
+            <span>CHF {latestAgreement.totalCost.toLocaleString()}</span>
+          </div>
+          <div className="text-[10px] text-gray-400">v{latestAgreement.version} — {new Date(latestAgreement.sentAt).toLocaleDateString()}</div>
+        </div>
+      ) : (
+        <div className="space-y-1 text-gray-600">
+          <div className="flex justify-between"><span>{t('collaborator.estTravel')}</span><span>CHF {athlete.estTravel}</span></div>
+          <div className="flex justify-between"><span>{t('collaborator.estAccommodation')}</span><span>CHF {athlete.estAccommodation}</span></div>
+          <div className="flex justify-between"><span>{t('collaborator.estAppearance')}</span><span>CHF {athlete.estAppearance}</span></div>
+          <div className="border-t pt-1 mt-1 flex justify-between font-semibold text-gray-900">
+            <span>{t('contract.totalCost')}</span>
+            <span>CHF {athlete.estTotal.toLocaleString()}</span>
           </div>
         </div>
       )}
@@ -558,6 +615,7 @@ export default function AthletePage() {
   const [internalNotes, setInternalNotes] = useState('')
   const [notesInitialized, setNotesInitialized] = useState(false)
   const [agreementForm, setAgreementForm] = useState(() => defaultAgreement())
+  const [showCostPopup, setShowCostPopup] = useState(false)
 
   const { data: athlete, isLoading } = useQuery<AthleteDetail>({
     queryKey: ['athlete', id],
@@ -689,7 +747,6 @@ export default function AthletePage() {
 
   const toggleSection = (name: string) => setOpenSection(openSection === name ? null : name)
 
-  // Cost display mode based on negotiation status
   const costMode =
     currentStatus === 'confirmed' ? 'confirmed' :
     ['agreement_sent', 'counter_offer_sent'].includes(currentStatus) ? 'negotiating' :
@@ -702,9 +759,20 @@ export default function AthletePage() {
     return !base.includes(status) && extra.includes(status)
   }
 
+  // Cost summary text for banner
+  const costSummary = (() => {
+    if (costMode === 'confirmed' && athlete.agreements.length === 0) return t('selection.acceptedAtMeeting')
+    if (costMode !== 'estimated' && latestAgreement) return `CHF ${latestAgreement.totalCost.toLocaleString()}`
+    return `CHF ${athlete.estTotal.toLocaleString()}`
+  })()
+
+  const costLabel = costMode === 'confirmed' ? t('selection.confirmedCostLabel') :
+    costMode === 'negotiating' ? t('selection.costInNegotiation') :
+    t('selection.estimatedCostLabel')
+
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* ── Bandeau ──────────────────────────────────────────────────────── */}
+      {/* ── Banner ──────────────────────────────────────────────────────── */}
       <div className="bg-white border-b">
         <div className="max-w-7xl mx-auto px-6 py-4">
           {/* Top row: navigation + language */}
@@ -723,7 +791,7 @@ export default function AthletePage() {
             <LanguageSwitcher />
           </div>
 
-          {/* Athlete info row */}
+          {/* Athlete info + actions */}
           <div className="flex items-start justify-between gap-4">
             <div>
               <div className="flex items-center gap-3 mb-1">
@@ -734,15 +802,18 @@ export default function AthletePage() {
                   {t(`status.${currentStatus}`)}
                 </span>
               </div>
-              <div className="flex items-center gap-3 text-sm text-gray-500">
+              <div className="flex flex-wrap items-center gap-3 text-sm text-gray-500">
                 <span className={
                   athlete.isSwiss ? 'text-red-600 font-semibold' :
                   athlete.isEap ? 'text-blue-600 font-semibold' : ''
                 }>
                   {athlete.nationality}
                   {athlete.isSwiss && ' (SUI)'}
-                  {athlete.isEap && ' (EAP)'}
                 </span>
+                {athlete.isEap && (
+                  <span className="text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded font-medium">EAP</span>
+                )}
+                {athlete.dateOfBirth && <span>{athlete.dateOfBirth}</span>}
                 {athlete.federation && <span>— {athlete.federation}</span>}
                 {athlete.club && <span>· {athlete.club}</span>}
                 {athlete.gender && (
@@ -750,11 +821,41 @@ export default function AthletePage() {
                     {athlete.gender}
                   </span>
                 )}
+                {athlete.managerName && (
+                  <span className="text-xs text-gray-500">
+                    Manager: {athlete.managerName}
+                  </span>
+                )}
+                {athlete.waProfileUrl && (
+                  <a href={athlete.waProfileUrl} target="_blank" rel="noopener noreferrer"
+                    className="text-xs text-blue-600 hover:text-blue-800" title="World Athletics">
+                    WA ↗
+                  </a>
+                )}
+                {/* Cost summary — staff only */}
+                {isStaff && (
+                  <div className="relative ml-auto">
+                    <button
+                      onMouseEnter={() => setShowCostPopup(true)}
+                      onMouseLeave={() => setShowCostPopup(false)}
+                      className={`text-xs font-medium px-2 py-0.5 rounded border cursor-default ${
+                        costMode === 'confirmed' ? 'border-green-200 bg-green-50 text-green-700' :
+                        costMode === 'negotiating' ? 'border-blue-200 bg-blue-50 text-blue-700' :
+                        'border-gray-200 bg-gray-50 text-gray-600'
+                      }`}
+                    >
+                      {costLabel}: {costSummary}
+                    </button>
+                    {showCostPopup && (
+                      <CostPopup athlete={athlete} latestAgreement={latestAgreement} costMode={costMode} t={t} />
+                    )}
+                  </div>
+                )}
               </div>
             </div>
 
             {/* Action buttons */}
-            <div className="flex flex-wrap gap-2 justify-end">
+            <div className="flex flex-wrap gap-2 justify-end shrink-0">
               {allowedTransitions.map((status) => {
                 const needsConfirm = ['confirmed', 'rejected', 'withdrawn', 'to_review'].includes(status)
                 const committeeOnly = isCommitteeOnly(status as NegotiationStatus)
@@ -762,7 +863,7 @@ export default function AthletePage() {
                   <button
                     key={status}
                     onClick={() => {
-                      if (status === 'agreement_sent') {
+                      if (status === 'agreement_sent' && isStaff) {
                         setActiveTab('negotiation')
                         setShowAgreementForm(true)
                       } else if (needsConfirm) {
@@ -838,6 +939,31 @@ export default function AthletePage() {
 
           {statusMutation.isError && (
             <p className="text-xs text-red-600 mt-2">{(statusMutation.error as Error)?.message || t('common.error')}</p>
+          )}
+
+          {/* Events in banner — per spec */}
+          {athlete.applications.length > 0 && (
+            <div className="mt-4 border-t pt-3">
+              <div className="text-xs font-semibold text-gray-500 mb-1">{t('selection.participation')}</div>
+              {athlete.applications.map(app => (
+                <BannerEventRow
+                  key={app.id}
+                  app={app}
+                  athlete={athlete}
+                  edition={athlete.edition}
+                  isStaff={!!isStaff}
+                  onParticipationChange={(appId, status) =>
+                    participationMutation.mutate({ appId, status })
+                  }
+                  onRescore={(appId) => scoreMutation.mutate(appId)}
+                  onWaPerfSave={(athleteId, eventId, data) =>
+                    waPerfMutation.mutate({ athleteId, eventId, ...data })
+                  }
+                  isPendingParticipation={participationMutation.isPending}
+                  t={t}
+                />
+              ))}
+            </div>
           )}
         </div>
 
@@ -941,57 +1067,63 @@ export default function AthletePage() {
             </div>
 
             <div className="space-y-4">
-              {/* Assigned selector */}
-              <CollapsibleSection title={t('selection.assignedSelector')} isOpen={openSection === 'selector'} onToggle={() => toggleSection('selector')}>
-                <SelectorAssign
-                  currentValue={athlete.assignedSelector}
-                  staffUsers={staffUsers}
-                  onSave={(val) => athleteUpdateMutation.mutate({ assignedSelector: val || null })}
-                  isPending={athleteUpdateMutation.isPending}
-                  t={t}
-                />
-              </CollapsibleSection>
+              {/* Assigned selector — staff only */}
+              {isStaff && (
+                <CollapsibleSection title={t('selection.assignedSelector')} isOpen={openSection === 'selector'} onToggle={() => toggleSection('selector')}>
+                  <SelectorAssign
+                    currentValue={athlete.assignedSelector}
+                    staffUsers={staffUsers}
+                    onSave={(val) => athleteUpdateMutation.mutate({ assignedSelector: val || null })}
+                    isPending={athleteUpdateMutation.isPending}
+                    t={t}
+                  />
+                </CollapsibleSection>
+              )}
 
-              {/* Cost estimates */}
-              <CollapsibleSection title={t('selection.estimatedCost')} isOpen={openSection === 'costs'} onToggle={() => toggleSection('costs')}>
-                <AthleteFieldEditor
-                  athlete={athlete}
-                  fields={[
-                    { key: 'estTravel', label: t('collaborator.estTravel'), type: 'number' },
-                    { key: 'estAccommodation', label: t('collaborator.estAccommodation'), type: 'number' },
-                    { key: 'estAppearance', label: t('collaborator.estAppearance'), type: 'number' },
-                  ]}
-                  onSave={(data) => athleteUpdateMutation.mutate(data)}
-                  isPending={athleteUpdateMutation.isPending}
-                  error={athleteUpdateMutation.error}
-                  t={t}
-                />
-                <p className="text-xs text-gray-400 mt-1">{t('collaborator.estTotalHint')}</p>
-              </CollapsibleSection>
+              {/* Cost estimates — staff only */}
+              {isStaff && (
+                <CollapsibleSection title={t('selection.estimatedCost')} isOpen={openSection === 'costs'} onToggle={() => toggleSection('costs')}>
+                  <AthleteFieldEditor
+                    athlete={athlete}
+                    fields={[
+                      { key: 'estTravel', label: t('collaborator.estTravel'), type: 'number' },
+                      { key: 'estAccommodation', label: t('collaborator.estAccommodation'), type: 'number' },
+                      { key: 'estAppearance', label: t('collaborator.estAppearance'), type: 'number' },
+                    ]}
+                    onSave={(data) => athleteUpdateMutation.mutate(data)}
+                    isPending={athleteUpdateMutation.isPending}
+                    error={athleteUpdateMutation.error}
+                    t={t}
+                  />
+                  <p className="text-xs text-gray-400 mt-1">{t('collaborator.estTotalHint')}</p>
+                </CollapsibleSection>
+              )}
 
-              {/* Payment */}
-              <CollapsibleSection title={t('collaborator.payment')} isOpen={openSection === 'payment'} onToggle={() => toggleSection('payment')}>
-                <AthleteFieldEditor
-                  athlete={athlete}
-                  fields={[
-                    { key: 'bankIban', label: t('collaborator.iban'), type: 'text' },
-                    { key: 'paymentStatus', label: t('collaborator.paymentStatus'), type: 'select', options: [
-                      { value: 'pending', label: t('common.pending') }, { value: 'done', label: t('common.done') },
-                    ]},
-                    { key: 'paymentAmount', label: t('collaborator.paymentAmount'), type: 'number' },
-                    { key: 'paymentDate', label: t('collaborator.paymentDate'), type: 'date' },
-                    { key: 'paymentMethod', label: t('collaborator.paymentMethod'), type: 'select', options: [
-                      { value: '', label: '—' }, { value: 'cash', label: t('collaborator.cash') },
-                      { value: 'bank', label: t('collaborator.bank') }, { value: 'western_union', label: t('collaborator.westernUnion') },
-                      { value: 'paypal', label: t('collaborator.paypal') }, { value: 'other', label: t('collaborator.other') },
-                    ]},
-                  ]}
-                  onSave={(data) => athleteUpdateMutation.mutate(data)}
-                  isPending={athleteUpdateMutation.isPending}
-                  error={athleteUpdateMutation.error}
-                  t={t}
-                />
-              </CollapsibleSection>
+              {/* Payment — staff only */}
+              {isStaff && (
+                <CollapsibleSection title={t('collaborator.payment')} isOpen={openSection === 'payment'} onToggle={() => toggleSection('payment')}>
+                  <AthleteFieldEditor
+                    athlete={athlete}
+                    fields={[
+                      { key: 'bankIban', label: t('collaborator.iban'), type: 'text' },
+                      { key: 'paymentStatus', label: t('collaborator.paymentStatus'), type: 'select', options: [
+                        { value: 'pending', label: t('common.pending') }, { value: 'done', label: t('common.done') },
+                      ]},
+                      { key: 'paymentAmount', label: t('collaborator.paymentAmount'), type: 'number' },
+                      { key: 'paymentDate', label: t('collaborator.paymentDate'), type: 'date' },
+                      { key: 'paymentMethod', label: t('collaborator.paymentMethod'), type: 'select', options: [
+                        { value: '', label: '—' }, { value: 'cash', label: t('collaborator.cash') },
+                        { value: 'bank', label: t('collaborator.bank') }, { value: 'western_union', label: t('collaborator.westernUnion') },
+                        { value: 'paypal', label: t('collaborator.paypal') }, { value: 'other', label: t('collaborator.other') },
+                      ]},
+                    ]}
+                    onSave={(data) => athleteUpdateMutation.mutate(data)}
+                    isPending={athleteUpdateMutation.isPending}
+                    error={athleteUpdateMutation.error}
+                    t={t}
+                  />
+                </CollapsibleSection>
+              )}
 
               {/* Notes */}
               <CollapsibleSection title={t('common.notes')} isOpen={openSection === 'notes'} onToggle={() => toggleSection('notes')}>
@@ -1004,22 +1136,24 @@ export default function AthletePage() {
                     <label className="block text-xs font-medium text-gray-500 mb-1">{t('collaborator.additionalNotes')}</label>
                     <p className="text-xs text-gray-600 bg-gray-50 p-2 rounded min-h-[2rem]">{athlete.additionalNotes || '—'}</p>
                   </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-500 mb-1">{t('collaborator.internalNotes')}</label>
-                    <textarea
-                      className={inputCls}
-                      rows={3}
-                      value={internalNotes}
-                      onChange={(e) => setInternalNotes(e.target.value)}
-                    />
-                    <button
-                      onClick={() => internalNotesMutation.mutate(internalNotes)}
-                      disabled={internalNotesMutation.isPending}
-                      className="mt-2 text-xs bg-gray-900 text-white px-3 py-1 rounded hover:bg-gray-800 disabled:opacity-50"
-                    >
-                      {t('common.save')}
-                    </button>
-                  </div>
+                  {isStaff && (
+                    <div>
+                      <label className="block text-xs font-medium text-gray-500 mb-1">{t('collaborator.internalNotes')}</label>
+                      <textarea
+                        className={inputCls}
+                        rows={3}
+                        value={internalNotes}
+                        onChange={(e) => setInternalNotes(e.target.value)}
+                      />
+                      <button
+                        onClick={() => internalNotesMutation.mutate(internalNotes)}
+                        disabled={internalNotesMutation.isPending}
+                        className="mt-2 text-xs bg-gray-900 text-white px-3 py-1 rounded hover:bg-gray-800 disabled:opacity-50"
+                      >
+                        {t('common.save')}
+                      </button>
+                    </div>
+                  )}
                 </div>
               </CollapsibleSection>
             </div>
@@ -1029,94 +1163,13 @@ export default function AthletePage() {
         {/* ── Tab 2: Agreement & Negotiation ───────────────────────────── */}
         {activeTab === 'negotiation' && (
           <div className="grid grid-cols-2 gap-6">
-            {/* Left: Event Selection + Cost + Agreements */}
+            {/* Left: Agreements */}
             <div className="space-y-4">
-              {/* Event Selection */}
-              <div className="bg-white rounded-lg border p-4">
-                <h3 className="font-semibold text-sm mb-3">{t('selection.participation')}</h3>
-                <div className="space-y-2">
-                  {athlete.applications.map(app => (
-                    <EventRow
-                      key={app.id}
-                      app={app}
-                      athlete={athlete}
-                      edition={athlete.edition}
-                      onParticipationChange={(appId, status) =>
-                        participationMutation.mutate({ appId, status })
-                      }
-                      onRescore={(appId) => scoreMutation.mutate(appId)}
-                      onWaPerfSave={(athleteId, eventId, data) =>
-                        waPerfMutation.mutate({ athleteId, eventId, ...data })
-                      }
-                      isPendingParticipation={participationMutation.isPending}
-                      t={t}
-                    />
-                  ))}
-                </div>
-                {!allDecided && athlete.applications.length > 0 && (
-                  <p className="text-xs text-gray-400 mt-2">{t('selection.decideAllFirst')}</p>
-                )}
-                {allDecided && (
-                  <p className="text-xs text-green-600 mt-2">{t('selection.allDecided')}</p>
-                )}
-              </div>
-
-              {/* Cost display based on status */}
-              <div className="bg-white rounded-lg border p-4">
-                <h3 className="font-semibold text-sm mb-3">
-                  {costMode === 'confirmed' ? t('selection.confirmedCostLabel') :
-                   costMode === 'negotiating' ? t('selection.costInNegotiation') :
-                   t('selection.estimatedCostLabel')}
-                </h3>
-                {costMode === 'confirmed' && athlete.agreements.length === 0 ? (
-                  <p className="text-sm text-green-700 italic">{t('selection.acceptedAtMeeting')}</p>
-                ) : costMode === 'confirmed' && latestAgreement ? (
-                  <div className="text-sm">
-                    <div className="flex justify-between font-semibold text-green-700">
-                      <span>{t('contract.totalCost')}</span>
-                      <span>CHF {latestAgreement.totalCost.toLocaleString()}</span>
-                    </div>
-                    <div className="text-xs text-gray-500 mt-1">
-                      v{latestAgreement.version} — {new Date(latestAgreement.sentAt).toLocaleDateString()}
-                    </div>
-                  </div>
-                ) : costMode === 'negotiating' && latestAgreement ? (
-                  <div className="text-sm">
-                    <div className="flex justify-between font-semibold text-blue-700">
-                      <span>{t('contract.totalCost')}</span>
-                      <span>CHF {latestAgreement.totalCost.toLocaleString()}</span>
-                    </div>
-                    <div className="text-xs text-gray-500 mt-1">
-                      v{latestAgreement.version} — {t(`status.${currentStatus}`)}
-                    </div>
-                  </div>
-                ) : (
-                  <div className="text-sm text-gray-600">
-                    <div className="flex justify-between">
-                      <span>{t('collaborator.estTravel')}</span>
-                      <span className="font-mono">CHF {athlete.estTravel.toLocaleString()}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>{t('collaborator.estAccommodation')}</span>
-                      <span className="font-mono">CHF {athlete.estAccommodation.toLocaleString()}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>{t('collaborator.estAppearance')}</span>
-                      <span className="font-mono">CHF {athlete.estAppearance.toLocaleString()}</span>
-                    </div>
-                    <div className="flex justify-between font-semibold text-gray-900 border-t pt-1 mt-1">
-                      <span>{t('contract.totalCost')}</span>
-                      <span className="font-mono">CHF {athlete.estTotal.toLocaleString()}</span>
-                    </div>
-                  </div>
-                )}
-              </div>
-
               {/* Agreement history */}
               <div className="bg-white rounded-lg border p-4">
                 <div className="flex items-center justify-between mb-3">
                   <h3 className="font-semibold text-sm">{t('contract.title')}</h3>
-                  {!showAgreementForm && !['confirmed', 'rejected', 'withdrawn'].includes(currentStatus) && (
+                  {isStaff && !showAgreementForm && !['confirmed', 'rejected', 'withdrawn'].includes(currentStatus) && (
                     <button
                       onClick={() => setShowAgreementForm(true)}
                       disabled={!allDecided}
@@ -1127,19 +1180,21 @@ export default function AthletePage() {
                   )}
                 </div>
 
-                {athlete.agreements.length === 0 && !showAgreementForm ? (
+                {currentStatus === 'confirmed' && athlete.agreements.length === 0 ? (
+                  <p className="text-sm text-green-700 italic">{t('selection.acceptedAtMeeting')}</p>
+                ) : athlete.agreements.length === 0 && !showAgreementForm ? (
                   <p className="text-xs text-gray-400">{t('contract.noOfferYet')}</p>
                 ) : (
                   <div className="space-y-3">
                     {athlete.agreements.map(c => (
-                      <AgreementCard key={c.id} agreement={c} t={t} />
+                      <AgreementCard key={c.id} agreement={c} t={t} isStaff={!!isStaff} />
                     ))}
                   </div>
                 )}
               </div>
 
-              {/* Agreement form */}
-              {showAgreementForm && (
+              {/* Agreement form — staff only */}
+              {showAgreementForm && isStaff && (
                 <div className="bg-white rounded-lg border p-4">
                   <h3 className="font-semibold text-sm mb-3">
                     {t('contract.sendOffer')} — v{(athlete.agreements.length || 0) + 1}
@@ -1284,15 +1339,17 @@ export default function AthletePage() {
               {/* Add interaction */}
               <div className="bg-white rounded-lg border p-4">
                 <h3 className="font-semibold text-sm mb-3">{t('collaborator.addNote')}</h3>
-                <select
-                  className={`${inputCls} mb-2`}
-                  value={noteType}
-                  onChange={e => setNoteType(e.target.value as typeof noteType)}
-                >
-                  <option value="note">{t('collaborator.note')}</option>
-                  <option value="call">{t('collaborator.phoneCall')}</option>
-                  <option value="email">{t('athlete.email')}</option>
-                </select>
+                {isStaff && (
+                  <select
+                    className={`${inputCls} mb-2`}
+                    value={noteType}
+                    onChange={e => setNoteType(e.target.value as typeof noteType)}
+                  >
+                    <option value="note">{t('collaborator.note')}</option>
+                    <option value="call">{t('collaborator.phoneCall')}</option>
+                    <option value="email">{t('athlete.email')}</option>
+                  </select>
+                )}
                 <textarea
                   className={inputCls}
                   rows={3}
@@ -1303,7 +1360,7 @@ export default function AthletePage() {
                 <button
                   onClick={() => {
                     if (noteContent.trim()) {
-                      noteMutation.mutate({ type: noteType, content: noteContent })
+                      noteMutation.mutate({ type: isAthleteOrManager ? 'note' : noteType, content: noteContent })
                     }
                   }}
                   disabled={noteMutation.isPending || !noteContent.trim()}
@@ -1313,13 +1370,13 @@ export default function AthletePage() {
                 </button>
               </div>
 
-              {/* Timeline */}
+              {/* Timeline — limited height with scrollbar */}
               <div className="bg-white rounded-lg border p-4">
                 <h3 className="font-semibold text-sm mb-3">{t('collaborator.timeline')}</h3>
                 {athlete.interactions.length === 0 ? (
                   <p className="text-xs text-gray-400">{t('collaborator.noInteractions')}</p>
                 ) : (
-                  <div className="space-y-3">
+                  <div className="space-y-3 max-h-96 overflow-y-auto">
                     {athlete.interactions.map(interaction => (
                       <InteractionCard key={interaction.id} interaction={interaction} />
                     ))}
