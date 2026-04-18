@@ -5,7 +5,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from '@web/lib/api'
 import { useAuth } from '@web/lib/auth'
 import { LanguageSwitcher } from '@web/App'
-import { NEGOTIATION_TRANSITIONS, COMMITTEE_EXTRA_TRANSITIONS, NIGHT_LABELS, DINNER_LABELS } from '@shared/constants'
+import { NEGOTIATION_TRANSITIONS, COMMITTEE_EXTRA_TRANSITIONS, ATHLETE_TRANSITIONS, NIGHT_LABELS, DINNER_LABELS } from '@shared/constants'
 import { STATUS_COLORS, formatPerf } from '@web/lib/ui-constants'
 import { computeScore } from '@shared/scoring'
 import type {
@@ -649,7 +649,12 @@ export default function AthletePage() {
 
   const archiveMutation = useMutation({
     mutationFn: () => api.delete(`/api/v1/athletes/${id}`),
-    onSuccess: () => navigate(user?.role === 'committee' ? '/committee/candidates' : '/collaborator/candidates'),
+    onSuccess: () => navigate(
+      user?.role === 'committee' ? '/committee/candidates' :
+      user?.role === 'manager' ? '/manager/portal' :
+      user?.role === 'athlete' ? '/athlete/portal' :
+      '/collaborator/candidates'
+    ),
   })
 
   // ── Render ─────────────────────────────────────────────────────────────────
@@ -662,10 +667,19 @@ export default function AthletePage() {
     )
   }
 
+  const isStaff = user?.role === 'collaborator' || user?.role === 'committee'
+  const isCommittee = user?.role === 'committee'
+  const isAthleteOrManager = user?.role === 'athlete' || user?.role === 'manager'
+
   const currentStatus = athlete.negotiationStatus as NegotiationStatus
-  const baseTransitions = NEGOTIATION_TRANSITIONS[currentStatus] ?? []
-  const extraTransitions = user?.role === 'committee' ? (COMMITTEE_EXTRA_TRANSITIONS[currentStatus] ?? []) : []
-  const allowedTransitions = [...baseTransitions, ...extraTransitions]
+  let allowedTransitions: NegotiationStatus[]
+  if (isAthleteOrManager) {
+    allowedTransitions = ATHLETE_TRANSITIONS[currentStatus] ?? []
+  } else {
+    const baseTransitions = NEGOTIATION_TRANSITIONS[currentStatus] ?? []
+    const extraTransitions = isCommittee ? (COMMITTEE_EXTRA_TRANSITIONS[currentStatus] ?? []) : []
+    allowedTransitions = [...baseTransitions, ...extraTransitions]
+  }
 
   const allDecided = athlete.applications.length > 0
     && athlete.applications.every(a => a.participationStatus !== 'pending')
@@ -681,8 +695,12 @@ export default function AthletePage() {
     ['agreement_sent', 'counter_offer_sent'].includes(currentStatus) ? 'negotiating' :
     'estimated'
 
-  const isCommitteeOnly = (status: NegotiationStatus) =>
-    !baseTransitions.includes(status) && extraTransitions.includes(status)
+  const isCommitteeOnly = (status: NegotiationStatus) => {
+    if (isAthleteOrManager) return false
+    const base = NEGOTIATION_TRANSITIONS[currentStatus] ?? []
+    const extra = isCommittee ? (COMMITTEE_EXTRA_TRANSITIONS[currentStatus] ?? []) : []
+    return !base.includes(status) && extra.includes(status)
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -692,10 +710,15 @@ export default function AthletePage() {
           {/* Top row: navigation + language */}
           <div className="flex items-center justify-between mb-3">
             <Link
-              to={user?.role === 'committee' ? '/committee/candidates' : '/collaborator/candidates'}
+              to={
+                isCommittee ? '/committee/candidates' :
+                user?.role === 'manager' ? '/manager/portal' :
+                user?.role === 'athlete' ? '/athlete/portal' :
+                '/collaborator/candidates'
+              }
               className="text-sm text-gray-400 hover:text-gray-600"
             >
-              ← {t('selection.candidates')}
+              ← {t('common.back')}
             </Link>
             <LanguageSwitcher />
           </div>
@@ -1308,7 +1331,7 @@ export default function AthletePage() {
         )}
 
         {/* Archive button — committee only */}
-        {user?.role === 'committee' && !athlete.archivedAt && (
+        {isCommittee && !athlete.archivedAt && (
           <div className="mt-6 text-right">
             <button
               onClick={() => {

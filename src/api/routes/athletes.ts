@@ -3,7 +3,7 @@ import { zValidator } from '@hono/zod-validator'
 import { eq, sql } from 'drizzle-orm'
 import * as schema from '../db/schema'
 import { athleteRegistrationSchema, batchAthleteRegistrationSchema, athleteUpdateSchema, negotiationStatusChangeSchema } from '@shared/validation'
-import { NEGOTIATION_TRANSITIONS, COMMITTEE_EXTRA_TRANSITIONS } from '@shared/constants'
+import { NEGOTIATION_TRANSITIONS, COMMITTEE_EXTRA_TRANSITIONS, ATHLETE_TRANSITIONS } from '@shared/constants'
 import { requireAuth } from '../middleware/auth'
 import { sendEmail, sendMagicLinkEmail, sendStatusChangeEmail } from '../services/email'
 import { generateToken, magicLinkExpiresAt } from '../services/auth'
@@ -233,8 +233,9 @@ athletes.post('/batch', requireAuth('manager'), zValidator('json', batchAthleteR
 
 // ── GET /athletes/:id — full athlete profile with applications, agreements, interactions ─
 
-athletes.get('/:id', requireAuth('collaborator', 'committee'), async (c) => {
+athletes.get('/:id', requireAuth('athlete', 'manager', 'collaborator', 'committee'), async (c) => {
   const db = c.get('db')
+  const user = c.get('user')!
   const id = c.req.param('id')!
 
   const athRows = await db.select().from(schema.athlete).where(eq(schema.athlete.id, id)).limit(1)
@@ -242,6 +243,25 @@ athletes.get('/:id', requireAuth('collaborator', 'committee'), async (c) => {
     return c.json({ error: 'Athlete not found' }, 404)
   }
   const ath = athRows[0]
+
+  // Ownership check for athlete/manager roles
+  const isStaff = ['collaborator', 'committee'].includes(user.role)
+  if (!isStaff) {
+    const isOwner = ath.userId === user.id
+    const isManager = ath.managerId === user.id
+    if (!isOwner && !isManager) {
+      return c.json({ error: 'Not authorized to view this athlete' }, 403)
+    }
+  }
+
+  // Fetch manager name if managerId exists
+  let managerName: string | null = null
+  if (ath.managerId) {
+    const managerRows = await db.select().from(schema.user).where(eq(schema.user.id, ath.managerId)).limit(1)
+    if (managerRows.length > 0) {
+      managerName = `${managerRows[0].firstName} ${managerRows[0].lastName}`
+    }
+  }
 
   // Fetch all applications for this athlete with event + catalog
   const appRows = await db
@@ -270,11 +290,16 @@ athletes.get('/:id', requireAuth('collaborator', 'committee'), async (c) => {
   }))
 
   // Fetch agreements
-  const agreements = await db
+  const rawAgreements = await db
     .select()
     .from(schema.agreement)
     .where(eq(schema.agreement.athleteId, id))
     .orderBy(schema.agreement.version)
+
+  // Strip totalCost from agreements for athlete/manager view
+  const agreements = isStaff
+    ? rawAgreements
+    : rawAgreements.map(a => ({ ...a, totalCost: undefined }))
 
   // Fetch interactions (ordered most recent first)
   const interactions = await db
@@ -289,6 +314,9 @@ athletes.get('/:id', requireAuth('collaborator', 'committee'), async (c) => {
 
   return c.json({
     ...ath,
+    managerName,
+    // Hide cost estimates from athlete/manager
+    ...(isStaff ? {} : { estTravel: undefined, estAccommodation: undefined, estAppearance: undefined, estTotal: undefined }),
     applications,
     agreements,
     interactions,
@@ -347,7 +375,7 @@ athletes.patch('/:id', requireAuth('athlete', 'manager', 'collaborator', 'commit
 
 // ── PATCH /athletes/:id/negotiation-status — change negotiation status ───────
 
-athletes.patch('/:id/negotiation-status', requireAuth('collaborator', 'committee'), async (c) => {
+athletes.patch('/:id/negotiation-status', requireAuth('athlete', 'manager', 'collaborator', 'committee'), async (c) => {
   const db = c.get('db')
   const user = c.get('user')!
   const id = c.req.param('id')!
@@ -367,10 +395,24 @@ athletes.patch('/:id/negotiation-status', requireAuth('collaborator', 'committee
   const ath = athRows[0]
   const currentStatus = ath.negotiationStatus as NegotiationStatus
 
-  // Validate transition (committee users have extra transitions)
-  const baseAllowed = NEGOTIATION_TRANSITIONS[currentStatus] ?? []
-  const extraAllowed = user.role === 'committee' ? (COMMITTEE_EXTRA_TRANSITIONS[currentStatus] ?? []) : []
-  const allowed = [...baseAllowed, ...extraAllowed]
+  const isStaff = ['collaborator', 'committee'].includes(user.role)
+
+  // Ownership check for athlete/manager
+  if (!isStaff) {
+    if (ath.userId !== user.id && ath.managerId !== user.id) {
+      return c.json({ error: 'Not authorized to act on this athlete' }, 403)
+    }
+  }
+
+  // Validate transition based on role
+  let allowed: NegotiationStatus[]
+  if (isStaff) {
+    const baseAllowed = NEGOTIATION_TRANSITIONS[currentStatus] ?? []
+    const extraAllowed = user.role === 'committee' ? (COMMITTEE_EXTRA_TRANSITIONS[currentStatus] ?? []) : []
+    allowed = [...baseAllowed, ...extraAllowed]
+  } else {
+    allowed = ATHLETE_TRANSITIONS[currentStatus] ?? []
+  }
   if (!allowed.includes(newStatus)) {
     return c.json({
       error: `Cannot transition from "${currentStatus}" to "${newStatus}"`,
@@ -480,7 +522,7 @@ athletes.post('/:id/restore', requireAuth('committee'), async (c) => {
 
 // ── POST /athletes/:id/interactions — add interaction at athlete level ────────
 
-athletes.post('/:id/interactions', requireAuth('collaborator', 'committee'), async (c) => {
+athletes.post('/:id/interactions', requireAuth('athlete', 'manager', 'collaborator', 'committee'), async (c) => {
   const db = c.get('db')
   const user = c.get('user')!
   const id = c.req.param('id')!
@@ -503,6 +545,15 @@ athletes.post('/:id/interactions', requireAuth('collaborator', 'committee'), asy
   const athRows = await db.select().from(schema.athlete).where(eq(schema.athlete.id, id)).limit(1)
   if (athRows.length === 0) {
     return c.json({ error: 'Athlete not found' }, 404)
+  }
+  const ath = athRows[0]
+
+  // Ownership check for athlete/manager
+  const isStaff = ['collaborator', 'committee'].includes(user.role)
+  if (!isStaff) {
+    if (ath.userId !== user.id && ath.managerId !== user.id) {
+      return c.json({ error: 'Not authorized' }, 403)
+    }
   }
 
   // If applicationId provided, verify it belongs to this athlete

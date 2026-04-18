@@ -398,6 +398,11 @@ export default function App() {
                 <AthletePortalPage />
               </ProtectedRoute>
             } />
+            <Route path="/athlete/athletes/:id" element={
+              <ProtectedRoute roles={['athlete', 'manager']}>
+                <CollaboratorAthletePage />
+              </ProtectedRoute>
+            } />
 
             {/* Manager — requires manager role */}
             <Route path="/manager/portal" element={
@@ -407,7 +412,7 @@ export default function App() {
             } />
             <Route path="/manager/athletes/:id" element={
               <ProtectedRoute roles={['manager']}>
-                <AthletePortalPage />
+                <CollaboratorAthletePage />
               </ProtectedRoute>
             } />
 

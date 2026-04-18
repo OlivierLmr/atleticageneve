@@ -319,6 +319,7 @@ export interface EditionCosts {
 }
 
 export interface AthleteDetail extends Athlete {
+  managerName: string | null
   applications: ApplicationForAthlete[]
   agreements: Agreement[]
   interactions: Interaction[]

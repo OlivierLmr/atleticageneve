@@ -19,6 +19,16 @@ export const COMMITTEE_EXTRA_TRANSITIONS: Record<NegotiationStatus, NegotiationS
   withdrawn:           ['to_review'],
 }
 
+// Athlete/manager transitions (per PDF spec "Pour l'athlète ou le manager")
+export const ATHLETE_TRANSITIONS: Record<NegotiationStatus, NegotiationStatus[]> = {
+  to_review:           ['withdrawn'],
+  agreement_sent:      ['confirmed', 'counter_offer_sent', 'withdrawn'],
+  counter_offer_sent:  ['withdrawn'],
+  confirmed:           ['withdrawn'],
+  rejected:            [],
+  withdrawn:           [],
+}
+
 export const PARTICIPATION_TRANSITIONS: Record<ParticipationStatus, ParticipationStatus[]> = {
   pending:      ['selected', 'not_selected'],
   selected:     ['not_selected'],
