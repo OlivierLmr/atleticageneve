@@ -538,7 +538,7 @@ athletes.post('/:id/interactions', requireAuth('athlete', 'manager', 'collaborat
     return c.json({ error: 'type and content are required' }, 400)
   }
 
-  const validTypes = ['email', 'call', 'note']
+  const validTypes: string[] = ['email', 'call', 'note', 'counter_offer', 'status_change', 'agreement']
   if (!validTypes.includes(type)) {
     return c.json({ error: `type must be one of: ${validTypes.join(', ')}` }, 400)
   }
