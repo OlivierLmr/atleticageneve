@@ -1,4 +1,4 @@
-- Always run `npm test` before committing. If tests fail, fix the issues and re-run until they pass.
+- Always run `npm run check` before committing. If any check fails, fix the issues and re-run until they pass.
 - after each piece of work is done, commit it.
 - do not deploy unless asked to.
 - After deploying, test the deployment by trying to connect as admin (e.g. using curl). You should also check that the frontend is able to do the same (i.e. it communicates correctly with the backend and is able to log in).
