@@ -127,6 +127,7 @@ export interface Athlete {
   nationality: string
   gender: Gender
   federation: string | null
+  club: string | null
   isEap: boolean
   isSwiss: boolean
   distanceFromGva: number
@@ -254,6 +255,7 @@ export interface EmailLog {
   to: string
   subject: string
   body: string
+  htmlBody: string | null
   lang: string
   sentAt: string
   relatedAthleteId: string | null
@@ -298,4 +300,27 @@ export interface ApplicationWithDetails extends Application {
   agreements: Agreement[]
   interactions: Interaction[]
   waPerformance?: WaPerformance | null
+}
+
+export interface ApplicationForAthlete extends Application {
+  event: Event & { catalog: EventCatalog }
+  waPerformance: WaPerformance | null
+}
+
+export interface EditionCosts {
+  weightPB: number
+  weightSB: number
+  weightRanking: number
+  weightCost: number
+  bonusEap: number
+  stadiumMealCost: number
+  transportAirportHotelCost: number
+  transportHotelStadiumCost: number
+}
+
+export interface AthleteDetail extends Athlete {
+  applications: ApplicationForAthlete[]
+  agreements: Agreement[]
+  interactions: Interaction[]
+  edition: EditionCosts | null
 }

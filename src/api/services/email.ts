@@ -13,16 +13,18 @@ interface EmailParams {
   to: string
   subject: string
   body: string
+  htmlBody?: string
   lang?: 'en' | 'fr'
   relatedAthleteId?: string
 }
 
-export async function sendEmail({ db, to, subject, body, lang = 'en', relatedAthleteId }: EmailParams): Promise<void> {
+export async function sendEmail({ db, to, subject, body, htmlBody, lang = 'en', relatedAthleteId }: EmailParams): Promise<void> {
   // Persist to email_log
   await db.insert(schema.emailLog).values({
     to,
     subject,
     body,
+    htmlBody: htmlBody ?? null,
     lang,
     relatedAthleteId: relatedAthleteId ?? null,
   })
@@ -43,7 +45,11 @@ export async function sendMagicLinkEmail(db: DB, email: string, token: string, b
     ? `Bonjour,\n\nCliquez sur le lien suivant pour vous connecter :\n${link}\n\nCe lien est à usage unique et expire dans 30 minutes.\n\nAtletica Genève`
     : `Hello,\n\nClick the following link to log in:\n${link}\n\nThis link is single-use and expires in 30 minutes.\n\nAtletica Geneve`
 
-  await sendEmail({ db, to: email, subject, body, lang })
+  const htmlBody = lang === 'fr'
+    ? `<p>Bonjour,</p><p>Cliquez sur le lien suivant pour vous connecter :</p><p><a href="${link}">${link}</a></p><p>Ce lien est à usage unique et expire dans 30 minutes.</p><p>Atletica Genève</p>`
+    : `<p>Hello,</p><p>Click the following link to log in:</p><p><a href="${link}">${link}</a></p><p>This link is single-use and expires in 30 minutes.</p><p>Atletica Geneve</p>`
+
+  await sendEmail({ db, to: email, subject, body, htmlBody, lang })
 }
 
 export async function sendStatusChangeEmail(
@@ -80,17 +86,16 @@ export async function sendStatusChangeEmail(
     ? `Mise à jour candidature — ${athleteName}`
     : `Application update — ${athleteName}`
 
-  const linkLine = magicLinkUrl
-    ? (lang === 'fr'
-      ? `\nAccédez directement à votre portail : ${magicLinkUrl}`
-      : `\nAccess your portal directly: ${magicLinkUrl}`)
-    : (lang === 'fr'
-      ? `\nConsultez le portail : ${portalUrl}`
-      : `\nView the portal: ${portalUrl}`)
+  const linkUrl = magicLinkUrl ?? portalUrl
+  const linkLabel = lang === 'fr' ? 'Accéder au portail' : 'Access portal'
 
   const body = lang === 'fr'
-    ? `Bonjour,\n\nLa candidature de ${athleteName} a été mise à jour.\nNouveau statut : ${label}${linkLine}\n\nAtletica Genève`
-    : `Hello,\n\nThe application for ${athleteName} has been updated.\nNew status: ${label}${linkLine}\n\nAtletica Geneve`
+    ? `Bonjour,\n\nLa candidature de ${athleteName} a été mise à jour.\nNouveau statut : ${label}\n\nConsultez le portail : ${linkUrl}\n\nAtletica Genève`
+    : `Hello,\n\nThe application for ${athleteName} has been updated.\nNew status: ${label}\n\nView the portal: ${linkUrl}\n\nAtletica Geneve`
 
-  await sendEmail({ db, to: email, subject, body, lang, relatedAthleteId })
+  const htmlBody = lang === 'fr'
+    ? `<p>Bonjour,</p><p>La candidature de <strong>${athleteName}</strong> a été mise à jour.</p><p>Nouveau statut : <strong>${label}</strong></p><p><a href="${linkUrl}">${linkLabel}</a></p><p>Atletica Genève</p>`
+    : `<p>Hello,</p><p>The application for <strong>${athleteName}</strong> has been updated.</p><p>New status: <strong>${label}</strong></p><p><a href="${linkUrl}">${linkLabel}</a></p><p>Atletica Geneve</p>`
+
+  await sendEmail({ db, to: email, subject, body, htmlBody, lang, relatedAthleteId })
 }

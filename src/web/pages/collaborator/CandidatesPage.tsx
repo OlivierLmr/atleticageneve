@@ -212,7 +212,7 @@ export default function CandidatesPage() {
                     <tr key={app.id} className="border-b hover:bg-gray-50 transition-colors">
                       <td className="px-3 py-2.5">
                         <Link
-                          to={user?.role === 'committee' ? `/committee/athletes/${app.id}` : `/collaborator/athletes/${app.id}`}
+                          to={user?.role === 'committee' ? `/committee/athletes/${app.athleteId}` : `/collaborator/athletes/${app.athleteId}`}
                           className="font-medium text-gray-900 hover:underline"
                         >
                           {app.athlete.lastName}, {app.athlete.firstName}

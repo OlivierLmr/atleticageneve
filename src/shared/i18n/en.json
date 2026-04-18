@@ -78,7 +78,8 @@
     "withdrawn": "Withdrawn",
     "contract_sent": "Offer sent",
     "counter_offer": "Counter-offer",
-    "accepted": "Confirmed"
+    "accepted": "Confirmed",
+    "rattraper": "Reinstate"
   },
   "home": {
     "iAmAthleteManager": "I'm an athlete or manager",
@@ -112,6 +113,7 @@
     "male": "Male",
     "female": "Female",
     "federation": "Club / National team",
+    "club": "Club / Team",
     "phone": "Mobile phone",
     "email": "Email",
     "confirmEmail": "Confirm email",
@@ -232,6 +234,8 @@
     "meetRecord": "Meet record",
     "assignedSelector": "Assigned selector",
     "estimatedCost": "Estimated cost",
+    "estimatedCostLabel": "Estimated",
+    "confirmedCostLabel": "Confirmed",
     "participation": "Event Selection",
     "rescore": "Re-score",
     "editPerformance": "Edit performance",
@@ -239,10 +243,19 @@
     "noActions": "No available actions",
     "allDecided": "All events decided — ready to send agreement",
     "decideAllFirst": "Decide all events before sending an agreement",
-    "maxSlots": "Max slots"
+    "maxSlots": "Max slots",
+    "confirmedAthletes": "Confirmed athletes for this event",
+    "noConfirmedAthletes": "No confirmed athletes yet",
+    "scoringBreakdown": "Scoring breakdown",
+    "acceptedAtMeeting": "Accepted at meeting (no formal agreement)",
+    "costInNegotiation": "In negotiation",
+    "rattraper": "Reinstate to review"
   },
   "collaborator": {
     "personalData": "Personal Data",
+    "tabPersonal": "Personal Data",
+    "tabNegotiation": "Agreement & Negotiation",
+    "identity": "Identity",
     "payment": "Payment",
     "iban": "IBAN",
     "paymentStatus": "Payment status",
