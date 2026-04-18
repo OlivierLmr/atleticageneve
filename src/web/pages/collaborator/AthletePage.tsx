@@ -96,14 +96,27 @@ function defaultAgreement(existing?: Agreement) {
 
 // ── Sub-components ───────────────────────────────────────────────────────────
 
-function CollapsibleSection({ title, isOpen, onToggle, children }: {
-  title: string; isOpen: boolean; onToggle: () => void; children: React.ReactNode
+function CollapsibleSection({ title, isOpen, onToggle, canEdit, isEditing, onToggleEdit, children }: {
+  title: string; isOpen: boolean; onToggle: () => void
+  canEdit?: boolean; isEditing?: boolean; onToggleEdit?: () => void
+  children: React.ReactNode
 }) {
   return (
     <div className="bg-white rounded-lg border">
       <button onClick={onToggle} className="w-full flex items-center justify-between p-3 text-sm font-semibold hover:bg-gray-50">
-        {title}
-        <span className="text-gray-400 text-xs">{isOpen ? '▾' : '▸'}</span>
+        <span>{title}</span>
+        <span className="flex items-center gap-2">
+          {canEdit && isOpen && (
+            <span
+              onClick={e => { e.stopPropagation(); onToggleEdit?.() }}
+              className={`text-xs cursor-pointer px-1.5 py-0.5 rounded ${isEditing ? 'text-blue-600 bg-blue-50' : 'text-gray-400 hover:text-gray-600'}`}
+              title={isEditing ? 'Cancel edit' : 'Edit'}
+            >
+              ✎
+            </span>
+          )}
+          <span className="text-gray-400 text-xs">{isOpen ? '▾' : '▸'}</span>
+        </span>
       </button>
       {isOpen && <div className="px-4 pb-4">{children}</div>}
     </div>
@@ -115,6 +128,32 @@ interface FieldDef {
   label: string
   type: 'text' | 'number' | 'date' | 'select' | 'checkbox' | 'textarea'
   options?: { value: string; label: string }[]
+}
+
+function FieldReadOnly({ athlete, fields, t }: {
+  athlete: Athlete; fields: FieldDef[]; t: (key: string) => string
+}) {
+  return (
+    <div className="space-y-1.5">
+      {fields.map(f => {
+        const raw = (athlete as unknown as Record<string, unknown>)[f.key]
+        let display: string
+        if (f.type === 'checkbox') {
+          display = raw ? t('common.yes') : t('common.no')
+        } else if (f.type === 'select') {
+          display = f.options?.find(o => o.value === raw)?.label ?? String(raw ?? '—')
+        } else {
+          display = raw != null && raw !== '' && raw !== 0 ? String(raw) : '—'
+        }
+        return (
+          <div key={f.key} className="flex justify-between text-xs">
+            <span className="text-gray-500">{f.label}</span>
+            <span className="text-gray-900 font-medium text-right max-w-[60%] truncate">{display}</span>
+          </div>
+        )
+      })}
+    </div>
+  )
 }
 
 function AthleteFieldEditor({ athlete, fields, onSave, isPending, error, t }: {
@@ -608,6 +647,7 @@ export default function AthletePage() {
 
   const [activeTab, setActiveTab] = useState<'personal' | 'negotiation'>('personal')
   const [openSection, setOpenSection] = useState<string | null>('identity')
+  const [editingSection, setEditingSection] = useState<string | null>(null)
   const [confirmAction, setConfirmAction] = useState<NegotiationStatus | null>(null)
   const [showAgreementForm, setShowAgreementForm] = useState(false)
   const [noteType, setNoteType] = useState<'note' | 'call' | 'email'>('note')
@@ -1109,81 +1149,123 @@ export default function AthletePage() {
       <div className="max-w-7xl mx-auto px-6 py-6">
 
         {/* ── Tab 1: Personal Data ──────────────────────────────────────── */}
-        {activeTab === 'personal' && (
+        {activeTab === 'personal' && (() => {
+          // Field definitions for each section
+          const identityFields: FieldDef[] = [
+            { key: 'firstName', label: t('athlete.firstName'), type: 'text' },
+            { key: 'lastName', label: t('athlete.lastName'), type: 'text' },
+            { key: 'dateOfBirth', label: t('athlete.dateOfBirth'), type: 'date' },
+            { key: 'nationality', label: t('athlete.nationality'), type: 'text' },
+            { key: 'gender', label: t('athlete.gender'), type: 'select', options: [
+              { value: 'M', label: t('athlete.male') }, { value: 'F', label: t('athlete.female') }
+            ]},
+            { key: 'federation', label: t('athlete.federation'), type: 'text' },
+            { key: 'club', label: t('athlete.club'), type: 'text' },
+            { key: 'athleteEmail', label: t('athlete.email'), type: 'text' },
+            { key: 'athletePhone', label: t('athlete.phone'), type: 'text' },
+            { key: 'waProfileUrl', label: t('athlete.waProfile'), type: 'text' },
+            { key: 'swiLicence', label: t('athlete.swissLicence'), type: 'text' },
+            { key: 'honours', label: t('athlete.honours'), type: 'text' },
+            { key: 'distanceFromGva', label: t('athlete.distanceFromGva'), type: 'number' },
+            { key: 'isEap', label: t('athlete.eapMember'), type: 'checkbox' },
+            { key: 'isSwiss', label: t('athlete.swiss'), type: 'checkbox' },
+            { key: 'eapCity', label: t('athlete.eapCity'), type: 'text' },
+          ]
+          // Athletes/managers can only edit contact fields from identity
+          const athleteIdentityFields: FieldDef[] = identityFields.filter(f =>
+            ['athleteEmail', 'athletePhone'].includes(f.key)
+          )
+
+          const complianceFields: FieldDef[] = [
+            { key: 'iRunClean', label: t('compliance.iRunClean'), type: 'select', options: [
+              { value: 'yes', label: t('common.yes') }, { value: 'no', label: t('common.no') },
+              { value: 'in_progress', label: t('common.inProgress') }, { value: 'unknown', label: t('common.unknown') },
+            ]},
+            { key: 'dopingFree', label: t('compliance.dopingFree'), type: 'select', options: [
+              { value: 'yes', label: t('common.yes') }, { value: 'no', label: t('common.no') }, { value: 'unknown', label: t('common.unknown') },
+            ]},
+          ]
+
+          const logisticsFields: FieldDef[] = [
+            { key: 'arrivalDate', label: `${t('logistics.arrival')} ${t('logistics.date')}`, type: 'date' },
+            { key: 'arrivalFlight', label: `${t('logistics.arrival')} ${t('logistics.flightNumber')}`, type: 'text' },
+            { key: 'arrivalFrom', label: `${t('logistics.arrival')} ${t('logistics.from')}`, type: 'text' },
+            { key: 'arrivalTime', label: `${t('logistics.arrival')} ${t('logistics.time')}`, type: 'text' },
+            { key: 'departureDate', label: `${t('logistics.departure')} ${t('logistics.date')}`, type: 'date' },
+            { key: 'departureFlight', label: `${t('logistics.departure')} ${t('logistics.flightNumber')}`, type: 'text' },
+            { key: 'departureTo', label: `${t('logistics.departure')} ${t('logistics.to')}`, type: 'text' },
+            { key: 'departureTime', label: `${t('logistics.departure')} ${t('logistics.time')}`, type: 'text' },
+            { key: 'accommodationReqs', label: t('logistics.specialRequests'), type: 'textarea' },
+          ]
+
+          const costFields: FieldDef[] = [
+            { key: 'estTravel', label: t('collaborator.estTravel'), type: 'number' },
+            { key: 'estAccommodation', label: t('collaborator.estAccommodation'), type: 'number' },
+            { key: 'estAppearance', label: t('collaborator.estAppearance'), type: 'number' },
+          ]
+
+          const paymentFields: FieldDef[] = [
+            { key: 'bankIban', label: t('collaborator.iban'), type: 'text' },
+            { key: 'paymentStatus', label: t('collaborator.paymentStatus'), type: 'select', options: [
+              { value: 'pending', label: t('common.pending') }, { value: 'done', label: t('common.done') },
+            ]},
+            { key: 'paymentAmount', label: t('collaborator.paymentAmount'), type: 'number' },
+            { key: 'paymentDate', label: t('collaborator.paymentDate'), type: 'date' },
+            { key: 'paymentMethod', label: t('collaborator.paymentMethod'), type: 'select', options: [
+              { value: '', label: '—' }, { value: 'cash', label: t('collaborator.cash') },
+              { value: 'bank', label: t('collaborator.bank') }, { value: 'western_union', label: t('collaborator.westernUnion') },
+              { value: 'paypal', label: t('collaborator.paypal') }, { value: 'other', label: t('collaborator.other') },
+            ]},
+          ]
+
+          const toggleEdit = (section: string) => setEditingSection(editingSection === section ? null : section)
+
+          // Helper to render a section with view/edit toggle
+          const renderSection = (name: string, title: string, fields: FieldDef[], canEdit: boolean) => (
+            <CollapsibleSection
+              title={title}
+              isOpen={openSection === name}
+              onToggle={() => toggleSection(name)}
+              canEdit={canEdit}
+              isEditing={editingSection === name}
+              onToggleEdit={() => toggleEdit(name)}
+            >
+              {editingSection === name && canEdit ? (
+                <AthleteFieldEditor
+                  athlete={athlete}
+                  fields={fields}
+                  onSave={(data) => { athleteUpdateMutation.mutate(data); setEditingSection(null) }}
+                  isPending={athleteUpdateMutation.isPending}
+                  error={athleteUpdateMutation.error}
+                  t={t}
+                />
+              ) : (
+                <FieldReadOnly athlete={athlete} fields={fields} t={t} />
+              )}
+            </CollapsibleSection>
+          )
+
+          return (
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-4">
-              {/* Identity */}
-              <CollapsibleSection title={t('collaborator.identity')} isOpen={openSection === 'identity'} onToggle={() => toggleSection('identity')}>
-                <AthleteFieldEditor
-                  athlete={athlete}
-                  fields={[
-                    { key: 'firstName', label: t('athlete.firstName'), type: 'text' },
-                    { key: 'lastName', label: t('athlete.lastName'), type: 'text' },
-                    { key: 'dateOfBirth', label: t('athlete.dateOfBirth'), type: 'date' },
-                    { key: 'nationality', label: t('athlete.nationality'), type: 'text' },
-                    { key: 'gender', label: t('athlete.gender'), type: 'select', options: [
-                      { value: 'M', label: t('athlete.male') }, { value: 'F', label: t('athlete.female') }
-                    ]},
-                    { key: 'federation', label: t('athlete.federation'), type: 'text' },
-                    { key: 'club', label: t('athlete.club'), type: 'text' },
-                    { key: 'athleteEmail', label: t('athlete.email'), type: 'text' },
-                    { key: 'athletePhone', label: t('athlete.phone'), type: 'text' },
-                    { key: 'waProfileUrl', label: t('athlete.waProfile'), type: 'text' },
-                    { key: 'swiLicence', label: t('athlete.swissLicence'), type: 'text' },
-                    { key: 'honours', label: t('athlete.honours'), type: 'text' },
-                    { key: 'distanceFromGva', label: t('athlete.distanceFromGva'), type: 'number' },
-                    { key: 'isEap', label: t('athlete.eapMember'), type: 'checkbox' },
-                    { key: 'isSwiss', label: t('athlete.swiss'), type: 'checkbox' },
-                    { key: 'eapCity', label: t('athlete.eapCity'), type: 'text' },
-                  ]}
-                  onSave={(data) => athleteUpdateMutation.mutate(data)}
-                  isPending={athleteUpdateMutation.isPending}
-                  error={athleteUpdateMutation.error}
-                  t={t}
-                />
-              </CollapsibleSection>
+              {/* Identity — staff can edit all, athlete/manager can edit contact only */}
+              {isStaff
+                ? renderSection('identity', t('collaborator.identity'), identityFields, true)
+                : (
+                  <>
+                    <CollapsibleSection title={t('collaborator.identity')} isOpen={openSection === 'identity'} onToggle={() => toggleSection('identity')}>
+                      <FieldReadOnly athlete={athlete} fields={identityFields.filter(f => !['athleteEmail', 'athletePhone'].includes(f.key))} t={t} />
+                    </CollapsibleSection>
+                    {renderSection('contact', t('athlete.contact'), athleteIdentityFields, true)}
+                  </>
+                )
+              }
 
-              {/* Compliance */}
-              <CollapsibleSection title={t('compliance.title')} isOpen={openSection === 'compliance'} onToggle={() => toggleSection('compliance')}>
-                <AthleteFieldEditor
-                  athlete={athlete}
-                  fields={[
-                    { key: 'iRunClean', label: t('compliance.iRunClean'), type: 'select', options: [
-                      { value: 'yes', label: t('common.yes') }, { value: 'no', label: t('common.no') },
-                      { value: 'in_progress', label: t('common.inProgress') }, { value: 'unknown', label: t('common.unknown') },
-                    ]},
-                    { key: 'dopingFree', label: t('compliance.dopingFree'), type: 'select', options: [
-                      { value: 'yes', label: t('common.yes') }, { value: 'no', label: t('common.no') }, { value: 'unknown', label: t('common.unknown') },
-                    ]},
-                  ]}
-                  onSave={(data) => athleteUpdateMutation.mutate(data)}
-                  isPending={athleteUpdateMutation.isPending}
-                  error={athleteUpdateMutation.error}
-                  t={t}
-                />
-              </CollapsibleSection>
+              {/* Compliance — editable by all */}
+              {renderSection('compliance', t('compliance.title'), complianceFields, true)}
 
-              {/* Logistics */}
-              <CollapsibleSection title={t('logistics.title')} isOpen={openSection === 'logistics'} onToggle={() => toggleSection('logistics')}>
-                <AthleteFieldEditor
-                  athlete={athlete}
-                  fields={[
-                    { key: 'arrivalDate', label: `${t('logistics.arrival')} ${t('logistics.date')}`, type: 'date' },
-                    { key: 'arrivalFlight', label: `${t('logistics.arrival')} ${t('logistics.flightNumber')}`, type: 'text' },
-                    { key: 'arrivalFrom', label: `${t('logistics.arrival')} ${t('logistics.from')}`, type: 'text' },
-                    { key: 'arrivalTime', label: `${t('logistics.arrival')} ${t('logistics.time')}`, type: 'text' },
-                    { key: 'departureDate', label: `${t('logistics.departure')} ${t('logistics.date')}`, type: 'date' },
-                    { key: 'departureFlight', label: `${t('logistics.departure')} ${t('logistics.flightNumber')}`, type: 'text' },
-                    { key: 'departureTo', label: `${t('logistics.departure')} ${t('logistics.to')}`, type: 'text' },
-                    { key: 'departureTime', label: `${t('logistics.departure')} ${t('logistics.time')}`, type: 'text' },
-                    { key: 'accommodationReqs', label: t('logistics.specialRequests'), type: 'textarea' },
-                  ]}
-                  onSave={(data) => athleteUpdateMutation.mutate(data)}
-                  isPending={athleteUpdateMutation.isPending}
-                  error={athleteUpdateMutation.error}
-                  t={t}
-                />
-              </CollapsibleSection>
+              {/* Logistics — editable by all */}
+              {renderSection('logistics', t('logistics.title'), logisticsFields, true)}
             </div>
 
             <div className="space-y-4">
@@ -1202,48 +1284,13 @@ export default function AthletePage() {
 
               {/* Cost estimates — staff only */}
               {isStaff && (
-                <CollapsibleSection title={t('selection.estimatedCost')} isOpen={openSection === 'costs'} onToggle={() => toggleSection('costs')}>
-                  <AthleteFieldEditor
-                    athlete={athlete}
-                    fields={[
-                      { key: 'estTravel', label: t('collaborator.estTravel'), type: 'number' },
-                      { key: 'estAccommodation', label: t('collaborator.estAccommodation'), type: 'number' },
-                      { key: 'estAppearance', label: t('collaborator.estAppearance'), type: 'number' },
-                    ]}
-                    onSave={(data) => athleteUpdateMutation.mutate(data)}
-                    isPending={athleteUpdateMutation.isPending}
-                    error={athleteUpdateMutation.error}
-                    t={t}
-                  />
-                  <p className="text-xs text-gray-400 mt-1">{t('collaborator.estTotalHint')}</p>
-                </CollapsibleSection>
+                <>
+                  {renderSection('costs', t('selection.estimatedCost'), costFields, true)}
+                </>
               )}
 
               {/* Payment — staff only */}
-              {isStaff && (
-                <CollapsibleSection title={t('collaborator.payment')} isOpen={openSection === 'payment'} onToggle={() => toggleSection('payment')}>
-                  <AthleteFieldEditor
-                    athlete={athlete}
-                    fields={[
-                      { key: 'bankIban', label: t('collaborator.iban'), type: 'text' },
-                      { key: 'paymentStatus', label: t('collaborator.paymentStatus'), type: 'select', options: [
-                        { value: 'pending', label: t('common.pending') }, { value: 'done', label: t('common.done') },
-                      ]},
-                      { key: 'paymentAmount', label: t('collaborator.paymentAmount'), type: 'number' },
-                      { key: 'paymentDate', label: t('collaborator.paymentDate'), type: 'date' },
-                      { key: 'paymentMethod', label: t('collaborator.paymentMethod'), type: 'select', options: [
-                        { value: '', label: '—' }, { value: 'cash', label: t('collaborator.cash') },
-                        { value: 'bank', label: t('collaborator.bank') }, { value: 'western_union', label: t('collaborator.westernUnion') },
-                        { value: 'paypal', label: t('collaborator.paypal') }, { value: 'other', label: t('collaborator.other') },
-                      ]},
-                    ]}
-                    onSave={(data) => athleteUpdateMutation.mutate(data)}
-                    isPending={athleteUpdateMutation.isPending}
-                    error={athleteUpdateMutation.error}
-                    t={t}
-                  />
-                </CollapsibleSection>
-              )}
+              {isStaff && renderSection('payment', t('collaborator.payment'), paymentFields, true)}
 
               {/* Notes */}
               <CollapsibleSection title={t('common.notes')} isOpen={openSection === 'notes'} onToggle={() => toggleSection('notes')}>
@@ -1278,7 +1325,8 @@ export default function AthletePage() {
               </CollapsibleSection>
             </div>
           </div>
-        )}
+          )
+        })()}
 
         {/* ── Tab 2: Agreement & Negotiation ───────────────────────────── */}
         {activeTab === 'negotiation' && (

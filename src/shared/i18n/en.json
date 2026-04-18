@@ -137,7 +137,8 @@
     "applicationSubmitted": "Your application has been submitted successfully.",
     "selectGenderFirst": "Please select a gender first.",
     "noEventsForGender": "No events available for this gender.",
-    "loginLinkSent": "A login link has been sent to {{email}} — use it to track your application."
+    "loginLinkSent": "A login link has been sent to {{email}} — use it to track your application.",
+    "contact": "Contact"
   },
   "manager": {
     "registration": "Manager Registration",

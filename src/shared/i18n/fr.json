@@ -137,7 +137,8 @@
     "applicationSubmitted": "Votre candidature a été soumise avec succès.",
     "selectGenderFirst": "Veuillez d'abord sélectionner une catégorie.",
     "noEventsForGender": "Aucune épreuve disponible pour cette catégorie.",
-    "loginLinkSent": "Un lien de connexion a été envoyé à {{email}} — utilisez-le pour suivre votre candidature."
+    "loginLinkSent": "Un lien de connexion a été envoyé à {{email}} — utilisez-le pour suivre votre candidature.",
+    "contact": "Contact"
   },
   "manager": {
     "registration": "Inscription Manager",
