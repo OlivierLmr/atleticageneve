@@ -353,5 +353,13 @@
     "hotels": "Hotels",
     "hotelName": "Hotel name",
     "noHotelsYet": "No hotels yet"
+  },
+  "action": {
+    "acceptOffer": "Accept offer",
+    "counterOffer": "Counter-offer",
+    "counterOfferPlaceholder": "Describe your counter-proposal…",
+    "withdraw": "Withdraw",
+    "sendMessage": "Send message",
+    "messagePlaceholder": "Type your message…"
   }
 }

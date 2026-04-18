@@ -616,6 +616,10 @@ export default function AthletePage() {
   const [notesInitialized, setNotesInitialized] = useState(false)
   const [agreementForm, setAgreementForm] = useState(() => defaultAgreement())
   const [showCostPopup, setShowCostPopup] = useState(false)
+  const [showCounterOfferModal, setShowCounterOfferModal] = useState(false)
+  const [counterOfferText, setCounterOfferText] = useState('')
+  const [showMessageModal, setShowMessageModal] = useState(false)
+  const [messageText, setMessageText] = useState('')
 
   const { data: athlete, isLoading } = useQuery<AthleteDetail>({
     queryKey: ['athlete', id],
@@ -703,6 +707,28 @@ export default function AthletePage() {
     mutationFn: (data: { athleteId: string; eventId: string; personalBest?: number; seasonBest?: number; worldRanking?: number }) =>
       api.post('/api/v1/wa-performance', data),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['athlete', id] }),
+  })
+
+  const counterOfferMutation = useMutation({
+    mutationFn: async (text: string) => {
+      await api.post(`/api/v1/athletes/${id}/interactions`, { type: 'counter_offer', content: text })
+      await api.patch(`/api/v1/athletes/${id}/negotiation-status`, { status: 'counter_offer_sent' })
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['athlete', id] })
+      setShowCounterOfferModal(false)
+      setCounterOfferText('')
+    },
+  })
+
+  const freeMessageMutation = useMutation({
+    mutationFn: (text: string) =>
+      api.post(`/api/v1/athletes/${id}/interactions`, { type: 'note', content: text }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['athlete', id] })
+      setShowMessageModal(false)
+      setMessageText('')
+    },
   })
 
   const archiveMutation = useMutation({
@@ -859,11 +885,24 @@ export default function AthletePage() {
               {allowedTransitions.map((status) => {
                 const needsConfirm = ['confirmed', 'rejected', 'withdrawn', 'to_review'].includes(status)
                 const committeeOnly = isCommitteeOnly(status as NegotiationStatus)
+
+                // Athlete/manager-specific labels
+                const buttonLabel = isAthleteOrManager
+                  ? status === 'confirmed' ? t('action.acceptOffer')
+                    : status === 'counter_offer_sent' ? t('action.counterOffer')
+                    : status === 'withdrawn' ? t('action.withdraw')
+                    : t(`status.${status}`)
+                  : committeeOnly && status === 'to_review'
+                    ? t('status.rattraper')
+                    : t(`status.${status}`)
+
                 return (
                   <button
                     key={status}
                     onClick={() => {
-                      if (status === 'agreement_sent' && isStaff) {
+                      if (isAthleteOrManager && status === 'counter_offer_sent') {
+                        setShowCounterOfferModal(true)
+                      } else if (status === 'agreement_sent' && isStaff) {
                         setActiveTab('negotiation')
                         setShowAgreementForm(true)
                       } else if (needsConfirm) {
@@ -883,18 +922,27 @@ export default function AthletePage() {
                         ? 'bg-gray-50 text-gray-500 border-gray-200 hover:bg-gray-100'
                         : status === 'agreement_sent'
                         ? 'bg-blue-600 text-white border-blue-600 hover:bg-blue-700'
+                        : status === 'counter_offer_sent'
+                        ? 'bg-purple-600 text-white border-purple-600 hover:bg-purple-700'
                         : status === 'to_review' && committeeOnly
                         ? 'bg-orange-50 text-orange-600 border-orange-200 hover:bg-orange-100'
                         : 'bg-gray-100 text-gray-700 border-gray-200 hover:bg-gray-200'
                     }`}
                   >
-                    {committeeOnly && status === 'to_review'
-                      ? t('status.rattraper')
-                      : t(`status.${status}`)}
+                    {buttonLabel}
                   </button>
                 )
               })}
-              {allowedTransitions.length === 0 && (
+
+              {/* Send message — always visible for all roles, all statuses */}
+              <button
+                onClick={() => setShowMessageModal(true)}
+                className="text-xs px-3 py-1.5 rounded font-medium border border-gray-300 bg-white text-gray-600 hover:bg-gray-50"
+              >
+                {t('action.sendMessage')}
+              </button>
+
+              {allowedTransitions.length === 0 && !isAthleteOrManager && (
                 <span className="text-xs text-gray-400 py-1.5">{t('selection.noActions')}</span>
               )}
             </div>
@@ -939,6 +987,78 @@ export default function AthletePage() {
 
           {statusMutation.isError && (
             <p className="text-xs text-red-600 mt-2">{(statusMutation.error as Error)?.message || t('common.error')}</p>
+          )}
+
+          {/* Counter-offer modal — free text for athlete/manager */}
+          {showCounterOfferModal && (
+            <div className="mt-3 p-4 rounded border border-purple-300 bg-purple-50">
+              <h3 className="text-sm font-semibold text-gray-900 mb-2">{t('action.counterOffer')}</h3>
+              <textarea
+                className="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-purple-500"
+                rows={4}
+                placeholder={t('action.counterOfferPlaceholder')}
+                value={counterOfferText}
+                onChange={e => setCounterOfferText(e.target.value)}
+              />
+              <div className="flex gap-2 mt-2">
+                <button
+                  onClick={() => {
+                    if (counterOfferText.trim()) {
+                      counterOfferMutation.mutate(counterOfferText)
+                    }
+                  }}
+                  disabled={counterOfferMutation.isPending || !counterOfferText.trim()}
+                  className="text-xs px-3 py-1.5 rounded font-medium bg-purple-600 text-white hover:bg-purple-700 disabled:opacity-50"
+                >
+                  {counterOfferMutation.isPending ? t('common.loading') : t('common.submit')}
+                </button>
+                <button
+                  onClick={() => { setShowCounterOfferModal(false); setCounterOfferText('') }}
+                  className="text-xs px-3 py-1.5 rounded border border-gray-300 hover:bg-gray-50"
+                >
+                  {t('common.cancel')}
+                </button>
+              </div>
+              {counterOfferMutation.isError && (
+                <p className="text-xs text-red-600 mt-1">{(counterOfferMutation.error as Error)?.message || t('common.error')}</p>
+              )}
+            </div>
+          )}
+
+          {/* Send message modal — always available */}
+          {showMessageModal && (
+            <div className="mt-3 p-4 rounded border border-gray-300 bg-gray-50">
+              <h3 className="text-sm font-semibold text-gray-900 mb-2">{t('action.sendMessage')}</h3>
+              <textarea
+                className="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-gray-500"
+                rows={3}
+                placeholder={t('action.messagePlaceholder')}
+                value={messageText}
+                onChange={e => setMessageText(e.target.value)}
+              />
+              <div className="flex gap-2 mt-2">
+                <button
+                  onClick={() => {
+                    if (messageText.trim()) {
+                      freeMessageMutation.mutate(messageText)
+                    }
+                  }}
+                  disabled={freeMessageMutation.isPending || !messageText.trim()}
+                  className="text-xs px-3 py-1.5 rounded font-medium bg-gray-900 text-white hover:bg-gray-800 disabled:opacity-50"
+                >
+                  {freeMessageMutation.isPending ? t('common.loading') : t('common.submit')}
+                </button>
+                <button
+                  onClick={() => { setShowMessageModal(false); setMessageText('') }}
+                  className="text-xs px-3 py-1.5 rounded border border-gray-300 hover:bg-gray-50"
+                >
+                  {t('common.cancel')}
+                </button>
+              </div>
+              {freeMessageMutation.isError && (
+                <p className="text-xs text-red-600 mt-1">{(freeMessageMutation.error as Error)?.message || t('common.error')}</p>
+              )}
+            </div>
           )}
 
           {/* Events in banner — per spec */}
