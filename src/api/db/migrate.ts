@@ -272,6 +272,11 @@ const MIGRATION_0002_STMTS = [
 // Global flag: Worker instances re-use this across requests within the same isolate.
 let migrated = false
 
+/** Reset the migrated flag — used by test helpers when creating a fresh DB. */
+export function resetMigrationState(): void {
+  migrated = false
+}
+
 export async function ensureMigrated(d1: D1Database): Promise<void> {
   if (migrated) return
 

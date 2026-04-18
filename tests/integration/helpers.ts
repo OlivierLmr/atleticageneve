@@ -9,12 +9,19 @@ import { Miniflare } from 'miniflare'
 import { drizzle } from 'drizzle-orm/d1'
 import { eq } from 'drizzle-orm'
 import * as schema from '@api/db/schema'
+import { resetMigrationState } from '@api/db/migrate'
 import app from '@api/index'
 import fs from 'fs'
 import path from 'path'
 
 const MIGRATION_PATHS = [
-  path.resolve(__dirname, '../../src/api/db/migrations/0001_spec_v3.sql'),
+  { file: path.resolve(__dirname, '../../src/api/db/migrations/0001_spec_v3.sql'), name: '0001_spec_v3' },
+]
+
+// MIGRATION_0002 ALTER statements — must match src/api/db/migrate.ts
+const MIGRATION_0002_STMTS = [
+  'ALTER TABLE athlete ADD COLUMN club TEXT',
+  'ALTER TABLE email_log ADD COLUMN html_body TEXT',
 ]
 
 export interface TestContext {
@@ -25,6 +32,9 @@ export interface TestContext {
 }
 
 export async function setupTestContext(): Promise<TestContext> {
+  // Reset migration flag so ensureMigrated() re-checks for this fresh DB
+  resetMigrationState()
+
   const mf = new Miniflare({
     modules: true,
     script: 'export default { fetch() { return new Response("ok") } }',
@@ -34,9 +44,14 @@ export async function setupTestContext(): Promise<TestContext> {
   const d1 = await mf.getD1Database('DB') as unknown as D1Database
   const db = drizzle(d1, { schema })
 
-  // Run migrations
-  for (const migrationPath of MIGRATION_PATHS) {
-    const migrationSql = fs.readFileSync(migrationPath, 'utf-8')
+  // Create migration tracking table
+  await d1.prepare(
+    `CREATE TABLE IF NOT EXISTS d1_migrations (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT UNIQUE NOT NULL, applied_at TEXT NOT NULL DEFAULT (datetime('now')))`
+  ).run()
+
+  // Run migration 0001 from SQL file
+  for (const { file, name } of MIGRATION_PATHS) {
+    const migrationSql = fs.readFileSync(file, 'utf-8')
     const statements = migrationSql
       .split(/;\s*\n/)
       .map((s) => s.replace(/--.*$/gm, '').trim())
@@ -44,7 +59,20 @@ export async function setupTestContext(): Promise<TestContext> {
 
     const batch = statements.map((s) => d1.prepare(s))
     await d1.batch(batch)
+
+    // Record migration as applied so ensureMigrated() skips it
+    await d1.prepare('INSERT OR IGNORE INTO d1_migrations (name) VALUES (?)').bind(name).run()
   }
+
+  // Run migration 0002 (ALTER TABLE statements)
+  for (const stmt of MIGRATION_0002_STMTS) {
+    try {
+      await d1.prepare(stmt).run()
+    } catch {
+      // Column already exists — safe to ignore
+    }
+  }
+  await d1.prepare('INSERT OR IGNORE INTO d1_migrations (name) VALUES (?)').bind('0002_spec_v4').run()
 
   // Request helper
   const request = async (urlPath: string, init?: RequestInit): Promise<Response> => {
