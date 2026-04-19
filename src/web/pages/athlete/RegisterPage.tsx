@@ -23,6 +23,7 @@ export default function AthleteRegisterPage() {
   const [submitted, setSubmitted] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
+  const [emailPreview, setEmailPreview] = useState<{ subject: string; body: string } | null>(null)
 
   // Form state
   const [form, setForm] = useState({
@@ -81,7 +82,7 @@ export default function AthleteRegisterPage() {
     setSubmitting(true)
     setError('')
     try {
-      await api.post('/api/v1/athletes', {
+      const result = await api.post('/api/v1/athletes', {
         firstName: form.firstName,
         lastName: form.lastName,
         gender: form.gender,
@@ -100,13 +101,45 @@ export default function AthleteRegisterPage() {
         dopingFree: form.dopingFree,
         participantNotes: form.participantNotes || undefined,
         additionalNotes: form.additionalNotes || undefined,
-      })
-      setSubmitted(true)
+      }) as { emailPreview?: { subject: string; body: string } | null }
+      if (result.emailPreview) {
+        setEmailPreview(result.emailPreview)
+      } else {
+        setSubmitted(true)
+      }
     } catch (err) {
       setError(err instanceof ApiError ? err.message : t('common.error'))
     } finally {
       setSubmitting(false)
     }
+  }
+
+  if (emailPreview) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
+        <div className="w-full max-w-lg">
+          <h1 className="text-xl font-bold mb-4 text-center">Atletica Genève</h1>
+          <div className="bg-white rounded-lg border p-6">
+            <h2 className="font-bold text-sm mb-1">{t('emailPreview.title')}</h2>
+            <p className="text-xs text-gray-500 mb-4">{t('emailPreview.description')}</p>
+            <div className="bg-gray-50 rounded border p-4 text-xs space-y-3 mb-6">
+              <div>
+                <span className="font-semibold text-gray-600">{t('emailPreview.subject')} :</span>{' '}
+                <span>{emailPreview.subject}</span>
+              </div>
+              <hr />
+              <pre className="whitespace-pre-wrap font-sans leading-relaxed">{emailPreview.body}</pre>
+            </div>
+            <button
+              onClick={() => { setEmailPreview(null); setSubmitted(true) }}
+              className="w-full px-4 py-2 text-sm bg-gray-900 text-white rounded-md hover:bg-gray-800"
+            >
+              {t('common.close')}
+            </button>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   if (submitted) {

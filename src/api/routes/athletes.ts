@@ -6,6 +6,7 @@ import { athleteRegistrationSchema, batchAthleteRegistrationSchema, athleteUpdat
 import { NEGOTIATION_TRANSITIONS, COMMITTEE_EXTRA_TRANSITIONS, ATHLETE_TRANSITIONS } from '@shared/constants'
 import { requireAuth } from '../middleware/auth'
 import { sendEmail, sendMagicLinkEmail, sendStatusChangeEmail } from '../services/email'
+import type { EmailContent } from '../services/email'
 import { generateToken, magicLinkExpiresAt } from '../services/auth'
 import type { Env } from '../index'
 import type { NegotiationStatus } from '@shared/types'
@@ -87,6 +88,7 @@ athletes.post('/', zValidator('json', athleteRegistrationSchema), async (c) => {
 
   // If email provided, create a user record so the athlete can log in later
   let magicLinkSent = false
+  let emailPreview: EmailContent | null = null
   if (data.athleteEmail) {
     const existingUsers = await db
       .select()
@@ -124,7 +126,7 @@ athletes.post('/', zValidator('json', athleteRegistrationSchema), async (c) => {
     })
 
     const baseUrl = c.req.header('Origin') ?? 'http://localhost:5173'
-    await sendMagicLinkEmail(db, data.athleteEmail, token, baseUrl)
+    emailPreview = await sendMagicLinkEmail(db, data.athleteEmail, token, baseUrl)
     magicLinkSent = true
   }
 
@@ -150,6 +152,7 @@ athletes.post('/', zValidator('json', athleteRegistrationSchema), async (c) => {
     athleteId,
     applicationIds,
     magicLinkSent,
+    emailPreview,
   }, 201)
 })
 
