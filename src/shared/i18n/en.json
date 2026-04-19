@@ -357,6 +357,11 @@
     "hotelName": "Hotel name",
     "noHotelsYet": "No hotels yet"
   },
+  "emailPreview": {
+    "title": "Email preview",
+    "description": "Here is the content of the email that would have been sent to the athlete if the mail sending engine were active.",
+    "subject": "Subject"
+  },
   "action": {
     "acceptOffer": "Accept offer",
     "counterOffer": "Counter-offer",

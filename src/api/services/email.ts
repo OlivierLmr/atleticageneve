@@ -42,7 +42,13 @@ export async function sendEmail({ db, to, subject, body, htmlBody, lang = 'en', 
   return emailId
 }
 
-export async function sendMagicLinkEmail(db: DB, email: string, token: string, baseUrl: string, lang: 'en' | 'fr' = 'en'): Promise<void> {
+export interface EmailContent {
+  subject: string
+  body: string
+  htmlBody: string
+}
+
+export async function sendMagicLinkEmail(db: DB, email: string, token: string, baseUrl: string, lang: 'en' | 'fr' = 'en'): Promise<EmailContent> {
   const link = `${baseUrl}/auth/verify?token=${token}`
   const subject = lang === 'fr' ? 'Votre lien de connexion — Atletica Genève' : 'Your login link — Atletica Geneve'
   const body = lang === 'fr'
@@ -54,6 +60,7 @@ export async function sendMagicLinkEmail(db: DB, email: string, token: string, b
     : `<p>Hello,</p><p>Click the following link to log in:</p><p><a href="${link}">${link}</a></p><p>This link is single-use and expires in 30 minutes.</p><p>Atletica Geneve</p>`
 
   await sendEmail({ db, to: email, subject, body, htmlBody, lang })
+  return { subject, body, htmlBody }
 }
 
 export async function sendStatusChangeEmail(

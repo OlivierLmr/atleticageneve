@@ -357,6 +357,11 @@
     "hotelName": "Nom de l'hôtel",
     "noHotelsYet": "Aucun hôtel pour l'instant"
   },
+  "emailPreview": {
+    "title": "Aperçu du mail envoyé",
+    "description": "Voici le contenu du mail qui aurait été envoyé à l'athlète si le moteur d'envoi de mails était actif.",
+    "subject": "Sujet"
+  },
   "action": {
     "acceptOffer": "Accepter l'offre",
     "counterOffer": "Faire une contre-offre",
