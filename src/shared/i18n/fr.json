@@ -215,7 +215,8 @@
   "participation": {
     "pending": "En attente",
     "selected": "Sélectionné",
-    "not_selected": "Non sélectionné"
+    "not_selected": "Non sélectionné",
+    "lockedConfirmed": "Sélection verrouillée — participation confirmée"
   },
   "selection": {
     "title": "Sélection des candidats",

@@ -186,6 +186,17 @@ applications.patch('/:id/participation-status', async (c) => {
   const app = apps[0]
   const currentStatus = app.participationStatus as ParticipationStatus
 
+  // Block changes when athlete negotiation is confirmed
+  const athletes = await db
+    .select({ negotiationStatus: schema.athlete.negotiationStatus })
+    .from(schema.athlete)
+    .where(eq(schema.athlete.id, app.athleteId))
+    .limit(1)
+
+  if (athletes.length > 0 && athletes[0].negotiationStatus === 'confirmed') {
+    return c.json({ error: 'Cannot change participation status when athlete negotiation is confirmed' }, 403)
+  }
+
   // Validate transition
   const allowed = PARTICIPATION_TRANSITIONS[currentStatus]
   if (!allowed || !allowed.includes(newStatus)) {
