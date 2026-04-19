@@ -562,9 +562,9 @@ function BannerEventRow({ app, athlete, edition, isStaff, onParticipationChange,
         </div>
       )}
 
-      {/* Participation status — staff gets buttons, athlete/manager gets read-only badge */}
-      <div className="flex gap-1 shrink-0">
-        {isStaff ? (
+      {/* Participation status — staff gets buttons (locked when athlete is confirmed), others get read-only badge */}
+      <div className="flex gap-1 shrink-0 items-center">
+        {isStaff && athlete.negotiationStatus !== 'confirmed' ? (
           <>
             {(['pending', 'selected', 'not_selected'] as const).map((status) => (
               <button
@@ -586,9 +586,14 @@ function BannerEventRow({ app, athlete, edition, isStaff, onParticipationChange,
             ))}
           </>
         ) : (
-          <span className={`text-[10px] px-2 py-0.5 rounded font-medium ${PARTICIPATION_COLORS[app.participationStatus] ?? 'bg-gray-100 text-gray-500'}`}>
-            {t(`participation.${app.participationStatus}`)}
-          </span>
+          <>
+            <span className={`text-[10px] px-2 py-0.5 rounded font-medium ${PARTICIPATION_COLORS[app.participationStatus] ?? 'bg-gray-100 text-gray-500'}`}>
+              {t(`participation.${app.participationStatus}`)}
+            </span>
+            {isStaff && athlete.negotiationStatus === 'confirmed' && (
+              <span className="text-[10px] text-gray-400" title={t('participation.lockedConfirmed')}>🔒</span>
+            )}
+          </>
         )}
       </div>
 
