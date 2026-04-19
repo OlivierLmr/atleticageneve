@@ -102,44 +102,15 @@ export default function AthleteRegisterPage() {
         participantNotes: form.participantNotes || undefined,
         additionalNotes: form.additionalNotes || undefined,
       }) as { emailPreview?: { subject: string; body: string } | null }
+      setSubmitted(true)
       if (result.emailPreview) {
         setEmailPreview(result.emailPreview)
-      } else {
-        setSubmitted(true)
       }
     } catch (err) {
       setError(err instanceof ApiError ? err.message : t('common.error'))
     } finally {
       setSubmitting(false)
     }
-  }
-
-  if (emailPreview) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
-        <div className="w-full max-w-lg">
-          <h1 className="text-xl font-bold mb-4 text-center">Atletica Genève</h1>
-          <div className="bg-white rounded-lg border p-6">
-            <h2 className="font-bold text-sm mb-1">{t('emailPreview.title')}</h2>
-            <p className="text-xs text-gray-500 mb-4">{t('emailPreview.description')}</p>
-            <div className="bg-gray-50 rounded border p-4 text-xs space-y-3 mb-6">
-              <div>
-                <span className="font-semibold text-gray-600">{t('emailPreview.subject')} :</span>{' '}
-                <span>{emailPreview.subject}</span>
-              </div>
-              <hr />
-              <pre className="whitespace-pre-wrap font-sans leading-relaxed">{emailPreview.body}</pre>
-            </div>
-            <button
-              onClick={() => { setEmailPreview(null); setSubmitted(true) }}
-              className="w-full px-4 py-2 text-sm bg-gray-900 text-white rounded-md hover:bg-gray-800"
-            >
-              {t('common.close')}
-            </button>
-          </div>
-        </div>
-      </div>
-    )
   }
 
   if (submitted) {
@@ -157,6 +128,28 @@ export default function AthleteRegisterPage() {
           </div>
           <Link to="/" className="text-xs text-gray-400 underline mt-4 inline-block">{t('common.back')}</Link>
         </div>
+        {emailPreview && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 px-4">
+            <div className="w-full max-w-lg bg-white rounded-lg border shadow-xl p-6">
+              <h2 className="font-bold text-sm mb-1">{t('emailPreview.title')}</h2>
+              <p className="text-xs text-gray-500 mb-4">{t('emailPreview.description')}</p>
+              <div className="bg-gray-50 rounded border p-4 text-xs space-y-3 mb-6">
+                <div>
+                  <span className="font-semibold text-gray-600">{t('emailPreview.subject')} :</span>{' '}
+                  <span>{emailPreview.subject}</span>
+                </div>
+                <hr />
+                <pre className="whitespace-pre-wrap font-sans leading-relaxed">{emailPreview.body}</pre>
+              </div>
+              <button
+                onClick={() => setEmailPreview(null)}
+                className="w-full px-4 py-2 text-sm bg-gray-900 text-white rounded-md hover:bg-gray-800"
+              >
+                {t('common.close')}
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     )
   }
