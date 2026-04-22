@@ -120,6 +120,7 @@ auth.post('/identify', async (c) => {
   }
 
   // User is athlete/manager → send magic link
+  let emailPreview: { subject: string; body: string } | undefined
   if (user.email) {
     const token = generateToken()
     await db.insert(schema.magicLink).values({
@@ -129,10 +130,11 @@ auth.post('/identify', async (c) => {
     })
     const baseUrl = c.req.header('Origin') ?? 'http://localhost:5173'
     const lang = (user.preferredLang as 'en' | 'fr') ?? 'en'
-    await sendMagicLinkEmail(db, user.email, token, baseUrl, lang)
+    const result = await sendMagicLinkEmail(db, user.email, token, baseUrl, lang)
+    emailPreview = { subject: result.subject, body: result.body }
   }
 
-  return c.json({ method: 'magic_link', message: 'If this email is registered, a login link has been sent.' })
+  return c.json({ method: 'magic_link', message: 'If this email is registered, a login link has been sent.', emailPreview })
 })
 
 // ── POST /auth/login-with-password — for identified password users ────────────
