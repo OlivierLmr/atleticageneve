@@ -5,7 +5,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from '@web/lib/api'
 import { useAuth } from '@web/lib/auth'
 import { LanguageSwitcher } from '@web/App'
-import { NEGOTIATION_TRANSITIONS, COMMITTEE_EXTRA_TRANSITIONS, ATHLETE_TRANSITIONS, NIGHT_LABELS, DINNER_LABELS } from '@shared/constants'
+import { NEGOTIATION_TRANSITIONS, COMMITTEE_EXTRA_TRANSITIONS, ATHLETE_TRANSITIONS, SEND_AGREEMENT_FROM, NIGHT_LABELS, DINNER_LABELS } from '@shared/constants'
 import { STATUS_COLORS, formatPerf } from '@web/lib/ui-constants'
 import { computeScore } from '@shared/scoring'
 import type {
@@ -662,7 +662,8 @@ export default function AthletePage() {
   const [activeTab, setActiveTab] = useState<'personal' | 'negotiation'>('personal')
   const [openSection, setOpenSection] = useState<string | null>('identity')
   const [editingSection, setEditingSection] = useState<string | null>(null)
-  const [confirmAction, setConfirmAction] = useState<NegotiationStatus | null>(null)
+  const [confirmTransition, setConfirmTransition] = useState<{ from: NegotiationStatus; to: NegotiationStatus } | null>(null)
+  const [emailPreview, setEmailPreview] = useState<{ subject: string; body: string } | null>(null)
   const [showAgreementForm, setShowAgreementForm] = useState(false)
   const [noteType, setNoteType] = useState<'note' | 'call' | 'email'>('note')
   const [noteContent, setNoteContent] = useState('')
@@ -717,19 +718,27 @@ export default function AthletePage() {
 
   const statusMutation = useMutation({
     mutationFn: (status: NegotiationStatus) =>
-      api.patch(`/api/v1/athletes/${id}/negotiation-status`, { status }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['athlete', id] }),
+      api.patch<{ id: string; status: string; emailPreview?: { subject: string; body: string } }>(
+        `/api/v1/athletes/${id}/negotiation-status`, { status }
+      ),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['athlete', id] })
+      if (data?.emailPreview) setEmailPreview(data.emailPreview)
+    },
   })
 
   const agreementMutation = useMutation({
     mutationFn: (data: ReturnType<typeof defaultAgreement>) =>
-      api.post(`/api/v1/athletes/${id}/agreements`, {
-        ...data,
-        hotelRoomId: data.hotelRoomId || undefined,
-      }),
-    onSuccess: () => {
+      api.post<{ id: string; athleteId: string; version: number; totalCost: number; emailPreview?: { subject: string; body: string } }>(
+        `/api/v1/athletes/${id}/agreements`, {
+          ...data,
+          hotelRoomId: data.hotelRoomId || undefined,
+        }
+      ),
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['athlete', id] })
       setShowAgreementForm(false)
+      if (data?.emailPreview) setEmailPreview(data.emailPreview)
     },
   })
 
@@ -773,13 +782,16 @@ export default function AthletePage() {
 
   const counterOfferMutation = useMutation({
     mutationFn: async (text: string) => {
-      await api.post(`/api/v1/athletes/${id}/interactions`, { type: 'counter_offer', content: text })
-      await api.patch(`/api/v1/athletes/${id}/negotiation-status`, { status: 'counter_offer_sent' })
+      await api.post<{ id: string }>(`/api/v1/athletes/${id}/interactions`, { type: 'counter_offer', content: text })
+      return api.patch<{ id: string; status: string; emailPreview?: { subject: string; body: string } }>(
+        `/api/v1/athletes/${id}/negotiation-status`, { status: 'counter_offer_sent' }
+      )
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['athlete', id] })
       setShowCounterOfferModal(false)
       setCounterOfferText('')
+      if (data?.emailPreview) setEmailPreview(data.emailPreview)
     },
   })
 
@@ -830,6 +842,40 @@ export default function AthletePage() {
   const allDecided = athlete.applications.length > 0
     && athlete.applications.every(a => a.participationStatus !== 'pending')
 
+  const hasAtLeastOneSelected = athlete.applications.some(a => a.participationStatus === 'selected')
+
+  const canSendAgreement = isStaff && SEND_AGREEMENT_FROM.includes(currentStatus)
+
+  const getButtonLabel = (targetStatus: NegotiationStatus): string => {
+    if (targetStatus === 'withdrawn') return t('action.withdraw')
+    if (targetStatus === 'confirmed') return t('action.accept')
+    if (targetStatus === 'counter_offer_sent') return t('action.sendCounterOffer')
+    if (targetStatus === 'rejected') {
+      if (currentStatus === 'confirmed' && isCommittee) return t('action.overrideReject')
+      return t('action.reject')
+    }
+    if (targetStatus === 'to_review') return t('action.reopen')
+    return t(`status.${targetStatus}`)
+  }
+
+  const handleTransitionClick = (targetStatus: NegotiationStatus) => {
+    setConfirmTransition({ from: currentStatus, to: targetStatus })
+  }
+
+  const handleConfirmTransition = () => {
+    if (!confirmTransition) return
+    const { to } = confirmTransition
+    setConfirmTransition(null)
+    if (to === 'agreement_sent' && isStaff) {
+      setActiveTab('negotiation')
+      setShowAgreementForm(true)
+    } else if (to === 'counter_offer_sent' && isAthleteOrManager) {
+      setShowCounterOfferModal(true)
+    } else {
+      statusMutation.mutate(to)
+    }
+  }
+
   const inputCls = 'w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-gray-900'
   const labelCls = 'block text-xs font-medium text-gray-500 mb-1'
 
@@ -839,13 +885,6 @@ export default function AthletePage() {
     currentStatus === 'confirmed' ? 'confirmed' :
     ['agreement_sent', 'counter_offer_sent'].includes(currentStatus) ? 'negotiating' :
     'estimated'
-
-  const isCommitteeOnly = (status: NegotiationStatus) => {
-    if (isAthleteOrManager) return false
-    const base = NEGOTIATION_TRANSITIONS[currentStatus] ?? []
-    const extra = isCommittee ? (COMMITTEE_EXTRA_TRANSITIONS[currentStatus] ?? []) : []
-    return !base.includes(status) && extra.includes(status)
-  }
 
   // Cost summary text for banner (estTotal and totalCost are undefined for athlete/manager roles)
   const costSummary = (() => {
@@ -944,57 +983,56 @@ export default function AthletePage() {
 
             {/* Action buttons */}
             <div className="flex flex-wrap gap-2 justify-end shrink-0">
-              {allowedTransitions.map((status) => {
-                const needsConfirm = ['confirmed', 'rejected', 'withdrawn', 'to_review'].includes(status)
-                const committeeOnly = isCommitteeOnly(status as NegotiationStatus)
+              {/* Send Agreement — staff only, separate from allowedTransitions */}
+              {canSendAgreement && (
+                <button
+                  onClick={() => handleTransitionClick('agreement_sent')}
+                  disabled={!allDecided || !hasAtLeastOneSelected || statusMutation.isPending}
+                  title={
+                    !allDecided ? t('selection.decideAllFirst') :
+                    !hasAtLeastOneSelected ? t('selection.needAtLeastOneSelected') :
+                    undefined
+                  }
+                  className={`text-xs px-3 py-1.5 rounded font-medium border ${
+                    allDecided && hasAtLeastOneSelected
+                      ? 'bg-blue-600 text-white border-blue-600 hover:bg-blue-700'
+                      : 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed'
+                  }`}
+                >
+                  {t('action.sendAgreement')}
+                </button>
+              )}
 
-                // Athlete/manager-specific labels
-                const buttonLabel = isAthleteOrManager
-                  ? status === 'confirmed' ? t('action.acceptOffer')
-                    : status === 'counter_offer_sent' ? t('action.counterOffer')
-                    : status === 'withdrawn' ? t('action.withdraw')
-                    : t(`status.${status}`)
-                  : committeeOnly && status === 'to_review'
-                    ? t('status.rattraper')
-                    : t(`status.${status}`)
+              {/* Awaiting response — staff views agreement_sent */}
+              {isStaff && currentStatus === 'agreement_sent' && (
+                <span className="text-xs text-blue-600 py-1.5 italic">{t('selection.awaitingResponse')}</span>
+              )}
 
-                return (
-                  <button
-                    key={status}
-                    onClick={() => {
-                      if (isAthleteOrManager && status === 'counter_offer_sent') {
-                        setShowCounterOfferModal(true)
-                      } else if (status === 'agreement_sent' && isStaff) {
-                        setActiveTab('negotiation')
-                        setShowAgreementForm(true)
-                      } else if (needsConfirm) {
-                        setConfirmAction(status as NegotiationStatus)
-                      } else {
-                        statusMutation.mutate(status as NegotiationStatus)
-                      }
-                    }}
-                    disabled={statusMutation.isPending}
-                    title={committeeOnly ? t('selection.rattraper') : undefined}
-                    className={`text-xs px-3 py-1.5 rounded font-medium border ${
-                      status === 'confirmed'
-                        ? 'bg-green-600 text-white border-green-600 hover:bg-green-700'
-                        : status === 'rejected'
-                        ? 'bg-red-50 text-red-600 border-red-200 hover:bg-red-100'
-                        : status === 'withdrawn'
-                        ? 'bg-gray-50 text-gray-500 border-gray-200 hover:bg-gray-100'
-                        : status === 'agreement_sent'
-                        ? 'bg-blue-600 text-white border-blue-600 hover:bg-blue-700'
-                        : status === 'counter_offer_sent'
-                        ? 'bg-purple-600 text-white border-purple-600 hover:bg-purple-700'
-                        : status === 'to_review' && committeeOnly
-                        ? 'bg-orange-50 text-orange-600 border-orange-200 hover:bg-orange-100'
-                        : 'bg-gray-100 text-gray-700 border-gray-200 hover:bg-gray-200'
-                    }`}
-                  >
-                    {buttonLabel}
-                  </button>
-                )
-              })}
+              {/* Standard transition buttons */}
+              {allowedTransitions.map((targetStatus) => (
+                <button
+                  key={targetStatus}
+                  onClick={() => handleTransitionClick(targetStatus)}
+                  disabled={statusMutation.isPending}
+                  className={`text-xs px-3 py-1.5 rounded font-medium border ${
+                    targetStatus === 'confirmed'
+                      ? 'bg-green-600 text-white border-green-600 hover:bg-green-700'
+                      : targetStatus === 'rejected' && currentStatus !== 'confirmed'
+                      ? 'bg-red-50 text-red-600 border-red-200 hover:bg-red-100'
+                      : targetStatus === 'rejected' && currentStatus === 'confirmed'
+                      ? 'bg-red-600 text-white border-red-600 hover:bg-red-700'
+                      : targetStatus === 'withdrawn'
+                      ? 'bg-gray-50 text-gray-500 border-gray-200 hover:bg-gray-100'
+                      : targetStatus === 'counter_offer_sent'
+                      ? 'bg-purple-600 text-white border-purple-600 hover:bg-purple-700'
+                      : targetStatus === 'to_review'
+                      ? 'bg-orange-50 text-orange-600 border-orange-200 hover:bg-orange-100'
+                      : 'bg-gray-100 text-gray-700 border-gray-200 hover:bg-gray-200'
+                  }`}
+                >
+                  {getButtonLabel(targetStatus)}
+                </button>
+              ))}
 
               {/* Send message — always visible for all roles, all statuses */}
               <button
@@ -1004,41 +1042,42 @@ export default function AthletePage() {
                 {t('action.sendMessage')}
               </button>
 
-              {allowedTransitions.length === 0 && !isAthleteOrManager && (
+              {allowedTransitions.length === 0 && !canSendAgreement && !isAthleteOrManager && currentStatus !== 'agreement_sent' && (
                 <span className="text-xs text-gray-400 py-1.5">{t('selection.noActions')}</span>
               )}
             </div>
           </div>
 
-          {/* Confirm dialog */}
-          {confirmAction && (
+          {/* Confirmation popup */}
+          {confirmTransition && (
             <div className="mt-3 p-3 rounded border border-yellow-300 bg-yellow-50">
               <p className="text-sm text-gray-900 mb-3">
-                {t('confirm.statusChange', {
+                {t(`confirm.transition.${confirmTransition.from}__${confirmTransition.to}`, {
                   athlete: `${athlete.firstName} ${athlete.lastName}`,
-                  status: confirmAction === 'to_review' ? t('status.rattraper') : t(`status.${confirmAction}`),
+                  meeting: athlete.edition?.name ?? '',
                 })}
               </p>
               <div className="flex gap-2">
                 <button
-                  onClick={() => {
-                    statusMutation.mutate(confirmAction)
-                    setConfirmAction(null)
-                  }}
+                  onClick={handleConfirmTransition}
                   className={`text-xs px-3 py-1.5 rounded font-medium ${
-                    confirmAction === 'confirmed'
+                    confirmTransition.to === 'confirmed'
                       ? 'bg-green-600 text-white hover:bg-green-700'
-                      : confirmAction === 'rejected'
+                      : confirmTransition.to === 'rejected'
                       ? 'bg-red-600 text-white hover:bg-red-700'
-                      : confirmAction === 'to_review'
+                      : confirmTransition.to === 'to_review'
                       ? 'bg-orange-600 text-white hover:bg-orange-700'
+                      : confirmTransition.to === 'agreement_sent'
+                      ? 'bg-blue-600 text-white hover:bg-blue-700'
+                      : confirmTransition.to === 'counter_offer_sent'
+                      ? 'bg-purple-600 text-white hover:bg-purple-700'
                       : 'bg-gray-600 text-white hover:bg-gray-700'
                   }`}
                 >
                   {t('common.confirm')}
                 </button>
                 <button
-                  onClick={() => setConfirmAction(null)}
+                  onClick={() => setConfirmTransition(null)}
                   className="text-xs px-3 py-1.5 rounded border border-gray-300 hover:bg-gray-50"
                 >
                   {t('common.cancel')}
@@ -1359,13 +1398,18 @@ export default function AthletePage() {
               <div className="bg-white rounded-lg border p-4">
                 <div className="flex items-center justify-between mb-3">
                   <h3 className="font-semibold text-sm">{t('contract.title')}</h3>
-                  {isStaff && !showAgreementForm && !['confirmed', 'rejected', 'withdrawn'].includes(currentStatus) && (
+                  {canSendAgreement && !showAgreementForm && (
                     <button
-                      onClick={() => setShowAgreementForm(true)}
-                      disabled={!allDecided}
-                      className={`text-xs ${allDecided ? 'text-blue-600 hover:text-blue-800' : 'text-gray-300 cursor-not-allowed'}`}
+                      onClick={() => handleTransitionClick('agreement_sent')}
+                      disabled={!allDecided || !hasAtLeastOneSelected}
+                      title={
+                        !allDecided ? t('selection.decideAllFirst') :
+                        !hasAtLeastOneSelected ? t('selection.needAtLeastOneSelected') :
+                        undefined
+                      }
+                      className={`text-xs ${allDecided && hasAtLeastOneSelected ? 'text-blue-600 hover:text-blue-800' : 'text-gray-300 cursor-not-allowed'}`}
                     >
-                      {latestAgreement ? t('contract.newVersion') : t('contract.sendOffer')}
+                      {latestAgreement ? t('contract.newVersion') : t('action.sendAgreement')}
                     </button>
                   )}
                 </div>
@@ -1597,6 +1641,36 @@ export default function AthletePage() {
           </div>
         )}
       </div>
+
+      {/* Email preview modal — shown after each status transition */}
+      {emailPreview && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30" onClick={() => setEmailPreview(null)}>
+          <div className="bg-white rounded-lg shadow-xl max-w-lg w-full mx-4 max-h-[80vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between p-4 border-b">
+              <h3 className="font-semibold text-sm">{t('emailPreview.title')}</h3>
+              <button onClick={() => setEmailPreview(null)} className="text-gray-400 hover:text-gray-600">✕</button>
+            </div>
+            <div className="p-4 space-y-3">
+              <p className="text-xs text-gray-500">{t('emailPreview.description')}</p>
+              <div className="text-xs">
+                <span className="font-medium text-gray-600">{t('emailPreview.subject')}:</span>{' '}
+                <span className="text-gray-900">{emailPreview.subject}</span>
+              </div>
+              <pre className="text-xs text-gray-700 whitespace-pre-wrap bg-gray-50 rounded p-3 border">
+                {emailPreview.body}
+              </pre>
+            </div>
+            <div className="p-4 border-t flex justify-end">
+              <button
+                onClick={() => setEmailPreview(null)}
+                className="text-xs px-4 py-1.5 rounded border border-gray-300 hover:bg-gray-50"
+              >
+                {t('common.close')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Email popup modal */}
       {viewingEmailId && (

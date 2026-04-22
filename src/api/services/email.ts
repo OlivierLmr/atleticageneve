@@ -48,6 +48,204 @@ export interface EmailContent {
   htmlBody: string
 }
 
+export interface TransitionEmailContent {
+  subject: string
+  body: string
+}
+
+/**
+ * Builds the email content for a given negotiation status transition.
+ * All emails are in English (mail engine not yet active).
+ */
+export function buildTransitionEmail(
+  from: string,
+  to: string,
+  athleteName: string,
+  meetingName: string,
+  senderName: string,
+  recipientName: string,
+  orgName: string = 'Atletica Geneve',
+): TransitionEmailContent | null {
+  const p = (s: string) => s
+    .replace(/\[Meeting Name\]/g, meetingName)
+    .replace(/\[Athlete Name\]/g, athleteName)
+    .replace(/\[Sender Name\]/g, senderName)
+    .replace(/\[Recipient Name\]/g, recipientName)
+    .replace(/\[Organization Name\]/g, orgName)
+
+  const key = `${from}__${to}`
+
+  const templates: Record<string, TransitionEmailContent> = {
+    'to_review__agreement_sent': {
+      subject: p('[Meeting Name] — Participation Agreement'),
+      body: p(`Dear [Recipient Name],
+
+We are pleased to inform you that we have reviewed [Athlete Name]'s application for [Meeting Name] and are ready to move forward with a participation offer.
+
+Please find attached the participation agreement for your review. We would be grateful if you could let us know your decision at your earliest convenience.
+
+Should you have any questions or wish to discuss any aspect of the agreement, please do not hesitate to reach out.
+
+We look forward to hearing from you.
+
+Kind regards,
+[Sender Name] — [Organization Name]`),
+    },
+
+    'to_review__rejected': {
+      subject: p('[Meeting Name] — Application Update'),
+      body: p(`Dear [Recipient Name],
+
+Thank you for [Athlete Name]'s interest in participating in [Meeting Name].
+
+After careful review, we regret to inform you that we are unable to offer a place at this edition of the meeting.
+
+We sincerely appreciate your trust and hope to have the opportunity to welcome [Athlete Name] at a future event.
+
+Kind regards,
+[Sender Name] — [Organization Name]`),
+    },
+
+    'to_review__withdrawn': {
+      subject: p('[Meeting Name] — Withdrawal of Application'),
+      body: p(`Dear [Recipient Name],
+
+I am writing to inform you that [Athlete Name] is withdrawing their application for [Meeting Name].
+
+We are sorry for any inconvenience this may cause and thank you for your understanding. We hope to have the opportunity to work together at a future event.
+
+Kind regards,
+[Sender Name]`),
+    },
+
+    'agreement_sent__confirmed': {
+      subject: p('[Meeting Name] — Agreement Accepted'),
+      body: p(`Dear [Recipient Name],
+
+We are delighted to confirm [Athlete Name]'s participation in [Meeting Name] on the terms set out in the agreement.
+
+We look forward to the event and thank you for the opportunity.
+
+Kind regards,
+[Sender Name]`),
+    },
+
+    'agreement_sent__counter_offer_sent': {
+      subject: p('[Meeting Name] — Counter-offer'),
+      body: p(`Dear [Recipient Name],
+
+Thank you for sending the participation agreement for [Athlete Name] at [Meeting Name].
+
+Having reviewed the proposed terms, we would like to suggest some adjustments. Please find our counter-offer attached.
+
+We remain open to discussion and look forward to reaching a mutually satisfactory agreement.
+
+Kind regards,
+[Sender Name]`),
+    },
+
+    'agreement_sent__withdrawn': {
+      subject: p('[Meeting Name] — Withdrawal'),
+      body: p(`Dear [Recipient Name],
+
+After careful consideration, we regret to inform you that [Athlete Name] must withdraw from [Meeting Name].
+
+We are sorry for any inconvenience this may cause and sincerely thank you for the opportunity that was extended. We hope to be able to collaborate at a future event.
+
+Kind regards,
+[Sender Name]`),
+    },
+
+    'counter_offer_sent__agreement_sent': {
+      subject: p('[Meeting Name] — Updated Participation Agreement'),
+      body: p(`Dear [Recipient Name],
+
+Thank you for your counter-offer regarding [Athlete Name]'s participation in [Meeting Name]. We have taken your points into consideration and are pleased to send you an updated participation agreement.
+
+We hope this revised proposal meets your expectations. Please do not hesitate to contact us if you have any further questions.
+
+Kind regards,
+[Sender Name] — [Organization Name]`),
+    },
+
+    'counter_offer_sent__rejected': {
+      subject: p('[Meeting Name] — End of Negotiations'),
+      body: p(`Dear [Recipient Name],
+
+Thank you for your counter-offer regarding [Athlete Name]'s participation in [Meeting Name].
+
+After careful consideration, we regret to inform you that we are unable to reach an agreement for this edition of the meeting.
+
+We sincerely value your interest and hope to have the opportunity to work together in the future.
+
+Kind regards,
+[Sender Name] — [Organization Name]`),
+    },
+
+    'counter_offer_sent__withdrawn': {
+      subject: p('[Meeting Name] — Withdrawal'),
+      body: p(`Dear [Recipient Name],
+
+Further to our counter-offer, we have decided to withdraw [Athlete Name]'s candidacy for [Meeting Name].
+
+We thank you for the time and effort devoted to the negotiation and apologize for any inconvenience caused. We hope to have the pleasure of working together at a future event.
+
+Kind regards,
+[Sender Name]`),
+    },
+
+    'confirmed__withdrawn': {
+      subject: p('[Meeting Name] — Withdrawal of Confirmed Participation'),
+      body: p(`Dear [Recipient Name],
+
+We regret to inform you that [Athlete Name] is unfortunately forced to withdraw from [Meeting Name], despite having previously confirmed their participation.
+
+We sincerely apologize for the disruption this may cause to your event organization and thank you for your understanding. Please do not hesitate to contact us if you need any further information.
+
+Kind regards,
+[Sender Name]`),
+    },
+
+    'confirmed__rejected': {
+      subject: p("[Meeting Name] — Update Regarding [Athlete Name]'s Participation"),
+      body: p(`Dear [Recipient Name],
+
+We regret to inform you that, due to exceptional circumstances, [Athlete Name]'s confirmed participation in [Meeting Name] has had to be cancelled.
+
+We are truly sorry for the inconvenience this causes and want to assure you that this decision was not taken lightly. We remain available to discuss this matter and hope to have the opportunity to welcome [Athlete Name] at a future event.
+
+Kind regards,
+[Sender Name] — [Organization Name]`),
+    },
+
+    'rejected__to_review': {
+      subject: p('[Meeting Name] — Application Reopened'),
+      body: p(`Dear [Recipient Name],
+
+Following our previous communication, we are pleased to inform you that [Athlete Name]'s application for [Meeting Name] has been reopened.
+
+We would like to invite you to resume discussions with us. Please feel free to contact us at your convenience.
+
+Kind regards,
+[Sender Name] — [Organization Name]`),
+    },
+
+    'withdrawn__to_review': {
+      subject: p('[Meeting Name] — Invitation to Reconsider'),
+      body: p(`Dear [Recipient Name],
+
+Following [Athlete Name]'s withdrawal from [Meeting Name], we would like to reach out and explore whether there might be an opportunity to resume the process.
+
+If circumstances have changed and you would be open to reconsidering, we would be very pleased to discuss this with you. Please feel free to contact us.
+
+Kind regards,
+[Sender Name] — [Organization Name]`),
+    },
+  }
+
+  return templates[key] ?? null
+}
+
 export async function sendMagicLinkEmail(db: DB, email: string, token: string, baseUrl: string, lang: 'en' | 'fr' = 'en'): Promise<EmailContent> {
   const link = `${baseUrl}/auth/verify?token=${token}`
   const subject = lang === 'fr' ? 'Votre candidature — Atletica Genève' : 'Your application — Atletica Geneve'
@@ -61,52 +259,4 @@ export async function sendMagicLinkEmail(db: DB, email: string, token: string, b
 
   await sendEmail({ db, to: email, subject, body, htmlBody, lang })
   return { subject, body, htmlBody }
-}
-
-export async function sendStatusChangeEmail(
-  db: DB,
-  email: string,
-  athleteName: string,
-  status: string,
-  portalUrl: string,
-  lang: 'en' | 'fr' = 'en',
-  magicLinkUrl?: string,
-  relatedAthleteId?: string,
-): Promise<string> {
-  const statusLabels: Record<string, Record<string, string>> = {
-    en: {
-      to_review: 'Under review',
-      agreement_sent: 'Agreement sent',
-      counter_offer_sent: 'Counter-offer received',
-      confirmed: 'Confirmed',
-      rejected: 'Not selected',
-      withdrawn: 'Withdrawn',
-    },
-    fr: {
-      to_review: "En cours d'examen",
-      agreement_sent: 'Accord envoyé',
-      counter_offer_sent: 'Contre-proposition reçue',
-      confirmed: 'Confirmé',
-      rejected: 'Non retenu',
-      withdrawn: 'Retiré',
-    },
-  }
-
-  const label = statusLabels[lang]?.[status] ?? status
-  const subject = lang === 'fr'
-    ? `Mise à jour candidature — ${athleteName}`
-    : `Application update — ${athleteName}`
-
-  const linkUrl = magicLinkUrl ?? portalUrl
-  const linkLabel = lang === 'fr' ? 'Accéder au portail' : 'Access portal'
-
-  const body = lang === 'fr'
-    ? `Bonjour,\n\nLa candidature de ${athleteName} a été mise à jour.\nNouveau statut : ${label}\n\nConsultez le portail : ${linkUrl}\n\nAtletica Genève`
-    : `Hello,\n\nThe application for ${athleteName} has been updated.\nNew status: ${label}\n\nView the portal: ${linkUrl}\n\nAtletica Geneve`
-
-  const htmlBody = lang === 'fr'
-    ? `<p>Bonjour,</p><p>La candidature de <strong>${athleteName}</strong> a été mise à jour.</p><p>Nouveau statut : <strong>${label}</strong></p><p><a href="${linkUrl}">${linkLabel}</a></p><p>Atletica Genève</p>`
-    : `<p>Hello,</p><p>The application for <strong>${athleteName}</strong> has been updated.</p><p>New status: <strong>${label}</strong></p><p><a href="${linkUrl}">${linkLabel}</a></p><p>Atletica Geneve</p>`
-
-  return sendEmail({ db, to: email, subject, body, htmlBody, lang, relatedAthleteId })
 }

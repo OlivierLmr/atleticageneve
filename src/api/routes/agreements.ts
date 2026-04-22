@@ -3,7 +3,7 @@ import { eq, desc, and } from 'drizzle-orm'
 import * as schema from '../db/schema'
 import { agreementSchema } from '@shared/validation'
 import { requireAuth } from '../middleware/auth'
-import { sendEmail } from '../services/email'
+import { sendEmail, buildTransitionEmail } from '../services/email'
 import type { Env } from '../index'
 import type { NegotiationStatus, ParticipationStatus } from '@shared/types'
 
@@ -109,6 +109,13 @@ agreements.post('/:athleteId/agreements', async (c) => {
     }, 400)
   }
 
+  const hasSelected = apps.some(a => (a.participationStatus as ParticipationStatus) === 'selected')
+  if (!hasSelected) {
+    return c.json({
+      error: 'At least one application must be selected before sending an agreement',
+    }, 400)
+  }
+
   // Get edition costs
   const editions = await db.select().from(schema.edition).limit(1)
   if (editions.length === 0) {
@@ -197,44 +204,34 @@ agreements.post('/:athleteId/agreements', async (c) => {
     authorName: `${user.firstName} ${user.lastName}`,
   })
 
-  // Send email notification to athlete and manager about the agreement
+  // Build and send transition email (to_review→agreement_sent or counter_offer_sent→agreement_sent)
   const athleteName = `${ath.firstName} ${ath.lastName}`
-  const nightCount = [
-    data.hotelNightTue, data.hotelNightWed, data.hotelNightThu,
-    data.hotelNightFri, data.hotelNightSat, data.hotelNightSun,
-  ].filter(Boolean).length
+  const senderName = `${user.firstName} ${user.lastName}`
 
-  const agreementSummary = [
-    `Appearance fee: CHF ${data.appearanceFee}`,
-    `Transport: CHF ${data.transport}`,
-    `Hotel nights: ${nightCount}`,
-    `Total cost: CHF ${totalCost}`,
-    data.notes ? `Notes: ${data.notes}` : null,
-  ].filter(Boolean).join('\n')
-
-  const agreementBody = `An agreement offer (v${nextVersion}) has been sent for ${athleteName}.\n\n${agreementSummary}\n\nPlease log in to the portal to review and respond.`
-
-  if (ath.athleteEmail) {
-    await sendEmail({
-      db,
-      to: ath.athleteEmail,
-      subject: `Agreement offer — ${athleteName}`,
-      body: agreementBody,
-      relatedAthleteId: athleteId,
-    })
-  }
-
+  // Determine recipient name: manager if managed, otherwise athlete
+  let recipientName = athleteName
+  let recipientEmail = ath.athleteEmail
   if (ath.managerId) {
     const managerRows = await db.select().from(schema.user).where(eq(schema.user.id, ath.managerId)).limit(1)
-    if (managerRows.length > 0 && managerRows[0].email) {
-      await sendEmail({
-        db,
-        to: managerRows[0].email,
-        subject: `Agreement offer — ${athleteName}`,
-        body: agreementBody,
-        relatedAthleteId: athleteId,
-      })
+    if (managerRows.length > 0) {
+      recipientName = `${managerRows[0].firstName} ${managerRows[0].lastName}`
+      recipientEmail = managerRows[0].email
     }
+  }
+
+  const emailContent = buildTransitionEmail(
+    currentStatus,
+    'agreement_sent',
+    athleteName,
+    edition.name,
+    senderName,
+    recipientName,
+  )
+
+  if (emailContent && recipientEmail) {
+    await sendEmail({ db, to: recipientEmail, subject: emailContent.subject, body: emailContent.body, relatedAthleteId: athleteId })
+  } else if (emailContent && ath.athleteEmail) {
+    await sendEmail({ db, to: ath.athleteEmail, subject: emailContent.subject, body: emailContent.body, relatedAthleteId: athleteId })
   }
 
   return c.json({
@@ -243,6 +240,7 @@ agreements.post('/:athleteId/agreements', async (c) => {
     version: nextVersion,
     totalCost,
     direction: 'to_athlete',
+    emailPreview: emailContent ?? undefined,
   }, 201)
 })
 

@@ -74,7 +74,7 @@
     "agreement_sent": "Agreement sent",
     "counter_offer_sent": "Counter-offer sent",
     "confirmed": "Confirmed",
-    "rejected": "Not selected",
+    "rejected": "Rejected",
     "withdrawn": "Withdrawn",
     "contract_sent": "Offer sent",
     "counter_offer": "Counter-offer",
@@ -92,7 +92,22 @@
     "withdraw": "Are you sure you want to withdraw?",
     "withdrawAthlete": "Withdraw {{athlete}}?",
     "archiveAthlete": "Archive {{athlete}}? This will hide them from all lists.",
-    "deleteHotel": "Delete hotel \"{{hotel}}\" and all its room types?"
+    "deleteHotel": "Delete hotel \"{{hotel}}\" and all its room types?",
+    "transition": {
+      "to_review__agreement_sent": "You are about to send a participation agreement to {{athlete}}. They will be notified and invited to respond.",
+      "to_review__rejected": "You are about to reject {{athlete}}'s application for {{meeting}}. They will be notified of this decision.",
+      "to_review__withdrawn": "You are about to withdraw {{athlete}}'s application from {{meeting}}. The organizers will be notified.",
+      "agreement_sent__confirmed": "You are about to accept the participation agreement for {{athlete}} in {{meeting}}. This will confirm their participation.",
+      "agreement_sent__counter_offer_sent": "You are about to send a counter-offer regarding {{athlete}}'s participation in {{meeting}}. The organizers will be notified.",
+      "agreement_sent__withdrawn": "You are about to withdraw {{athlete}} from {{meeting}}, while a participation agreement is pending. The organizers will be notified.",
+      "counter_offer_sent__agreement_sent": "You are about to send an updated participation agreement to {{athlete}}, taking their counter-offer into account. They will be notified and invited to respond.",
+      "counter_offer_sent__rejected": "You are about to reject {{athlete}}'s counter-offer and end the negotiation for {{meeting}}. They will be notified.",
+      "counter_offer_sent__withdrawn": "You are about to withdraw {{athlete}}'s candidacy from {{meeting}}. The organizers will be notified.",
+      "confirmed__withdrawn": "You are about to withdraw {{athlete}} from {{meeting}}, despite their participation having been confirmed. The organizers will be notified.",
+      "confirmed__rejected": "You are about to cancel {{athlete}}'s confirmed participation in {{meeting}}. This is a committee override action. They will be notified.",
+      "rejected__to_review": "You are about to reopen {{athlete}}'s application for {{meeting}}. This will restart the negotiation process. They will be notified.",
+      "withdrawn__to_review": "You are about to reopen {{athlete}}'s application for {{meeting}} following their withdrawal. This will restart the negotiation process. They will be notified."
+    }
   },
   "signup": {
     "title": "Welcome to Atletica Geneve",
@@ -245,6 +260,8 @@
     "noActions": "No available actions",
     "allDecided": "All events decided — ready to send agreement",
     "decideAllFirst": "Decide all events before sending an agreement",
+    "needAtLeastOneSelected": "At least one event must be selected before sending an agreement",
+    "awaitingResponse": "Awaiting athlete / manager response",
     "maxSlots": "Max slots",
     "confirmedAthletes": "Confirmed athletes for this event",
     "noConfirmedAthletes": "No confirmed athletes yet",
@@ -359,14 +376,20 @@
   },
   "emailPreview": {
     "title": "Email preview",
-    "description": "Here is the content of the email that would have been sent to the athlete if the mail sending engine were active.",
+    "description": "Here is the content of the email that would have been sent if the mail sending engine were active.",
     "subject": "Subject"
   },
   "action": {
+    "sendAgreement": "Send Agreement",
+    "reject": "Reject",
+    "accept": "Accept",
+    "sendCounterOffer": "Send Counter-offer",
+    "withdraw": "Withdraw",
+    "overrideReject": "Override: Reject",
+    "reopen": "Reopen",
     "acceptOffer": "Accept offer",
     "counterOffer": "Counter-offer",
     "counterOfferPlaceholder": "Describe your counter-proposal…",
-    "withdraw": "Withdraw",
     "sendMessage": "Send message",
     "messagePlaceholder": "Type your message…"
   }

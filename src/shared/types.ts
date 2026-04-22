@@ -309,6 +309,7 @@ export interface ApplicationForAthlete extends Application {
 }
 
 export interface EditionCosts {
+  name: string
   weightPB: number
   weightSB: number
   weightRanking: number
