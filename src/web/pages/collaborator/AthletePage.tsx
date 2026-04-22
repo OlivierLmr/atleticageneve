@@ -28,6 +28,30 @@ interface HotelWithRooms extends Hotel {
   rooms: HotelRoom[]
 }
 
+type AgreementFormDraft = {
+  appearanceFee: number | ''
+  otherCompensation: number | ''
+  otherCompensationDesc: string
+  transport: number | ''
+  transportAirportHotel: boolean
+  transportHotelStadium: boolean
+  hotelRoomId: string
+  hotelNightTue: boolean
+  hotelNightWed: boolean
+  hotelNightThu: boolean
+  hotelNightFri: boolean
+  hotelNightSat: boolean
+  hotelNightSun: boolean
+  dinnerTue: boolean
+  dinnerWed: boolean
+  dinnerThu: boolean
+  dinnerFri: boolean
+  dinnerSat: boolean
+  dinnerSun: boolean
+  stadiumMeals: boolean
+  notes: string
+}
+
 interface StaffUser {
   id: string
   firstName: string
@@ -43,7 +67,7 @@ interface ApplicationRow extends Application {
 
 // ── Agreement form defaults ──────────────────────────────────────────────────
 
-function defaultAgreement(existing?: Agreement) {
+function defaultAgreement(existing?: Agreement): AgreementFormDraft {
   if (existing) {
     return {
       appearanceFee: existing.appearanceFee,
@@ -70,10 +94,10 @@ function defaultAgreement(existing?: Agreement) {
     }
   }
   return {
-    appearanceFee: 0,
-    otherCompensation: 0,
+    appearanceFee: '',
+    otherCompensation: '',
     otherCompensationDesc: '',
-    transport: 0,
+    transport: '',
     transportAirportHotel: true,
     transportHotelStadium: true,
     hotelRoomId: '',
@@ -673,7 +697,7 @@ export default function AthletePage() {
   const [noteContent, setNoteContent] = useState('')
   const [internalNotes, setInternalNotes] = useState('')
   const [notesInitialized, setNotesInitialized] = useState(false)
-  const [agreementForm, setAgreementForm] = useState(() => defaultAgreement())
+  const [agreementForm, setAgreementForm] = useState<AgreementFormDraft>(() => defaultAgreement())
   const [showCostPopup, setShowCostPopup] = useState(false)
   const [showCounterOfferModal, setShowCounterOfferModal] = useState(false)
   const [counterOfferText, setCounterOfferText] = useState('')
@@ -731,15 +755,17 @@ export default function AthletePage() {
   })
 
   const agreementMutation = useMutation({
-    mutationFn: (data: ReturnType<typeof defaultAgreement>) =>
+    mutationFn: (data: AgreementFormDraft) =>
       api.post(`/api/v1/athletes/${id}/agreements`, {
         ...data,
+        appearanceFee: data.appearanceFee === '' ? 0 : data.appearanceFee,
+        otherCompensation: data.otherCompensation === '' ? 0 : data.otherCompensation,
+        transport: data.transport === '' ? 0 : data.transport,
         hotelRoomId: data.hotelRoomId || undefined,
       }),
     onSuccess: (data: { emailPreview?: { subject: string; body: string } }) => {
       queryClient.invalidateQueries({ queryKey: ['athlete', id] })
       setShowAgreementForm(false)
-      setConfirmDialog(null)
       if (data?.emailPreview) setEmailPreview(data.emailPreview)
     },
   })
@@ -1359,7 +1385,7 @@ export default function AthletePage() {
               <div className="bg-white rounded-lg border p-4">
                 <div className="flex items-center justify-between mb-3">
                   <h3 className="font-semibold text-sm">{t('contract.title')}</h3>
-                  {isStaff && !showAgreementForm && (currentStatus === 'to_review' || currentStatus === 'counter_offer_sent') && (
+                  {isStaff && (currentStatus === 'to_review' || currentStatus === 'counter_offer_sent') && (
                     <button
                       onClick={() => setShowAgreementForm(true)}
                       disabled={!canSendAgreement}
@@ -1373,7 +1399,7 @@ export default function AthletePage() {
 
                 {currentStatus === 'confirmed' && athlete.agreements.length === 0 ? (
                   <p className="text-sm text-green-700 italic">{t('selection.acceptedAtMeeting')}</p>
-                ) : athlete.agreements.length === 0 && !showAgreementForm ? (
+                ) : athlete.agreements.length === 0 ? (
                   <p className="text-xs text-gray-400">{t('contract.noOfferYet')}</p>
                 ) : (
                   <div className="space-y-3">
@@ -1384,151 +1410,6 @@ export default function AthletePage() {
                 )}
               </div>
 
-              {/* Agreement form — staff only */}
-              {showAgreementForm && isStaff && (
-                <div className="bg-white rounded-lg border p-4">
-                  <h3 className="font-semibold text-sm mb-3">
-                    {t('contract.sendOffer')} — v{(athlete.agreements.length || 0) + 1}
-                  </h3>
-                  <div className="space-y-3">
-                    <div>
-                      <label className={labelCls}>{t('contract.bonus')} (CHF)</label>
-                      <input type="number" className={inputCls} value={agreementForm.appearanceFee}
-                        onChange={e => setAgreementForm(p => ({ ...p, appearanceFee: parseInt(e.target.value) || 0 }))} />
-                    </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className={labelCls}>{t('contract.otherCompensation')} (CHF)</label>
-                        <input type="number" className={inputCls} value={agreementForm.otherCompensation}
-                          onChange={e => setAgreementForm(p => ({ ...p, otherCompensation: parseInt(e.target.value) || 0 }))} />
-                      </div>
-                      <div>
-                        <label className={labelCls}>{t('contract.description')}</label>
-                        <input className={inputCls} value={agreementForm.otherCompensationDesc}
-                          onChange={e => setAgreementForm(p => ({ ...p, otherCompensationDesc: e.target.value }))}
-                          placeholder={t('contract.otherCompensationDesc')} />
-                      </div>
-                    </div>
-                    <div>
-                      <label className={labelCls}>{t('contract.transport')} (CHF)</label>
-                      <input type="number" className={inputCls} value={agreementForm.transport}
-                        onChange={e => setAgreementForm(p => ({ ...p, transport: parseInt(e.target.value) || 0 }))} />
-                    </div>
-                    <div className="flex items-center gap-4">
-                      <label className="flex items-center gap-2 text-sm cursor-pointer">
-                        <input type="checkbox" checked={agreementForm.transportAirportHotel}
-                          onChange={e => setAgreementForm(p => ({ ...p, transportAirportHotel: e.target.checked }))} />
-                        {t('contract.transportAirportHotel')}
-                      </label>
-                      <label className="flex items-center gap-2 text-sm cursor-pointer">
-                        <input type="checkbox" checked={agreementForm.transportHotelStadium}
-                          onChange={e => setAgreementForm(p => ({ ...p, transportHotelStadium: e.target.checked }))} />
-                        {t('contract.transportHotelStadium')}
-                      </label>
-                    </div>
-                    <div>
-                      <label className={labelCls}>{t('logistics.hotel')}</label>
-                      <select className={inputCls} value={agreementForm.hotelRoomId}
-                        onChange={e => setAgreementForm(p => ({ ...p, hotelRoomId: e.target.value }))}>
-                        <option value="">— {t('contract.noHotelRoom')} —</option>
-                        {allRooms.map(r => (
-                          <option key={r.id} value={r.id}>{r.hotelName} — {r.roomType} (CHF {r.costPerNight}/night)</option>
-                        ))}
-                      </select>
-                    </div>
-                    <div>
-                      <label className={labelCls}>{t('contract.hotelNights')}</label>
-                      <div className="flex gap-2">
-                        {NIGHT_LABELS.map(night => {
-                          const key = `hotelNight${night.charAt(0).toUpperCase() + night.slice(1)}` as keyof typeof agreementForm
-                          return (
-                            <label key={night} className={`flex flex-col items-center text-xs cursor-pointer px-2 py-1 rounded border ${
-                              agreementForm[key] ? 'bg-gray-900 text-white border-gray-900' : 'border-gray-300'
-                            }`}>
-                              <input type="checkbox" className="sr-only" checked={agreementForm[key] as boolean}
-                                onChange={e => setAgreementForm(p => ({ ...p, [key]: e.target.checked }))} />
-                              {t(`night.${night}`)}
-                            </label>
-                          )
-                        })}
-                      </div>
-                    </div>
-                    <div>
-                      <label className={labelCls}>{t('contract.dinners')}</label>
-                      <div className="flex gap-2">
-                        {DINNER_LABELS.map(day => {
-                          const key = `dinner${day.charAt(0).toUpperCase() + day.slice(1)}` as keyof typeof agreementForm
-                          return (
-                            <label key={day} className={`flex flex-col items-center text-xs cursor-pointer px-2 py-1 rounded border ${
-                              agreementForm[key] ? 'bg-gray-900 text-white border-gray-900' : 'border-gray-300'
-                            }`}>
-                              <input type="checkbox" className="sr-only" checked={agreementForm[key] as boolean}
-                                onChange={e => setAgreementForm(p => ({ ...p, [key]: e.target.checked }))} />
-                              {t(`night.${day}`)}
-                            </label>
-                          )
-                        })}
-                      </div>
-                    </div>
-                    <label className="flex items-center gap-2 text-sm cursor-pointer">
-                      <input type="checkbox" checked={agreementForm.stadiumMeals}
-                        onChange={e => setAgreementForm(p => ({ ...p, stadiumMeals: e.target.checked }))} />
-                      {t('contract.stadiumMeals')}
-                    </label>
-                    <div>
-                      <label className={labelCls}>{t('contract.notesToAthlete')}</label>
-                      <textarea className={inputCls} rows={2} value={agreementForm.notes}
-                        onChange={e => setAgreementForm(p => ({ ...p, notes: e.target.value }))} />
-                    </div>
-
-                    {/* Live cost preview */}
-                    {(() => {
-                      const room = allRooms.find(r => r.id === agreementForm.hotelRoomId)
-                      const nights = NIGHT_LABELS.filter(n => agreementForm[`hotelNight${n.charAt(0).toUpperCase() + n.slice(1)}` as keyof typeof agreementForm]).length
-                      const dinners = DINNER_LABELS.filter(d => agreementForm[`dinner${d.charAt(0).toUpperCase() + d.slice(1)}` as keyof typeof agreementForm]).length
-                      let total = agreementForm.appearanceFee + agreementForm.otherCompensation + agreementForm.transport
-                      total += nights * (room?.costPerNight ?? 0)
-                      total += dinners * (room?.dinnerCost ?? 0)
-                      if (agreementForm.stadiumMeals) total += athlete.edition?.stadiumMealCost ?? 0
-                      if (agreementForm.transportAirportHotel) total += athlete.edition?.transportAirportHotelCost ?? 0
-                      if (agreementForm.transportHotelStadium) total += athlete.edition?.transportHotelStadiumCost ?? 0
-                      return (
-                        <div className="bg-gray-50 rounded p-3 text-sm">
-                          <div className="flex justify-between font-semibold">
-                            <span>{t('contract.totalCost')}</span>
-                            <span>CHF {total.toLocaleString()}</span>
-                          </div>
-                        </div>
-                      )
-                    })()}
-
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => {
-                          setConfirmDialog({
-                            fromStatus: currentStatus,
-                            toStatus: 'agreement_sent',
-                            onConfirm: () => agreementMutation.mutate(agreementForm),
-                          })
-                        }}
-                        disabled={agreementMutation.isPending}
-                        className="flex-1 py-2 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
-                      >
-                        {agreementMutation.isPending ? t('common.loading') : t('action.sendAgreement')}
-                      </button>
-                      <button
-                        onClick={() => setShowAgreementForm(false)}
-                        className="px-4 py-2 text-sm border rounded hover:bg-gray-50"
-                      >
-                        {t('common.cancel')}
-                      </button>
-                    </div>
-                    {agreementMutation.isError && (
-                      <p className="text-xs text-red-600">{(agreementMutation.error as Error)?.message || t('common.error')}</p>
-                    )}
-                  </div>
-                </div>
-              )}
             </div>
 
             {/* Right: Timeline */}
@@ -1701,6 +1582,169 @@ export default function AthletePage() {
             ) : (
               <div className="p-4 text-sm text-gray-400">{t('common.loading')}</div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Agreement form popup */}
+      {showAgreementForm && isStaff && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30" onClick={() => setShowAgreementForm(false)}>
+          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between p-4 border-b">
+              <h3 className="font-semibold text-sm">
+                {t('contract.sendOffer')} — v{(athlete.agreements.length || 0) + 1}
+              </h3>
+              <button onClick={() => setShowAgreementForm(false)} className="text-gray-400 hover:text-gray-600">✕</button>
+            </div>
+            <div className="p-4 space-y-3">
+              <div>
+                <label className={labelCls}>{t('contract.bonus')} (CHF)</label>
+                <input
+                  type="number"
+                  className={`${inputCls} text-right`}
+                  value={agreementForm.appearanceFee}
+                  placeholder="0"
+                  onChange={e => setAgreementForm(p => ({ ...p, appearanceFee: e.target.value === '' ? '' : (parseInt(e.target.value) || 0) }))}
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className={labelCls}>{t('contract.otherCompensation')} (CHF)</label>
+                  <input
+                    type="number"
+                    className={`${inputCls} text-right`}
+                    value={agreementForm.otherCompensation}
+                    placeholder="0"
+                    onChange={e => setAgreementForm(p => ({ ...p, otherCompensation: e.target.value === '' ? '' : (parseInt(e.target.value) || 0) }))}
+                  />
+                </div>
+                <div>
+                  <label className={labelCls}>{t('contract.description')}</label>
+                  <input
+                    className={inputCls}
+                    value={agreementForm.otherCompensationDesc}
+                    onChange={e => setAgreementForm(p => ({ ...p, otherCompensationDesc: e.target.value }))}
+                    placeholder={t('contract.otherCompensationDesc')}
+                  />
+                </div>
+              </div>
+              <div>
+                <label className={labelCls}>{t('contract.transport')} (CHF)</label>
+                <input
+                  type="number"
+                  className={`${inputCls} text-right`}
+                  value={agreementForm.transport}
+                  placeholder="0"
+                  onChange={e => setAgreementForm(p => ({ ...p, transport: e.target.value === '' ? '' : (parseInt(e.target.value) || 0) }))}
+                />
+              </div>
+              <div className="flex items-center gap-4">
+                <label className="flex items-center gap-2 text-sm cursor-pointer">
+                  <input type="checkbox" checked={agreementForm.transportAirportHotel}
+                    onChange={e => setAgreementForm(p => ({ ...p, transportAirportHotel: e.target.checked }))} />
+                  {t('contract.transportAirportHotel')}
+                </label>
+                <label className="flex items-center gap-2 text-sm cursor-pointer">
+                  <input type="checkbox" checked={agreementForm.transportHotelStadium}
+                    onChange={e => setAgreementForm(p => ({ ...p, transportHotelStadium: e.target.checked }))} />
+                  {t('contract.transportHotelStadium')}
+                </label>
+              </div>
+              <div>
+                <label className={labelCls}>{t('logistics.hotel')}</label>
+                <select className={inputCls} value={agreementForm.hotelRoomId}
+                  onChange={e => setAgreementForm(p => ({ ...p, hotelRoomId: e.target.value }))}>
+                  <option value="">— {t('contract.noHotelRoom')} —</option>
+                  {allRooms.map(r => (
+                    <option key={r.id} value={r.id}>{r.hotelName} — {r.roomType} (CHF {r.costPerNight}/night)</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className={labelCls}>{t('contract.hotelNights')}</label>
+                <div className="flex gap-2">
+                  {NIGHT_LABELS.map(night => {
+                    const key = `hotelNight${night.charAt(0).toUpperCase() + night.slice(1)}` as keyof AgreementFormDraft
+                    return (
+                      <label key={night} className={`flex flex-col items-center text-xs cursor-pointer px-2 py-1 rounded border ${
+                        agreementForm[key] ? 'bg-gray-900 text-white border-gray-900' : 'border-gray-300'
+                      }`}>
+                        <input type="checkbox" className="sr-only" checked={agreementForm[key] as boolean}
+                          onChange={e => setAgreementForm(p => ({ ...p, [key]: e.target.checked }))} />
+                        {t(`night.${night}`)}
+                      </label>
+                    )
+                  })}
+                </div>
+              </div>
+              <div>
+                <label className={labelCls}>{t('contract.dinners')}</label>
+                <div className="flex gap-2">
+                  {DINNER_LABELS.map(day => {
+                    const key = `dinner${day.charAt(0).toUpperCase() + day.slice(1)}` as keyof AgreementFormDraft
+                    return (
+                      <label key={day} className={`flex flex-col items-center text-xs cursor-pointer px-2 py-1 rounded border ${
+                        agreementForm[key] ? 'bg-gray-900 text-white border-gray-900' : 'border-gray-300'
+                      }`}>
+                        <input type="checkbox" className="sr-only" checked={agreementForm[key] as boolean}
+                          onChange={e => setAgreementForm(p => ({ ...p, [key]: e.target.checked }))} />
+                        {t(`night.${day}`)}
+                      </label>
+                    )
+                  })}
+                </div>
+              </div>
+              <label className="flex items-center gap-2 text-sm cursor-pointer">
+                <input type="checkbox" checked={agreementForm.stadiumMeals}
+                  onChange={e => setAgreementForm(p => ({ ...p, stadiumMeals: e.target.checked }))} />
+                {t('contract.stadiumMeals')}
+              </label>
+              <div>
+                <label className={labelCls}>{t('contract.notesToAthlete')}</label>
+                <textarea className={inputCls} rows={2} value={agreementForm.notes}
+                  onChange={e => setAgreementForm(p => ({ ...p, notes: e.target.value }))} />
+              </div>
+
+              {/* Live cost preview */}
+              {(() => {
+                const room = allRooms.find(r => r.id === agreementForm.hotelRoomId)
+                const nights = NIGHT_LABELS.filter(n => agreementForm[`hotelNight${n.charAt(0).toUpperCase() + n.slice(1)}` as keyof AgreementFormDraft]).length
+                const dinners = DINNER_LABELS.filter(d => agreementForm[`dinner${d.charAt(0).toUpperCase() + d.slice(1)}` as keyof AgreementFormDraft]).length
+                let total = (agreementForm.appearanceFee || 0) + (agreementForm.otherCompensation || 0) + (agreementForm.transport || 0)
+                total += nights * (room?.costPerNight ?? 0)
+                total += dinners * (room?.dinnerCost ?? 0)
+                if (agreementForm.stadiumMeals) total += athlete.edition?.stadiumMealCost ?? 0
+                if (agreementForm.transportAirportHotel) total += athlete.edition?.transportAirportHotelCost ?? 0
+                if (agreementForm.transportHotelStadium) total += athlete.edition?.transportHotelStadiumCost ?? 0
+                return (
+                  <div className="bg-gray-50 rounded p-3 text-sm">
+                    <div className="flex justify-between font-semibold">
+                      <span>{t('contract.totalCost')}</span>
+                      <span>CHF {total.toLocaleString()}</span>
+                    </div>
+                  </div>
+                )
+              })()}
+
+              <div className="flex gap-2 justify-end pt-2 border-t">
+                <button
+                  onClick={() => setShowAgreementForm(false)}
+                  className="px-4 py-2 text-sm border rounded hover:bg-gray-50"
+                >
+                  {t('common.cancel')}
+                </button>
+                <button
+                  onClick={() => agreementMutation.mutate(agreementForm)}
+                  disabled={agreementMutation.isPending}
+                  className="px-6 py-2 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 font-medium"
+                >
+                  {agreementMutation.isPending ? t('common.loading') : t('contract.validate')}
+                </button>
+              </div>
+              {agreementMutation.isError && (
+                <p className="text-xs text-red-600">{(agreementMutation.error as Error)?.message || t('common.error')}</p>
+              )}
+            </div>
           </div>
         </div>
       )}

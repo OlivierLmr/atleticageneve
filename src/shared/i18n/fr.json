@@ -199,7 +199,8 @@
     "newVersion": "Nouvelle version",
     "noHotelRoom": "Pas de chambre",
     "dinnersLockedHint": "Les dîners grisés n'étaient pas inclus dans l'offre",
-    "description": "Description"
+    "description": "Description",
+    "validate": "Valider"
   },
   "compliance": {
     "title": "Intégrité sportive",
