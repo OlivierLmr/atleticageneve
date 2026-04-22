@@ -199,7 +199,8 @@
     "newVersion": "New version",
     "noHotelRoom": "No hotel room",
     "dinnersLockedHint": "Greyed-out dinners were not included in the offer",
-    "description": "Description"
+    "description": "Description",
+    "validate": "Validate"
   },
   "compliance": {
     "title": "Clean & Fair",
