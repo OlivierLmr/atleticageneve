@@ -198,6 +198,7 @@ function HomePage() {
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [emailPreview, setEmailPreview] = useState<{ subject: string; body: string } | null>(null)
 
   // If already logged in, redirect to the right portal
   if (user && !loading) {
@@ -235,11 +236,15 @@ function HomePage() {
     setError('')
     setLoading(true)
     try {
-      const res = await api.post<{ method: string }>('/api/v1/auth/identify', { identifier: email.trim() })
+      const res = await api.post<{ method: string; emailPreview?: { subject: string; body: string } }>(
+        '/api/v1/auth/identify',
+        { identifier: email.trim() },
+      )
       if (res.method === 'not_found') {
         setError(t('auth.notRegistered'))
       } else {
         setMode('magic_link_sent')
+        if (res.emailPreview) setEmailPreview(res.emailPreview)
       }
     } catch (err) {
       setError(err instanceof ApiError ? err.message : t('common.error'))
@@ -254,6 +259,7 @@ function HomePage() {
     setEmail('')
     setPassword('')
     setError('')
+    setEmailPreview(null)
   }
 
   return (
@@ -369,6 +375,28 @@ function HomePage() {
         )}
       </div>
 
+      {emailPreview && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 px-4">
+          <div className="w-full max-w-lg bg-white rounded-lg border shadow-xl p-6">
+            <h2 className="font-bold text-sm mb-1">{t('emailPreview.title')}</h2>
+            <p className="text-xs text-gray-500 mb-4">{t('emailPreview.description')}</p>
+            <div className="bg-gray-50 rounded border p-4 text-xs space-y-3 mb-6">
+              <div>
+                <span className="font-semibold text-gray-600">{t('emailPreview.subject')} :</span>{' '}
+                <span>{emailPreview.subject}</span>
+              </div>
+              <hr />
+              <pre className="whitespace-pre-wrap font-sans leading-relaxed">{emailPreview.body}</pre>
+            </div>
+            <button
+              onClick={() => setEmailPreview(null)}
+              className="w-full px-4 py-2 text-sm bg-gray-900 text-white rounded-md hover:bg-gray-800"
+            >
+              {t('common.close')}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
