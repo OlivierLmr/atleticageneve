@@ -659,7 +659,7 @@ export default function AthletePage() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
 
-  const [activeTab, setActiveTab] = useState<'personal' | 'negotiation'>('personal')
+  const [activeTab, setActiveTab] = useState<'personal' | 'negotiation'>('negotiation')
   const [openSection, setOpenSection] = useState<string | null>('identity')
   const [editingSection, setEditingSection] = useState<string | null>(null)
   const [confirmDialog, setConfirmDialog] = useState<{
