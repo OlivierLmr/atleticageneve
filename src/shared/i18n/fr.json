@@ -70,14 +70,14 @@
     "candidates": "Candidats"
   },
   "status": {
-    "to_review": "En cours d'examen",
+    "to_review": "À examiner",
     "agreement_sent": "Accord envoyé",
-    "counter_offer_sent": "Contre-proposition envoyée",
+    "counter_offer_sent": "Contre-offre envoyée",
     "confirmed": "Confirmé",
-    "rejected": "Non retenu",
+    "rejected": "Rejeté",
     "withdrawn": "Retiré",
     "contract_sent": "Offre envoyée",
-    "counter_offer": "Contre-proposition",
+    "counter_offer": "Contre-offre",
     "accepted": "Confirmé",
     "rattraper": "Rattraper"
   },
@@ -92,7 +92,22 @@
     "withdraw": "Voulez-vous vraiment vous retirer ?",
     "withdrawAthlete": "Retirer {{athlete}} ?",
     "archiveAthlete": "Archiver {{athlete}} ? Cela le masquera de toutes les listes.",
-    "deleteHotel": "Supprimer l'hôtel « {{hotel}} » et tous ses types de chambres ?"
+    "deleteHotel": "Supprimer l'hôtel « {{hotel}} » et tous ses types de chambres ?",
+    "transition": {
+      "to_review__agreement_sent": "Vous êtes sur le point d'envoyer un accord de participation à **{{athlete}}**. Il/elle sera notifié(e) et invité(e) à répondre.",
+      "to_review__rejected": "Vous êtes sur le point de rejeter la candidature de **{{athlete}}** pour **{{meeting}}**. Il/elle sera notifié(e) de cette décision.",
+      "to_review__withdrawn": "Vous êtes sur le point de retirer la candidature de **{{athlete}}** du **{{meeting}}**. Les organisateurs seront notifiés.",
+      "agreement_sent__confirmed": "Vous êtes sur le point d'accepter l'accord de participation de **{{athlete}}** pour **{{meeting}}**. Cela confirmera leur participation.",
+      "agreement_sent__counter_offer_sent": "Vous êtes sur le point d'envoyer une contre-offre concernant la participation de **{{athlete}}** à **{{meeting}}**. Les organisateurs seront notifiés.",
+      "agreement_sent__withdrawn": "Vous êtes sur le point de retirer **{{athlete}}** du **{{meeting}}**, alors qu'un accord de participation est en cours. Les organisateurs seront notifiés.",
+      "counter_offer_sent__agreement_sent": "Vous êtes sur le point d'envoyer un accord de participation mis à jour à **{{athlete}}**, tenant compte de sa contre-offre. Il/elle sera notifié(e) et invité(e) à répondre.",
+      "counter_offer_sent__rejected": "Vous êtes sur le point de rejeter la contre-offre de **{{athlete}}** et de mettre fin à la négociation pour **{{meeting}}**. Il/elle sera notifié(e).",
+      "counter_offer_sent__withdrawn": "Vous êtes sur le point de retirer la candidature de **{{athlete}}** du **{{meeting}}**. Les organisateurs seront notifiés.",
+      "confirmed__withdrawn": "Vous êtes sur le point de retirer **{{athlete}}** du **{{meeting}}**, alors que sa participation avait été confirmée. Les organisateurs seront notifiés.",
+      "confirmed__rejected": "Vous êtes sur le point d'annuler la participation confirmée de **{{athlete}}** à **{{meeting}}**. Il s'agit d'une action de substitution du comité. Il/elle sera notifié(e).",
+      "rejected__to_review": "Vous êtes sur le point de rouvrir la candidature de **{{athlete}}** pour **{{meeting}}**. Cela relancera le processus de négociation. Il/elle sera notifié(e).",
+      "withdrawn__to_review": "Vous êtes sur le point de rouvrir la candidature de **{{athlete}}** pour **{{meeting}}** suite à son retrait. Cela relancera le processus de négociation. Il/elle sera notifié(e)."
+    }
   },
   "signup": {
     "title": "Bienvenue à Atletica Genève",
@@ -365,9 +380,16 @@
   "action": {
     "acceptOffer": "Accepter l'offre",
     "counterOffer": "Faire une contre-offre",
-    "counterOfferPlaceholder": "Décrivez votre contre-proposition…",
+    "counterOfferPlaceholder": "Décrivez votre contre-offre…",
     "withdraw": "Se retirer",
     "sendMessage": "Envoyer un message",
-    "messagePlaceholder": "Tapez votre message…"
+    "messagePlaceholder": "Tapez votre message…",
+    "sendAgreement": "Envoyer l'accord",
+    "accept": "Accepter",
+    "sendCounterOffer": "Envoyer une contre-offre",
+    "reject": "Rejeter",
+    "overrideReject": "Annuler : Rejeter",
+    "reopen": "Rouvrir",
+    "awaitingResponse": "En attente de réponse de l'athlète / manager"
   }
 }
