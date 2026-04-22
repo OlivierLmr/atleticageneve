@@ -212,6 +212,8 @@ export interface Agreement {
   sentBy: string | null
   sentAt: string
   createdAt: string
+  hotelName?: string | null
+  hotelRoomType?: string | null
 }
 
 export interface Hotel {
