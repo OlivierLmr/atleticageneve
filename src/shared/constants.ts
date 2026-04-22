@@ -1,10 +1,13 @@
 import type { NegotiationStatus, ParticipationStatus } from './types'
 
+// Staff (collaborator/committee) allowed direct status transitions.
+// Note: agreement_sent is only reached via agreement creation (POST /agreements), never via direct PATCH.
+// During agreement_sent, the ball is in the athlete/manager's court — staff cannot act.
 export const NEGOTIATION_TRANSITIONS: Record<NegotiationStatus, NegotiationStatus[]> = {
-  to_review:           ['agreement_sent', 'rejected'],
-  agreement_sent:      ['confirmed', 'rejected', 'counter_offer_sent', 'withdrawn'],
-  counter_offer_sent:  ['agreement_sent', 'rejected', 'withdrawn'],
-  confirmed:           ['withdrawn'],
+  to_review:           ['rejected'],
+  agreement_sent:      [],
+  counter_offer_sent:  ['rejected'],
+  confirmed:           [],
   rejected:            [],
   withdrawn:           [],
 }

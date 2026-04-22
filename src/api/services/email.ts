@@ -5,6 +5,7 @@
 
 import type { DrizzleD1Database } from 'drizzle-orm/d1'
 import * as schema from '../db/schema'
+import type { NegotiationStatus } from '@shared/types'
 
 type DB = DrizzleD1Database<typeof schema>
 
@@ -61,6 +62,94 @@ export async function sendMagicLinkEmail(db: DB, email: string, token: string, b
 
   await sendEmail({ db, to: email, subject, body, htmlBody, lang })
   return { subject, body, htmlBody }
+}
+
+export interface TransitionEmail {
+  subject: string
+  body: string
+}
+
+export function buildTransitionEmail(params: {
+  from: NegotiationStatus
+  to: NegotiationStatus
+  athleteName: string
+  meetingName: string
+  senderName: string
+  recipientName: string
+  organizationName: string
+}): TransitionEmail | null {
+  const { from, to, athleteName, meetingName, senderName, recipientName, organizationName } = params
+  const key = `${from}__${to}`
+
+  switch (key) {
+    case 'to_review__agreement_sent':
+      return {
+        subject: `${meetingName} — Participation Agreement`,
+        body: `Dear ${recipientName},\n\nWe are pleased to inform you that we have reviewed ${athleteName}'s application for ${meetingName} and are ready to move forward with a participation offer.\n\nPlease find attached the participation agreement for your review. We would be grateful if you could let us know your decision at your earliest convenience.\n\nShould you have any questions or wish to discuss any aspect of the agreement, please do not hesitate to reach out.\n\nWe look forward to hearing from you.\n\nKind regards,\n${senderName} — ${organizationName}`,
+      }
+    case 'to_review__rejected':
+      return {
+        subject: `${meetingName} — Application Update`,
+        body: `Dear ${recipientName},\n\nThank you for ${athleteName}'s interest in participating in ${meetingName}.\n\nAfter careful review, we regret to inform you that we are unable to offer a place at this edition of the meeting.\n\nWe sincerely appreciate your trust and hope to have the opportunity to welcome ${athleteName} at a future event.\n\nKind regards,\n${senderName} — ${organizationName}`,
+      }
+    case 'to_review__withdrawn':
+      return {
+        subject: `${meetingName} — Withdrawal of Application`,
+        body: `Dear ${recipientName},\n\nI am writing to inform you that ${athleteName} is withdrawing their application for ${meetingName}.\n\nWe are sorry for any inconvenience this may cause and thank you for your understanding. We hope to have the opportunity to work together at a future event.\n\nKind regards,\n${senderName}`,
+      }
+    case 'agreement_sent__confirmed':
+      return {
+        subject: `${meetingName} — Agreement Accepted`,
+        body: `Dear ${recipientName},\n\nWe are delighted to confirm ${athleteName}'s participation in ${meetingName} on the terms set out in the agreement.\n\nWe look forward to the event and thank you for the opportunity.\n\nKind regards,\n${senderName}`,
+      }
+    case 'agreement_sent__counter_offer_sent':
+      return {
+        subject: `${meetingName} — Counter-offer`,
+        body: `Dear ${recipientName},\n\nThank you for sending the participation agreement for ${athleteName} at ${meetingName}.\n\nHaving reviewed the proposed terms, we would like to suggest some adjustments. Please find our counter-offer attached.\n\nWe remain open to discussion and look forward to reaching a mutually satisfactory agreement.\n\nKind regards,\n${senderName}`,
+      }
+    case 'agreement_sent__withdrawn':
+      return {
+        subject: `${meetingName} — Withdrawal`,
+        body: `Dear ${recipientName},\n\nAfter careful consideration, we regret to inform you that ${athleteName} must withdraw from ${meetingName}.\n\nWe are sorry for any inconvenience this may cause and sincerely thank you for the opportunity that was extended. We hope to be able to collaborate at a future event.\n\nKind regards,\n${senderName}`,
+      }
+    case 'counter_offer_sent__agreement_sent':
+      return {
+        subject: `${meetingName} — Updated Participation Agreement`,
+        body: `Dear ${recipientName},\n\nThank you for your counter-offer regarding ${athleteName}'s participation in ${meetingName}. We have taken your points into consideration and are pleased to send you an updated participation agreement.\n\nWe hope this revised proposal meets your expectations. Please do not hesitate to contact us if you have any further questions.\n\nKind regards,\n${senderName} — ${organizationName}`,
+      }
+    case 'counter_offer_sent__rejected':
+      return {
+        subject: `${meetingName} — End of Negotiations`,
+        body: `Dear ${recipientName},\n\nThank you for your counter-offer regarding ${athleteName}'s participation in ${meetingName}.\n\nAfter careful consideration, we regret to inform you that we are unable to reach an agreement for this edition of the meeting.\n\nWe sincerely value your interest and hope to have the opportunity to work together in the future.\n\nKind regards,\n${senderName} — ${organizationName}`,
+      }
+    case 'counter_offer_sent__withdrawn':
+      return {
+        subject: `${meetingName} — Withdrawal`,
+        body: `Dear ${recipientName},\n\nFurther to our counter-offer, we have decided to withdraw ${athleteName}'s candidacy for ${meetingName}.\n\nWe thank you for the time and effort devoted to the negotiation and apologize for any inconvenience caused. We hope to have the pleasure of working together at a future event.\n\nKind regards,\n${senderName}`,
+      }
+    case 'confirmed__withdrawn':
+      return {
+        subject: `${meetingName} — Withdrawal of Confirmed Participation`,
+        body: `Dear ${recipientName},\n\nWe regret to inform you that ${athleteName} is unfortunately forced to withdraw from ${meetingName}, despite having previously confirmed their participation.\n\nWe sincerely apologize for the disruption this may cause to your event organization and thank you for your understanding. Please do not hesitate to contact us if you need any further information.\n\nKind regards,\n${senderName}`,
+      }
+    case 'confirmed__rejected':
+      return {
+        subject: `${meetingName} — Update Regarding ${athleteName}'s Participation`,
+        body: `Dear ${recipientName},\n\nWe regret to inform you that, due to exceptional circumstances, ${athleteName}'s confirmed participation in ${meetingName} has had to be cancelled.\n\nWe are truly sorry for the inconvenience this causes and want to assure you that this decision was not taken lightly. We remain available to discuss this matter and hope to have the opportunity to welcome ${athleteName} at a future event.\n\nKind regards,\n${senderName} — ${organizationName}`,
+      }
+    case 'rejected__to_review':
+      return {
+        subject: `${meetingName} — Application Reopened`,
+        body: `Dear ${recipientName},\n\nFollowing our previous communication, we are pleased to inform you that ${athleteName}'s application for ${meetingName} has been reopened.\n\nWe would like to invite you to resume discussions with us. Please feel free to contact us at your convenience.\n\nKind regards,\n${senderName} — ${organizationName}`,
+      }
+    case 'withdrawn__to_review':
+      return {
+        subject: `${meetingName} — Invitation to Reconsider`,
+        body: `Dear ${recipientName},\n\nFollowing ${athleteName}'s withdrawal from ${meetingName}, we would like to reach out and explore whether there might be an opportunity to resume the process.\n\nIf circumstances have changed and you would be open to reconsidering, we would be very pleased to discuss this with you. Please feel free to contact us.\n\nKind regards,\n${senderName} — ${organizationName}`,
+      }
+    default:
+      return null
+  }
 }
 
 export async function sendStatusChangeEmail(

@@ -5,7 +5,7 @@ import * as schema from '../db/schema'
 import { athleteRegistrationSchema, batchAthleteRegistrationSchema, athleteUpdateSchema, negotiationStatusChangeSchema } from '@shared/validation'
 import { NEGOTIATION_TRANSITIONS, COMMITTEE_EXTRA_TRANSITIONS, ATHLETE_TRANSITIONS } from '@shared/constants'
 import { requireAuth } from '../middleware/auth'
-import { sendEmail, sendMagicLinkEmail, sendStatusChangeEmail } from '../services/email'
+import { sendEmail, sendMagicLinkEmail, buildTransitionEmail } from '../services/email'
 import type { EmailContent } from '../services/email'
 import { generateToken, magicLinkExpiresAt } from '../services/auth'
 import type { Env } from '../index'
@@ -324,6 +324,7 @@ athletes.get('/:id', requireAuth('athlete', 'manager', 'collaborator', 'committe
     agreements,
     interactions,
     edition: edition ? {
+      name: edition.name,
       weightPB: edition.weightPB,
       weightSB: edition.weightSB,
       weightRanking: edition.weightRanking,
@@ -435,41 +436,58 @@ athletes.patch('/:id/negotiation-status', requireAuth('athlete', 'manager', 'col
     })
     .where(eq(schema.athlete.id, id))
 
-  // Send email notification to athlete and manager
+  // Send transition email
   const editions = await db.select().from(schema.edition).limit(1)
   const edition = editions[0]
-  const baseUrl = c.req.header('Origin') ?? 'http://localhost:5173'
-  const portalUrl = `${baseUrl}/portal`
+  const meetingName = edition?.name ?? 'Atletica Geneve'
+  const organizationName = 'Atletica Geneve'
+  const athleteName = `${ath.firstName} ${ath.lastName}`
+  const senderName = `${user.firstName} ${user.lastName}`
 
-  // Look up athlete's user record for preferred language
-  let athleteLang: 'en' | 'fr' = 'en'
-  if (ath.userId) {
-    const userRows = await db.select().from(schema.user).where(eq(schema.user.id, ath.userId)).limit(1)
-    if (userRows.length > 0) {
-      athleteLang = (userRows[0].preferredLang as 'en' | 'fr') ?? 'en'
-    }
-  }
-
-  let emailLogId: string | null = null
-  if (ath.athleteEmail) {
-    emailLogId = await sendStatusChangeEmail(db, ath.athleteEmail, `${ath.firstName} ${ath.lastName}`, newStatus, portalUrl, athleteLang, undefined, id)
-  }
-
+  // Look up manager once for both recipient name and email
+  let recipientName = athleteName
+  let managerEmail: string | null = null
   if (ath.managerId) {
     const managerRows = await db.select().from(schema.user).where(eq(schema.user.id, ath.managerId)).limit(1)
-    if (managerRows.length > 0 && managerRows[0].email) {
-      const managerLang = (managerRows[0].preferredLang as 'en' | 'fr') ?? 'en'
-      await sendStatusChangeEmail(db, managerRows[0].email, `${ath.firstName} ${ath.lastName}`, newStatus, portalUrl, managerLang, undefined, id)
+    if (managerRows.length > 0) {
+      recipientName = `${managerRows[0].firstName} ${managerRows[0].lastName}`
+      managerEmail = managerRows[0].email ?? null
     }
   }
 
-  // Notify edition notification email
-  if (edition?.notificationEmail) {
-    await sendEmail({
+  const transitionEmail = buildTransitionEmail({
+    from: currentStatus,
+    to: newStatus,
+    athleteName,
+    meetingName,
+    senderName,
+    recipientName,
+    organizationName,
+  })
+
+  let emailLogId: string | null = null
+
+  // Staff-initiated transitions: email goes to athlete/manager
+  if (isStaff && transitionEmail) {
+    const emailTo = ath.athleteEmail ?? managerEmail
+    if (emailTo) {
+      emailLogId = await sendEmail({
+        db,
+        to: emailTo,
+        subject: transitionEmail.subject,
+        body: transitionEmail.body,
+        relatedAthleteId: id,
+      })
+    }
+  }
+
+  // Athlete/manager-initiated transitions: notify edition notification email
+  if (!isStaff && edition?.notificationEmail && transitionEmail) {
+    emailLogId = await sendEmail({
       db,
       to: edition.notificationEmail,
-      subject: `Status change — ${ath.firstName} ${ath.lastName}`,
-      body: `${ath.firstName} ${ath.lastName} status changed from "${currentStatus}" to "${newStatus}" by ${user.firstName} ${user.lastName}.`,
+      subject: transitionEmail.subject,
+      body: transitionEmail.body,
       relatedAthleteId: id,
     })
   }
@@ -480,11 +498,16 @@ athletes.patch('/:id/negotiation-status', requireAuth('athlete', 'manager', 'col
     type: 'status_change',
     content: `Negotiation status changed from "${currentStatus}" to "${newStatus}"`,
     authorId: user.id,
-    authorName: `${user.firstName} ${user.lastName}`,
+    authorName: senderName,
     emailLogId,
   })
 
-  return c.json({ id, status: newStatus, previousStatus: currentStatus })
+  return c.json({
+    id,
+    status: newStatus,
+    previousStatus: currentStatus,
+    emailPreview: transitionEmail ?? undefined,
+  })
 })
 
 // ── DELETE /athletes/:id — archive (committee only) ──────────────────────────
