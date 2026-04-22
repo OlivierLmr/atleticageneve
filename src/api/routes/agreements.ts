@@ -4,6 +4,7 @@ import * as schema from '../db/schema'
 import { agreementSchema } from '@shared/validation'
 import { requireAuth } from '../middleware/auth'
 import { sendEmail, buildTransitionEmail } from '../services/email'
+import { formatAgreementTerms } from '@shared/agreementFormatter'
 import type { Env } from '../index'
 import type { NegotiationStatus, ParticipationStatus } from '@shared/types'
 
@@ -96,25 +97,35 @@ agreements.post('/:athleteId/agreements', async (c) => {
     }, 400)
   }
 
-  // Precondition: ALL athlete's applications must have participationStatus != 'pending'
-  const apps = await db
-    .select()
+  // Fetch all applications with event + catalog (needed for status checks and event names)
+  const appsWithDetails = await db
+    .select({
+      application: schema.application,
+      catalogName: schema.eventCatalog.name,
+      catalogGender: schema.eventCatalog.gender,
+    })
     .from(schema.application)
+    .innerJoin(schema.event, eq(schema.application.eventId, schema.event.id))
+    .innerJoin(schema.eventCatalog, eq(schema.event.catalogId, schema.eventCatalog.id))
     .where(eq(schema.application.athleteId, athleteId))
 
-  const hasPending = apps.some(a => (a.participationStatus as ParticipationStatus) === 'pending')
+  const hasPending = appsWithDetails.some(r => (r.application.participationStatus as ParticipationStatus) === 'pending')
   if (hasPending) {
     return c.json({
       error: 'All applications must have a participation decision (selected/not_selected) before sending an agreement',
     }, 400)
   }
 
-  const hasSelected = apps.some(a => (a.participationStatus as ParticipationStatus) === 'selected')
+  const hasSelected = appsWithDetails.some(r => (r.application.participationStatus as ParticipationStatus) === 'selected')
   if (!hasSelected) {
     return c.json({
       error: 'At least one application must be selected before sending an agreement',
     }, 400)
   }
+
+  const selectedEventNames = appsWithDetails
+    .filter(r => (r.application.participationStatus as ParticipationStatus) === 'selected')
+    .map(r => `${r.catalogName} ${r.catalogGender === 'M' ? 'Men' : 'Women'}`)
 
   // Get edition costs
   const editions = await db.select().from(schema.edition).limit(1)
@@ -123,16 +134,24 @@ agreements.post('/:athleteId/agreements', async (c) => {
   }
   const edition = editions[0]
 
-  // Get hotel room costs if specified
+  // Get hotel room costs and hotel name if specified
   let roomCosts: RoomCosts = { costPerNight: 0, dinnerCost: 0 }
+  let hotelName: string | null = null
+  let hotelRoomType: string | null = null
   if (data.hotelRoomId) {
-    const rooms = await db
-      .select()
+    const roomRows = await db
+      .select({
+        room: schema.hotelRoom,
+        hotelName: schema.hotel.name,
+      })
       .from(schema.hotelRoom)
+      .leftJoin(schema.hotel, eq(schema.hotelRoom.hotelId, schema.hotel.id))
       .where(eq(schema.hotelRoom.id, data.hotelRoomId))
       .limit(1)
-    if (rooms.length > 0) {
-      roomCosts = { costPerNight: rooms[0].costPerNight, dinnerCost: rooms[0].dinnerCost }
+    if (roomRows.length > 0) {
+      roomCosts = { costPerNight: roomRows[0].room.costPerNight, dinnerCost: roomRows[0].room.dinnerCost }
+      hotelName = roomRows[0].hotelName ?? null
+      hotelRoomType = roomRows[0].room.roomType ?? null
     }
   }
 
@@ -204,6 +223,43 @@ agreements.post('/:athleteId/agreements', async (c) => {
     authorName: `${user.firstName} ${user.lastName}`,
   })
 
+  // Build the agreement object with hotel info for formatting
+  const agreementForFormat = {
+    id: agreementId,
+    athleteId,
+    version: nextVersion,
+    direction: 'to_athlete' as const,
+    appearanceFee: data.appearanceFee,
+    otherCompensation: data.otherCompensation,
+    otherCompensationDesc: data.otherCompensationDesc ?? null,
+    transport: data.transport,
+    transportAirportHotel: data.transportAirportHotel,
+    transportHotelStadium: data.transportHotelStadium,
+    hotelRoomId: data.hotelRoomId ?? null,
+    hotelNightTue: data.hotelNightTue,
+    hotelNightWed: data.hotelNightWed,
+    hotelNightThu: data.hotelNightThu,
+    hotelNightFri: data.hotelNightFri,
+    hotelNightSat: data.hotelNightSat,
+    hotelNightSun: data.hotelNightSun,
+    dinnerTue: data.dinnerTue,
+    dinnerWed: data.dinnerWed,
+    dinnerThu: data.dinnerThu,
+    dinnerFri: data.dinnerFri,
+    dinnerSat: data.dinnerSat,
+    dinnerSun: data.dinnerSun,
+    stadiumMeals: data.stadiumMeals,
+    notes: data.notes ?? null,
+    totalCost,
+    sentBy: user.id,
+    sentAt: now,
+    createdAt: now,
+    hotelName,
+    hotelRoomType,
+  }
+
+  const agreementTerms = formatAgreementTerms(agreementForFormat, selectedEventNames, edition.name, 'en')
+
   // Build transition email for agreement_sent
   const athleteName = `${ath.firstName} ${ath.lastName}`
   const meetingName = edition.name
@@ -228,6 +284,7 @@ agreements.post('/:athleteId/agreements', async (c) => {
     senderName,
     recipientName,
     organizationName,
+    agreementTerms,
   })
 
   if (transitionEmail) {

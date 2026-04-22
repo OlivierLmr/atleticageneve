@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
 import { zValidator } from '@hono/zod-validator'
-import { eq, sql } from 'drizzle-orm'
+import { and, eq, sql } from 'drizzle-orm'
 import * as schema from '../db/schema'
 import { athleteRegistrationSchema, batchAthleteRegistrationSchema, athleteUpdateSchema, negotiationStatusChangeSchema } from '@shared/validation'
 import { NEGOTIATION_TRANSITIONS, COMMITTEE_EXTRA_TRANSITIONS, ATHLETE_TRANSITIONS } from '@shared/constants'
@@ -292,12 +292,24 @@ athletes.get('/:id', requireAuth('athlete', 'manager', 'collaborator', 'committe
     waPerformance: waPerfMap.get(r.application.eventId) ?? null,
   }))
 
-  // Fetch agreements
-  const rawAgreements = await db
-    .select()
+  // Fetch agreements with hotel name and room type
+  const rawAgreementRows = await db
+    .select({
+      agreement: schema.agreement,
+      hotelName: schema.hotel.name,
+      hotelRoomType: schema.hotelRoom.roomType,
+    })
     .from(schema.agreement)
+    .leftJoin(schema.hotelRoom, eq(schema.agreement.hotelRoomId, schema.hotelRoom.id))
+    .leftJoin(schema.hotel, eq(schema.hotelRoom.hotelId, schema.hotel.id))
     .where(eq(schema.agreement.athleteId, id))
     .orderBy(schema.agreement.version)
+
+  const rawAgreements = rawAgreementRows.map(r => ({
+    ...r.agreement,
+    hotelName: r.hotelName ?? null,
+    hotelRoomType: r.hotelRoomType ?? null,
+  }))
 
   // Strip totalCost from agreements for athlete/manager view
   const agreements = isStaff
@@ -455,6 +467,20 @@ athletes.patch('/:id/negotiation-status', requireAuth('athlete', 'manager', 'col
     }
   }
 
+  // For athlete/manager counter-offer transition, look up the most recent counter-offer text
+  let counterOfferText: string | undefined
+  if (currentStatus === 'agreement_sent' && newStatus === 'counter_offer_sent') {
+    const counterOfferRows = await db
+      .select()
+      .from(schema.interaction)
+      .where(and(eq(schema.interaction.athleteId, id), eq(schema.interaction.type, 'counter_offer')))
+      .orderBy(sql`${schema.interaction.createdAt} DESC`)
+      .limit(1)
+    if (counterOfferRows.length > 0) {
+      counterOfferText = counterOfferRows[0].content
+    }
+  }
+
   const transitionEmail = buildTransitionEmail({
     from: currentStatus,
     to: newStatus,
@@ -463,6 +489,7 @@ athletes.patch('/:id/negotiation-status', requireAuth('athlete', 'manager', 'col
     senderName,
     recipientName,
     organizationName,
+    counterOfferText,
   })
 
   let emailLogId: string | null = null

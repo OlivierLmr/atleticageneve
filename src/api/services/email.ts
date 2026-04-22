@@ -77,16 +77,22 @@ export function buildTransitionEmail(params: {
   senderName: string
   recipientName: string
   organizationName: string
+  agreementTerms?: string
+  counterOfferText?: string
 }): TransitionEmail | null {
-  const { from, to, athleteName, meetingName, senderName, recipientName, organizationName } = params
+  const { from, to, athleteName, meetingName, senderName, recipientName, organizationName, agreementTerms, counterOfferText } = params
   const key = `${from}__${to}`
 
   switch (key) {
-    case 'to_review__agreement_sent':
+    case 'to_review__agreement_sent': {
+      const termsSection = agreementTerms
+        ? `\n\nHere are the terms of our offer:\n\n${agreementTerms}`
+        : ''
       return {
         subject: `${meetingName} — Participation Agreement`,
-        body: `Dear ${recipientName},\n\nWe are pleased to inform you that we have reviewed ${athleteName}'s application for ${meetingName} and are ready to move forward with a participation offer.\n\nPlease find attached the participation agreement for your review. We would be grateful if you could let us know your decision at your earliest convenience.\n\nShould you have any questions or wish to discuss any aspect of the agreement, please do not hesitate to reach out.\n\nWe look forward to hearing from you.\n\nKind regards,\n${senderName} — ${organizationName}`,
+        body: `Dear ${recipientName},\n\nWe are pleased to inform you that we have reviewed ${athleteName}'s application for ${meetingName} and are ready to move forward with a participation offer.${termsSection}\n\nPlease let us know your decision at your earliest convenience. Should you have any questions or wish to discuss any aspect of the offer, please do not hesitate to reach out.\n\nKind regards,\n${senderName} — ${organizationName}`,
       }
+    }
     case 'to_review__rejected':
       return {
         subject: `${meetingName} — Application Update`,
@@ -102,21 +108,29 @@ export function buildTransitionEmail(params: {
         subject: `${meetingName} — Agreement Accepted`,
         body: `Dear ${recipientName},\n\nWe are delighted to confirm ${athleteName}'s participation in ${meetingName} on the terms set out in the agreement.\n\nWe look forward to the event and thank you for the opportunity.\n\nKind regards,\n${senderName}`,
       }
-    case 'agreement_sent__counter_offer_sent':
+    case 'agreement_sent__counter_offer_sent': {
+      const counterSection = counterOfferText
+        ? `\n\nHere is our counter-proposal:\n\n${counterOfferText}`
+        : '\n\nPlease find our counter-offer attached.'
       return {
         subject: `${meetingName} — Counter-offer`,
-        body: `Dear ${recipientName},\n\nThank you for sending the participation agreement for ${athleteName} at ${meetingName}.\n\nHaving reviewed the proposed terms, we would like to suggest some adjustments. Please find our counter-offer attached.\n\nWe remain open to discussion and look forward to reaching a mutually satisfactory agreement.\n\nKind regards,\n${senderName}`,
+        body: `Dear ${recipientName},\n\nThank you for sending the participation agreement for ${athleteName} at ${meetingName}.\n\nHaving reviewed the proposed terms, we would like to suggest some adjustments.${counterSection}\n\nWe remain open to discussion and look forward to reaching a mutually satisfactory agreement.\n\nKind regards,\n${senderName}`,
       }
+    }
     case 'agreement_sent__withdrawn':
       return {
         subject: `${meetingName} — Withdrawal`,
         body: `Dear ${recipientName},\n\nAfter careful consideration, we regret to inform you that ${athleteName} must withdraw from ${meetingName}.\n\nWe are sorry for any inconvenience this may cause and sincerely thank you for the opportunity that was extended. We hope to be able to collaborate at a future event.\n\nKind regards,\n${senderName}`,
       }
-    case 'counter_offer_sent__agreement_sent':
+    case 'counter_offer_sent__agreement_sent': {
+      const termsSection = agreementTerms
+        ? `\n\nHere are the revised terms:\n\n${agreementTerms}`
+        : ''
       return {
         subject: `${meetingName} — Updated Participation Agreement`,
-        body: `Dear ${recipientName},\n\nThank you for your counter-offer regarding ${athleteName}'s participation in ${meetingName}. We have taken your points into consideration and are pleased to send you an updated participation agreement.\n\nWe hope this revised proposal meets your expectations. Please do not hesitate to contact us if you have any further questions.\n\nKind regards,\n${senderName} — ${organizationName}`,
+        body: `Dear ${recipientName},\n\nThank you for your counter-offer regarding ${athleteName}'s participation in ${meetingName}. We have taken your points into consideration and are pleased to send you an updated participation offer.${termsSection}\n\nWe hope this revised proposal meets your expectations. Please do not hesitate to contact us if you have any further questions.\n\nKind regards,\n${senderName} — ${organizationName}`,
       }
+    }
     case 'counter_offer_sent__rejected':
       return {
         subject: `${meetingName} — End of Negotiations`,

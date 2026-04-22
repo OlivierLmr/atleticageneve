@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { formatAgreementTerms } from '@shared/agreementFormatter'
 import { Link, useParams, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from '@web/lib/api'
@@ -274,46 +275,44 @@ function SelectorAssign({ currentValue, staffUsers, onSave, isPending, t }: {
   )
 }
 
-function AgreementCard({ agreement: c, t, isStaff }: { agreement: Agreement; t: (key: string) => string; isStaff: boolean }) {
-  const nights = [
-    c.hotelNightTue, c.hotelNightWed, c.hotelNightThu,
-    c.hotelNightFri, c.hotelNightSat, c.hotelNightSun,
-  ].filter(Boolean).length
-
-  const dinners = [
-    c.dinnerTue, c.dinnerWed, c.dinnerThu,
-    c.dinnerFri, c.dinnerSat, c.dinnerSun,
-  ].filter(Boolean).length
-
-  // Only show non-empty fields (Phase 5.2 requirement)
-  const rows: Array<{ label: string; value: string }> = []
-  if (c.appearanceFee > 0) rows.push({ label: t('contract.bonus'), value: `CHF ${c.appearanceFee}` })
-  if (c.otherCompensation > 0) rows.push({ label: t('contract.otherCompensation'), value: `CHF ${c.otherCompensation}` })
-  if (c.transport > 0) rows.push({ label: t('contract.transport'), value: `CHF ${c.transport}` })
-  if (nights > 0) rows.push({ label: t('contract.hotelNights'), value: String(nights) })
-  if (dinners > 0) rows.push({ label: t('contract.dinners'), value: String(dinners) })
+function AgreementCard({
+  agreement: c,
+  selectedEventNames,
+  meetingName,
+  lang,
+  isStaff,
+  t,
+}: {
+  agreement: Agreement
+  selectedEventNames: string[]
+  meetingName: string
+  lang: string
+  isStaff: boolean
+  t: (key: string) => string
+}) {
+  const formattedLang = (lang === 'fr' ? 'fr' : 'en') as 'en' | 'fr'
+  const formattedText = formatAgreementTerms(c, selectedEventNames, meetingName, formattedLang)
 
   return (
-    <div className={`p-3 rounded border text-xs ${
-      c.direction === 'to_athlete' ? 'border-blue-200 bg-blue-50' : 'border-purple-200 bg-purple-50'
-    }`}>
-      <div className="flex justify-between mb-1">
-        <span className="font-semibold">
-          v{c.version} — {c.direction === 'to_athlete' ? t('contract.toAthlete') : t('contract.counterOffer')}
-        </span>
-        <span className="text-gray-500">{new Date(c.sentAt).toLocaleDateString()}</span>
-      </div>
-      {rows.length > 0 && (
-        <div className="grid grid-cols-2 gap-1 text-gray-600">
-          {rows.map(r => <span key={r.label}>{r.label}: {r.value}</span>)}
-        </div>
-      )}
+    <div className="p-3 rounded border border-blue-200 bg-blue-50 text-xs">
+      <pre className="whitespace-pre-wrap font-sans text-gray-700 leading-relaxed">{formattedText}</pre>
       {isStaff && c.totalCost > 0 && (
-        <div className="mt-1 font-semibold text-gray-900">
+        <div className="mt-2 pt-2 border-t border-blue-200 font-semibold text-gray-900">
           {t('contract.totalCost')}: CHF {c.totalCost.toLocaleString()}
         </div>
       )}
-      {c.notes && <p className="mt-1 text-gray-500 italic">{c.notes}</p>}
+    </div>
+  )
+}
+
+function CounterOfferCard({ interaction }: { interaction: Interaction }) {
+  return (
+    <div className="p-3 rounded border border-rose-200 bg-rose-50 text-xs">
+      <div className="flex justify-between mb-1">
+        <span className="font-semibold text-rose-700">{interaction.authorName}</span>
+        <span className="text-gray-500">{new Date(interaction.createdAt).toLocaleDateString()}</span>
+      </div>
+      <p className="text-gray-700 whitespace-pre-wrap">{interaction.content}</p>
     </div>
   )
 }
@@ -677,7 +676,7 @@ function CostPopup({ athlete, latestAgreement, costMode, t }: {
 // ── Main page ────────────────────────────────────────────────────────────────
 
 export default function AthletePage() {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const { id } = useParams<{ id: string }>()
   const { user } = useAuth()
   const navigate = useNavigate()
@@ -1397,17 +1396,61 @@ export default function AthletePage() {
                   )}
                 </div>
 
-                {currentStatus === 'confirmed' && athlete.agreements.length === 0 ? (
-                  <p className="text-sm text-green-700 italic">{t('selection.acceptedAtMeeting')}</p>
-                ) : athlete.agreements.length === 0 ? (
-                  <p className="text-xs text-gray-400">{t('contract.noOfferYet')}</p>
-                ) : (
-                  <div className="space-y-3">
-                    {athlete.agreements.map(c => (
-                      <AgreementCard key={c.id} agreement={c} t={t} isStaff={!!isStaff} />
-                    ))}
-                  </div>
-                )}
+                {(() => {
+                  const selectedEventNames = athlete.applications
+                    .filter(a => a.participationStatus === 'selected')
+                    .map(a => `${a.event.catalog.name} ${a.event.catalog.gender === 'M' ? (i18n.language === 'fr' ? 'Hommes' : 'Men') : (i18n.language === 'fr' ? 'Femmes' : 'Women')}`)
+                  const meetingName = athlete.edition?.name ?? 'Atletica Geneve'
+
+                  type TimelineItem =
+                    | { kind: 'agreement'; id: string; date: string; data: Agreement }
+                    | { kind: 'counter_offer'; id: string; date: string; data: Interaction }
+
+                  const agreementItems: TimelineItem[] = athlete.agreements.map(a => ({
+                    kind: 'agreement' as const,
+                    id: a.id,
+                    date: a.sentAt,
+                    data: a,
+                  }))
+
+                  const counterOfferItems: TimelineItem[] = athlete.interactions
+                    .filter(i => i.type === 'counter_offer')
+                    .map(i => ({
+                      kind: 'counter_offer' as const,
+                      id: i.id,
+                      date: i.createdAt,
+                      data: i,
+                    }))
+
+                  const timelineItems = [...agreementItems, ...counterOfferItems]
+                    .sort((a, b) => a.date.localeCompare(b.date))
+
+                  if (currentStatus === 'confirmed' && timelineItems.length === 0) {
+                    return <p className="text-sm text-green-700 italic">{t('selection.acceptedAtMeeting')}</p>
+                  }
+                  if (timelineItems.length === 0) {
+                    return <p className="text-xs text-gray-400">{t('contract.noOfferYet')}</p>
+                  }
+                  return (
+                    <div className="space-y-3">
+                      {timelineItems.map(item =>
+                        item.kind === 'agreement'
+                          ? (
+                            <AgreementCard
+                              key={item.id}
+                              agreement={item.data}
+                              selectedEventNames={selectedEventNames}
+                              meetingName={meetingName}
+                              lang={i18n.language}
+                              isStaff={!!isStaff}
+                              t={t}
+                            />
+                          )
+                          : <CounterOfferCard key={item.id} interaction={item.data} />
+                      )}
+                    </div>
+                  )
+                })()}
               </div>
 
             </div>
