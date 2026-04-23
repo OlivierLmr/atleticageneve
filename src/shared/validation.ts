@@ -48,7 +48,7 @@ export const athleteRegistrationSchema = z.object({
 export const batchAthleteSchema = z.object({
   firstName: z.string().min(1),
   lastName: z.string().min(1),
-  dateOfBirth: z.string().min(1),
+  dateOfBirth: z.string().optional(),
   nationality: z.string().min(2).max(3),
   gender: z.enum(['M', 'F']),
   isEap: z.boolean().default(false),

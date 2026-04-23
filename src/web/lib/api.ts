@@ -20,8 +20,9 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   })
 
   if (!res.ok) {
-    const body = await res.json().catch(() => ({ error: res.statusText })) as { error?: string }
-    throw new ApiError(res.status, body.error ?? res.statusText)
+    const body = await res.json().catch(() => ({ error: res.statusText })) as { error?: unknown }
+    const errorMessage = typeof body.error === 'string' ? body.error : res.statusText
+    throw new ApiError(res.status, errorMessage)
   }
 
   return res.json()

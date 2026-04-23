@@ -189,7 +189,7 @@ athletes.post('/batch', requireAuth('manager'), zValidator('json', batchAthleteR
       editionId: edition.id,
       firstName: data.firstName,
       lastName: data.lastName,
-      dateOfBirth: data.dateOfBirth,
+      dateOfBirth: data.dateOfBirth ?? null,
       nationality: data.nationality,
       gender: data.gender,
       isEap: data.isEap,
