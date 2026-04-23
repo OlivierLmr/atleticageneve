@@ -83,6 +83,7 @@ athletes.post('/', zValidator('json', athleteRegistrationSchema), async (c) => {
       type: 'status_change',
       content: 'Application submitted',
       authorName: `${data.firstName} ${data.lastName}`,
+      createdAt: new Date().toISOString(),
     })
   }
 
@@ -217,6 +218,7 @@ athletes.post('/batch', requireAuth('manager'), zValidator('json', batchAthleteR
         content: `Application submitted by manager ${user.firstName} ${user.lastName}`,
         authorId: user.id,
         authorName: `${user.firstName} ${user.lastName}`,
+        createdAt: new Date().toISOString(),
       })
     }
 
@@ -527,6 +529,7 @@ athletes.patch('/:id/negotiation-status', requireAuth('athlete', 'manager', 'col
     authorId: user.id,
     authorName: senderName,
     emailLogId,
+    createdAt: new Date().toISOString(),
   })
 
   return c.json({
@@ -632,6 +635,7 @@ athletes.post('/:id/interactions', requireAuth('athlete', 'manager', 'collaborat
     content,
     authorId: user.id,
     authorName: `${user.firstName} ${user.lastName}`,
+    createdAt: new Date().toISOString(),
   })
 
   return c.json({ id: interactionId }, 201)

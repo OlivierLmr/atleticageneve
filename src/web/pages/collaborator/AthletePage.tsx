@@ -1422,8 +1422,11 @@ export default function AthletePage() {
                       data: i,
                     }))
 
+                  // Normalize both ISO ("2026-04-23T12:00:00.000Z") and SQLite ("2026-04-23 12:00:00") formats
+                  const toMs = (d: string) =>
+                    new Date(d.includes('T') ? d : d.replace(' ', 'T') + 'Z').getTime()
                   const timelineItems = [...agreementItems, ...counterOfferItems]
-                    .sort((a, b) => b.date.localeCompare(a.date))
+                    .sort((a, b) => toMs(b.date) - toMs(a.date))
 
                   if (currentStatus === 'confirmed' && timelineItems.length === 0) {
                     return <p className="text-sm text-green-700 italic">{t('selection.acceptedAtMeeting')}</p>
