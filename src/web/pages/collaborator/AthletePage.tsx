@@ -1423,7 +1423,7 @@ export default function AthletePage() {
                     }))
 
                   const timelineItems = [...agreementItems, ...counterOfferItems]
-                    .sort((a, b) => a.date.localeCompare(b.date))
+                    .sort((a, b) => b.date.localeCompare(a.date))
 
                   if (currentStatus === 'confirmed' && timelineItems.length === 0) {
                     return <p className="text-sm text-green-700 italic">{t('selection.acceptedAtMeeting')}</p>
