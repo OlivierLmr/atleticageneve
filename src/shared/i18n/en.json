@@ -269,7 +269,10 @@
     "costInNegotiation": "In negotiation",
     "rattraper": "Reinstate to review",
     "slots": "Slots",
-    "available": "Available"
+    "available": "Available",
+    "selectionStatus": "Selection status",
+    "changeSelectionStatus": "Change selection status",
+    "confirmStatusChangeTo": "Confirm change to"
   },
   "collaborator": {
     "personalData": "Personal Data",
