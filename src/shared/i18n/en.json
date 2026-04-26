@@ -267,7 +267,9 @@
     "scoringBreakdown": "Scoring breakdown",
     "acceptedAtMeeting": "Accepted at meeting (no formal agreement)",
     "costInNegotiation": "In negotiation",
-    "rattraper": "Reinstate to review"
+    "rattraper": "Reinstate to review",
+    "slots": "Slots",
+    "available": "Available"
   },
   "collaborator": {
     "personalData": "Personal Data",

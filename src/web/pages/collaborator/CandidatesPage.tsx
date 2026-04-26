@@ -33,6 +33,172 @@ interface EventListItem extends Event {
 const ALL_STATUSES: NegotiationStatus[] = ['to_review', 'agreement_sent', 'counter_offer_sent', 'confirmed', 'rejected', 'withdrawn']
 const DEFAULT_STATUSES = new Set<NegotiationStatus>(['to_review', 'agreement_sent', 'counter_offer_sent', 'confirmed'])
 
+function MinimaRow({ label, value }: { label: string; value: number | null | undefined }) {
+  return (
+    <div className="flex items-center justify-between gap-4">
+      <span className="text-xs text-gray-500">{label}</span>
+      <span className="text-xs font-mono font-semibold text-gray-900">
+        {value != null ? value : 'N/A'}
+      </span>
+    </div>
+  )
+}
+
+function SlotBar({
+  total,
+  confirmed,
+  underNegotiation,
+  available,
+}: {
+  total: number
+  confirmed: number
+  underNegotiation: number
+  available: number
+}) {
+  const { t } = useTranslation()
+  const confirmedPct = total > 0 ? (confirmed / total) * 100 : 0
+  const negotiationPct = total > 0 ? (underNegotiation / total) * 100 : 0
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center gap-2">
+        <div className="flex h-4 flex-1 rounded-full overflow-hidden bg-gray-100">
+          <div
+            className="bg-green-500 transition-all duration-300"
+            style={{ width: `${confirmedPct}%` }}
+          />
+          <div
+            className="bg-blue-400 transition-all duration-300"
+            style={{ width: `${negotiationPct}%` }}
+          />
+        </div>
+        <span className="text-xs font-bold text-gray-700 w-5 text-right shrink-0">{total}</span>
+      </div>
+      <div className="flex flex-wrap gap-3">
+        <span className="flex items-center gap-1.5 text-xs text-gray-600">
+          <span className="w-2 h-2 rounded-sm bg-green-500 shrink-0" />
+          {confirmed} {t('status.confirmed').toLowerCase()}
+        </span>
+        <span className="flex items-center gap-1.5 text-xs text-gray-600">
+          <span className="w-2 h-2 rounded-sm bg-blue-400 shrink-0" />
+          {underNegotiation} {t('dashboard.inNegotiation').toLowerCase()}
+        </span>
+        <span className="flex items-center gap-1.5 text-xs text-gray-600">
+          <span className="w-2 h-2 rounded-sm bg-gray-100 border border-gray-300 shrink-0" />
+          {available} {t('selection.available').toLowerCase()}
+        </span>
+      </div>
+    </div>
+  )
+}
+
+function EventInfoPanel({
+  event,
+  applications,
+}: {
+  event: EventListItem
+  applications: ApplicationRow[]
+}) {
+  const { t } = useTranslation()
+
+  const selectedApps = applications.filter((a) => a.participationStatus === 'selected')
+
+  const confirmed = selectedApps.filter((a) => a.athlete.negotiationStatus === 'confirmed').length
+  const underNegotiation = selectedApps.filter(
+    (a) =>
+      a.athlete.negotiationStatus === 'agreement_sent' ||
+      a.athlete.negotiationStatus === 'counter_offer_sent'
+  ).length
+  const available = Math.max(0, event.maxSlots - confirmed - underNegotiation)
+
+  const swissApps = selectedApps.filter((a) => a.athlete.isSwiss)
+  const swissConfirmed = swissApps.filter((a) => a.athlete.negotiationStatus === 'confirmed').length
+  const swissNegotiation = swissApps.filter(
+    (a) =>
+      a.athlete.negotiationStatus === 'agreement_sent' ||
+      a.athlete.negotiationStatus === 'counter_offer_sent'
+  ).length
+  const swissAvailable = Math.max(0, event.swissQuota - swissConfirmed - swissNegotiation)
+
+  const eapApps = selectedApps.filter((a) => a.athlete.isEap)
+  const eapConfirmed = eapApps.filter((a) => a.athlete.negotiationStatus === 'confirmed').length
+  const eapNegotiation = eapApps.filter(
+    (a) =>
+      a.athlete.negotiationStatus === 'agreement_sent' ||
+      a.athlete.negotiationStatus === 'counter_offer_sent'
+  ).length
+  const eapAvailable = Math.max(0, event.eapQuota - eapConfirmed - eapNegotiation)
+
+  return (
+    <div className="bg-white rounded-lg border p-4 mb-4">
+      <div className="flex gap-6 flex-wrap items-start">
+        {/* Minima */}
+        <div className="min-w-[160px]">
+          <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-2">
+            {t('selection.minima')}
+          </p>
+          <div className="space-y-1.5">
+            <MinimaRow label={t('selection.international')} value={event.intMinima} />
+            <MinimaRow label={t('selection.swiss')} value={event.swissMinima} />
+            <MinimaRow label={t('selection.eap')} value={event.eapMinima} />
+          </div>
+        </div>
+
+        <div className="w-px self-stretch bg-gray-100" />
+
+        {/* Main slots */}
+        <div className="flex-1 min-w-[240px]">
+          <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-2">
+            {t('selection.slots')}
+          </p>
+          <SlotBar
+            total={event.maxSlots}
+            confirmed={confirmed}
+            underNegotiation={underNegotiation}
+            available={available}
+          />
+        </div>
+
+        {/* Swiss quota */}
+        {event.swissQuota > 0 && (
+          <>
+            <div className="w-px self-stretch bg-gray-100" />
+            <div className="min-w-[180px]">
+              <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-2">
+                {t('dashboard.swissQuota')}
+              </p>
+              <SlotBar
+                total={event.swissQuota}
+                confirmed={swissConfirmed}
+                underNegotiation={swissNegotiation}
+                available={swissAvailable}
+              />
+            </div>
+          </>
+        )}
+
+        {/* EAP quota */}
+        {event.eapQuota > 0 && (
+          <>
+            <div className="w-px self-stretch bg-gray-100" />
+            <div className="min-w-[180px]">
+              <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-2">
+                {t('dashboard.eapQuota')}
+              </p>
+              <SlotBar
+                total={event.eapQuota}
+                confirmed={eapConfirmed}
+                underNegotiation={eapNegotiation}
+                available={eapAvailable}
+              />
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  )
+}
+
 export default function CandidatesPage() {
   const { t } = useTranslation()
   const { user } = useAuth()
@@ -94,6 +260,8 @@ export default function CandidatesPage() {
     ).length,
     confirmed: applications.filter((a) => a.athlete.negotiationStatus === 'confirmed').length,
   }
+
+  const selectedEvent = eventFilter ? (events.find((e) => e.id === eventFilter) ?? null) : null
 
   const selectCls =
     'px-2 py-1.5 border border-gray-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-gray-900'
@@ -194,6 +362,11 @@ export default function CandidatesPage() {
             {filtered.length} {t('selection.candidates').toLowerCase()}
           </span>
         </div>
+
+        {/* Event info panel — shown when a specific event is selected */}
+        {selectedEvent && (
+          <EventInfoPanel event={selectedEvent} applications={applications} />
+        )}
 
         {/* Table */}
         {isLoading ? (

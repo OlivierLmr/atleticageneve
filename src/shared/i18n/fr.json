@@ -267,7 +267,9 @@
     "scoringBreakdown": "Détail du scoring",
     "acceptedAtMeeting": "Accepté au meeting (sans accord formel)",
     "costInNegotiation": "En négociation",
-    "rattraper": "Rattraper (remettre en examen)"
+    "rattraper": "Rattraper (remettre en examen)",
+    "slots": "Places",
+    "available": "Disponible"
   },
   "collaborator": {
     "personalData": "Données personnelles",
