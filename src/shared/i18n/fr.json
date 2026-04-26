@@ -269,7 +269,10 @@
     "costInNegotiation": "En négociation",
     "rattraper": "Rattraper (remettre en examen)",
     "slots": "Places",
-    "available": "Disponible"
+    "available": "Disponible",
+    "selectionStatus": "Statut de sélection",
+    "changeSelectionStatus": "Changer le statut de sélection",
+    "confirmStatusChangeTo": "Confirmer le changement vers"
   },
   "collaborator": {
     "personalData": "Données personnelles",
