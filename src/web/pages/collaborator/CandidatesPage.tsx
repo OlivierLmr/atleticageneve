@@ -30,20 +30,32 @@ interface EventListItem extends Event {
   perfType: string
 }
 
+const ALL_STATUSES: NegotiationStatus[] = ['to_review', 'agreement_sent', 'counter_offer_sent', 'confirmed', 'rejected', 'withdrawn']
+const DEFAULT_STATUSES = new Set<NegotiationStatus>(['to_review', 'agreement_sent', 'counter_offer_sent', 'confirmed'])
+
 export default function CandidatesPage() {
   const { t } = useTranslation()
   const { user } = useAuth()
+
   const [eventFilter, setEventFilter] = useState('')
-  const [statusFilter, setStatusFilter] = useState('')
+  const [statusFilters, setStatusFilters] = useState<Set<NegotiationStatus>>(DEFAULT_STATUSES)
   const [managerFilter, setManagerFilter] = useState('')
   const [search, setSearch] = useState('')
 
+  const toggleStatus = (s: NegotiationStatus) => {
+    setStatusFilters((prev) => {
+      const next = new Set(prev)
+      if (next.has(s)) next.delete(s)
+      else next.add(s)
+      return next
+    })
+  }
+
   const { data: applications = [], isLoading } = useQuery<ApplicationRow[]>({
-    queryKey: ['applications', eventFilter, statusFilter, managerFilter],
+    queryKey: ['applications', eventFilter, managerFilter],
     queryFn: () => {
       const params = new URLSearchParams()
       if (eventFilter) params.set('eventId', eventFilter)
-      if (statusFilter) params.set('negotiationStatus', statusFilter)
       if (managerFilter) params.set('managerId', managerFilter)
       const qs = params.toString()
       return api.get(`/api/v1/applications${qs ? `?${qs}` : ''}`)
@@ -60,14 +72,18 @@ export default function CandidatesPage() {
     queryFn: () => api.get('/api/v1/users?role=manager'),
   })
 
-  // Client-side name search
-  const filtered = search
-    ? applications.filter(
-        (a) =>
-          a.athlete.firstName.toLowerCase().includes(search.toLowerCase()) ||
-          a.athlete.lastName.toLowerCase().includes(search.toLowerCase())
+  // Client-side filtering: status checkboxes + name search
+  const filtered = applications.filter((a) => {
+    if (!statusFilters.has(a.athlete.negotiationStatus)) return false
+    if (search) {
+      const q = search.toLowerCase()
+      return (
+        a.athlete.firstName.toLowerCase().includes(q) ||
+        a.athlete.lastName.toLowerCase().includes(q)
       )
-    : applications
+    }
+    return true
+  })
 
   // Stats — negotiationStatus is on athlete, participationStatus is on application
   const stats = {
@@ -119,7 +135,7 @@ export default function CandidatesPage() {
         </div>
 
         {/* Filters */}
-        <div className="flex items-center gap-3 mb-4">
+        <div className="flex items-center flex-wrap gap-3 mb-4">
           <select
             className={selectCls}
             value={eventFilter}
@@ -148,20 +164,23 @@ export default function CandidatesPage() {
             </select>
           )}
 
-          <select
-            className={selectCls}
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-          >
-            <option value="">{t('common.all')} {t('common.statuses')}</option>
-            {(['to_review', 'agreement_sent', 'counter_offer_sent', 'confirmed', 'rejected', 'withdrawn'] as NegotiationStatus[]).map(
-              (s) => (
-                <option key={s} value={s}>
+          <div className="flex items-center gap-2 flex-wrap">
+            {ALL_STATUSES.map((s) => (
+              <label key={s} className="flex items-center gap-1 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={statusFilters.has(s)}
+                  onChange={() => toggleStatus(s)}
+                  className="rounded border-gray-300 text-gray-900 focus:ring-gray-900 w-3.5 h-3.5"
+                />
+                <span
+                  className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${STATUS_COLORS[s]}`}
+                >
                   {t(`status.${s}`)}
-                </option>
-              )
-            )}
-          </select>
+                </span>
+              </label>
+            ))}
+          </div>
 
           <input
             type="text"
