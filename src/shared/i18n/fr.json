@@ -251,6 +251,7 @@
     "eap": "EAP",
     "meetRecord": "Record du meeting",
     "assignedSelector": "Sélectionneur assigné",
+    "cost": "Coût",
     "estimatedCost": "Coût estimé",
     "estimatedCostLabel": "Estimé",
     "confirmedCostLabel": "Confirmé",

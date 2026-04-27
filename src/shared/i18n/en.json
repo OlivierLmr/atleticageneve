@@ -251,6 +251,7 @@
     "eap": "EAP",
     "meetRecord": "Meet record",
     "assignedSelector": "Assigned selector",
+    "cost": "Cost",
     "estimatedCost": "Estimated cost",
     "estimatedCostLabel": "Estimated",
     "confirmedCostLabel": "Confirmed",

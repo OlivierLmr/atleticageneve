@@ -13,6 +13,7 @@ interface ApplicationRow extends Application {
   athlete: Athlete
   event: Event & { catalog: EventCatalog }
   waPerformance: WaPerformance | null
+  latestOfferCost: number | null
 }
 
 interface EventListItem extends Event {
@@ -324,8 +325,10 @@ export default function CandidatesPage() {
         return app.athlete.nationality.toLowerCase()
       case 'negotiationStatus':
         return NEGOTIATION_ORDER[app.athlete.negotiationStatus] ?? 99
-      case 'cost':
-        return app.athlete.estTotal
+      case 'cost': {
+        const hasOffer = ['agreement_sent', 'counter_offer_sent', 'confirmed'].includes(app.athlete.negotiationStatus)
+        return hasOffer && app.latestOfferCost != null ? app.latestOfferCost : app.athlete.estTotal
+      }
       case 'event':
         return app.event.catalog.name.toLowerCase()
       case 'personalBest':
@@ -519,7 +522,7 @@ export default function CandidatesPage() {
                   <Th col="name" label={t('athlete.lastName')} />
                   <Th col="nationality" label={t('athlete.nationality')} />
                   <Th col="negotiationStatus" label={t('selection.negotiation')} />
-                  <Th col="cost" label={t('selection.estimatedCost')} />
+                  <Th col="cost" label={t('selection.cost')} />
                   <Th col="event" label={t('athlete.event')} />
                   <Th col="personalBest" label={t('athlete.personalBest')} />
                   <Th col="seasonBest" label={t('athlete.seasonBest')} />
@@ -588,9 +591,19 @@ export default function CandidatesPage() {
 
                       {/* Cost */}
                       <td className="px-3 py-2.5 font-mono text-xs">
-                        {app.athlete.estTotal > 0
-                          ? `CHF ${app.athlete.estTotal.toLocaleString()}`
-                          : '—'}
+                        {(() => {
+                          const hasOffer = ['agreement_sent', 'counter_offer_sent', 'confirmed'].includes(app.athlete.negotiationStatus)
+                          if (hasOffer && app.latestOfferCost != null) {
+                            return `CHF ${app.latestOfferCost.toLocaleString()}`
+                          }
+                          return app.athlete.estTotal > 0 ? (
+                            <span className="text-gray-400">
+                              CHF {app.athlete.estTotal.toLocaleString()}
+                            </span>
+                          ) : (
+                            <span className="text-gray-400">—</span>
+                          )
+                        })()}
                       </td>
 
                       {/* Event */}

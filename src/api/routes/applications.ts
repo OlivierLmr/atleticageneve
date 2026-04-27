@@ -1,5 +1,5 @@
 import { Hono } from 'hono'
-import { eq, and, sql, isNull, desc } from 'drizzle-orm'
+import { eq, and, sql, isNull, desc, inArray } from 'drizzle-orm'
 import * as schema from '../db/schema'
 import { participationStatusChangeSchema } from '@shared/validation'
 import { PARTICIPATION_TRANSITIONS } from '@shared/constants'
@@ -46,7 +46,7 @@ applications.get('/', async (c) => {
   const waPerfs = await db.select().from(schema.waPerformance)
   const waPerfMap = new Map(waPerfs.map(wp => [`${wp.athleteId}-${wp.eventId}`, wp]))
 
-  let results = rows.map((r) => ({
+  const baseResults = rows.map((r) => ({
     ...r.application,
     athlete: {
       ...r.athlete,
@@ -57,6 +57,33 @@ applications.get('/', async (c) => {
       catalog: r.catalog,
     },
     waPerformance: waPerfMap.get(`${r.application.athleteId}-${r.application.eventId}`) ?? null,
+  }))
+
+  // Fetch latest agreement totalCost per athlete
+  const athleteIds = [...new Set(baseResults.map((r) => r.athlete.id))]
+  const latestOfferCostMap = new Map<string, number>()
+  if (athleteIds.length > 0) {
+    const agreements = await db
+      .select({
+        athleteId: schema.agreement.athleteId,
+        version: schema.agreement.version,
+        totalCost: schema.agreement.totalCost,
+      })
+      .from(schema.agreement)
+      .where(inArray(schema.agreement.athleteId, athleteIds))
+    const latestVersionMap = new Map<string, number>()
+    for (const agr of agreements) {
+      const existingVersion = latestVersionMap.get(agr.athleteId) ?? -1
+      if (agr.version > existingVersion) {
+        latestVersionMap.set(agr.athleteId, agr.version)
+        latestOfferCostMap.set(agr.athleteId, agr.totalCost)
+      }
+    }
+  }
+
+  let results = baseResults.map((r) => ({
+    ...r,
+    latestOfferCost: latestOfferCostMap.get(r.athlete.id) ?? null,
   }))
 
   // Filter by managerId (athlete.managerId)
