@@ -24,6 +24,7 @@ export const edition = sqliteTable('edition', {
   weightRanking: integer('weight_ranking').notNull().default(30),
   weightCost: integer('weight_cost').notNull().default(10),
   bonusEap: integer('bonus_eap').notNull().default(5),
+  managerTierBonus: integer('manager_tier_bonus').notNull().default(1),
   createdAt: createdAt(),
   updatedAt: updatedAt(),
 })
@@ -67,6 +68,7 @@ export const event = sqliteTable('event', {
 export const country = sqliteTable('country', {
   code: text('code').primaryKey(),
   name: text('name').notNull(),
+  distanceFromGva: integer('distance_from_gva').notNull().default(0),
 })
 
 // ── EAP City ──────────────────────────────────────────────────────────────────
@@ -285,4 +287,26 @@ export const magicLink = sqliteTable('magic_link', {
   used: integer('used', { mode: 'boolean' }).notNull().default(false),
   redirectUrl: text('redirect_url'),
   createdAt: createdAt(),
+})
+
+// ── Cost Tier Config ──────────────────────────────────────────────────────────
+
+export const costTierConfig = sqliteTable('cost_tier_config', {
+  id: id(),
+  editionId: text('edition_id').notNull().references(() => edition.id),
+  tier: integer('tier').notNull(),
+  rankingMin: integer('ranking_min'),
+  rankingMax: integer('ranking_max'),
+  appearanceFee: integer('appearance_fee').notNull().default(0),
+  nightlyRate: integer('nightly_rate').notNull().default(0),
+})
+
+// ── Cost Distance Config ──────────────────────────────────────────────────────
+
+export const costDistanceConfig = sqliteTable('cost_distance_config', {
+  id: id(),
+  editionId: text('edition_id').notNull().references(() => edition.id),
+  distanceMax: integer('distance_max'),
+  travelCost: integer('travel_cost').notNull().default(0),
+  nights: integer('nights').notNull().default(0),
 })

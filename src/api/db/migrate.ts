@@ -273,6 +273,27 @@ const MIGRATION_0003_STMTS = [
   'ALTER TABLE interaction ADD COLUMN email_log_id TEXT REFERENCES email_log(id)',
 ]
 
+const MIGRATION_0004_STMTS = [
+  'ALTER TABLE edition ADD COLUMN manager_tier_bonus INTEGER NOT NULL DEFAULT 1',
+  'ALTER TABLE country ADD COLUMN distance_from_gva INTEGER NOT NULL DEFAULT 0',
+  `CREATE TABLE IF NOT EXISTS cost_tier_config (
+    id TEXT PRIMARY KEY,
+    edition_id TEXT NOT NULL REFERENCES edition(id),
+    tier INTEGER NOT NULL,
+    ranking_min INTEGER,
+    ranking_max INTEGER,
+    appearance_fee INTEGER NOT NULL DEFAULT 0,
+    nightly_rate INTEGER NOT NULL DEFAULT 0
+  )`,
+  `CREATE TABLE IF NOT EXISTS cost_distance_config (
+    id TEXT PRIMARY KEY,
+    edition_id TEXT NOT NULL REFERENCES edition(id),
+    distance_max INTEGER,
+    travel_cost INTEGER NOT NULL DEFAULT 0,
+    nights INTEGER NOT NULL DEFAULT 0
+  )`,
+]
+
 // Global flag: Worker instances re-use this across requests within the same isolate.
 let migrated = false
 
@@ -320,6 +341,17 @@ export async function ensureMigrated(d1: D1Database): Promise<void> {
       }
     }
     await d1.prepare('INSERT OR IGNORE INTO d1_migrations (name) VALUES (?)').bind('0003_interaction_email').run()
+  }
+
+  if (!applied.has('0004_cost_estimation')) {
+    for (const stmt of MIGRATION_0004_STMTS) {
+      try {
+        await d1.exec(stmt)
+      } catch {
+        // Column/table already exists — safe to ignore.
+      }
+    }
+    await d1.prepare('INSERT OR IGNORE INTO d1_migrations (name) VALUES (?)').bind('0004_cost_estimation').run()
   }
 
   migrated = true

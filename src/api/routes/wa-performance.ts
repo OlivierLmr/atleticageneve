@@ -1,9 +1,10 @@
 import { Hono } from 'hono'
-import { eq, and } from 'drizzle-orm'
+import { eq, and, desc } from 'drizzle-orm'
 import * as schema from '../db/schema'
 import { waPerformanceSchema } from '@shared/validation'
 import { computeScore } from '@shared/scoring'
 import { requireAuth } from '../middleware/auth'
+import { recalculateAthleteEstimatedCost } from '../services/costEstimation'
 import type { Env } from '../index'
 import type { PerfType, EditionWeights } from '@shared/types'
 
@@ -120,6 +121,9 @@ waPerformance.post('/', async (c) => {
 
     // Auto-recompute score if we have enough data
     if (finalPB != null && finalSB != null && finalRanking != null) {
+      // Recalculate estimated cost first (worldRanking may have changed tier)
+      await recalculateAthleteEstimatedCost(db, athleteId)
+
       // Get edition weights
       const editions = await db.select().from(schema.edition).limit(1)
       const edition = editions[0]
@@ -135,7 +139,7 @@ waPerformance.post('/', async (c) => {
         .where(eq(schema.event.id, eventId))
         .limit(1)
 
-      // Get athlete data
+      // Get fresh athlete data (cost may have been updated)
       const athleteRows = await db
         .select()
         .from(schema.athlete)
@@ -146,6 +150,15 @@ waPerformance.post('/', async (c) => {
         const evt = eventRows[0].event
         const catalog = eventRows[0].catalog
         const ath = athleteRows[0]
+
+        // Use agreement totalCost if negotiation has started, else use estTotal
+        const latestAgreements = await db
+          .select()
+          .from(schema.agreement)
+          .where(eq(schema.agreement.athleteId, athleteId))
+          .orderBy(desc(schema.agreement.version))
+          .limit(1)
+        const effectiveCost = latestAgreements.length > 0 ? latestAgreements[0].totalCost : ath.estTotal
 
         // Derive perfType from discipline
         const perfType: PerfType = catalog.discipline === 'Course' ? 'MIN' : 'MAX'
@@ -162,7 +175,7 @@ waPerformance.post('/', async (c) => {
           personalBest: finalPB,
           seasonBest: finalSB,
           worldRanking: finalRanking,
-          estimatedCostTotal: ath.estTotal,
+          estimatedCostTotal: effectiveCost,
           isEap: ath.isEap,
           isSwiss: ath.isSwiss,
           perfType,

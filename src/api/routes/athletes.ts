@@ -8,6 +8,7 @@ import { requireAuth } from '../middleware/auth'
 import { sendEmail, sendMagicLinkEmail, buildTransitionEmail } from '../services/email'
 import type { EmailContent } from '../services/email'
 import { generateToken, magicLinkExpiresAt } from '../services/auth'
+import { recalculateAthleteEstimatedCost } from '../services/costEstimation'
 import type { Env } from '../index'
 import type { NegotiationStatus } from '@shared/types'
 
@@ -86,6 +87,9 @@ athletes.post('/', zValidator('json', athleteRegistrationSchema), async (c) => {
       createdAt: new Date().toISOString(),
     })
   }
+
+  // Auto-calculate estimated costs
+  await recalculateAthleteEstimatedCost(db, athleteId)
 
   // If email provided, create a user record so the athlete can log in later
   let magicLinkSent = false
@@ -221,6 +225,8 @@ athletes.post('/batch', requireAuth('manager'), zValidator('json', batchAthleteR
         createdAt: new Date().toISOString(),
       })
     }
+
+    await recalculateAthleteEstimatedCost(db, athleteId)
 
     results.push({ athleteId, applicationIds, firstName: data.firstName, lastName: data.lastName, eventIds: validEventIds })
   }
@@ -374,19 +380,17 @@ athletes.patch('/:id', requireAuth('athlete', 'manager', 'collaborator', 'commit
     return c.json({ error: 'Not authorized to update this athlete' }, 403)
   }
 
-  // Auto-recompute estTotal if cost fields change
   const updates: Record<string, unknown> = { ...data, updatedBy: user.id, updatedAt: new Date().toISOString() }
-  if ('estTravel' in data || 'estAccommodation' in data || 'estAppearance' in data) {
-    const travel = (data.estTravel ?? ath.estTravel) || 0
-    const accommodation = (data.estAccommodation ?? ath.estAccommodation) || 0
-    const appearance = (data.estAppearance ?? ath.estAppearance) || 0
-    updates.estTotal = travel + accommodation + appearance
-  }
 
   await db
     .update(schema.athlete)
     .set(updates)
     .where(eq(schema.athlete.id, id))
+
+  // Recalculate estimated costs when relevant fields change
+  if ('nationality' in data || 'managerId' in data) {
+    await recalculateAthleteEstimatedCost(db, id)
+  }
 
   return c.json({ id, updated: Object.keys(updates) })
 })

@@ -1246,9 +1246,10 @@ export default function AthletePage() {
           ]
 
           const costFields: FieldDef[] = [
+            { key: 'estAppearance', label: t('collaborator.estAppearance'), type: 'number' },
             { key: 'estTravel', label: t('collaborator.estTravel'), type: 'number' },
             { key: 'estAccommodation', label: t('collaborator.estAccommodation'), type: 'number' },
-            { key: 'estAppearance', label: t('collaborator.estAppearance'), type: 'number' },
+            { key: 'estTotal', label: t('selection.estimatedCost'), type: 'number' },
           ]
 
           const paymentFields: FieldDef[] = [
@@ -1329,12 +1330,8 @@ export default function AthletePage() {
                 </CollapsibleSection>
               )}
 
-              {/* Cost estimates — staff only */}
-              {isStaff && (
-                <>
-                  {renderSection('costs', t('selection.estimatedCost'), costFields, true)}
-                </>
-              )}
+              {/* Cost estimates — staff only, read-only (auto-computed) */}
+              {isStaff && renderSection('costs', t('selection.estimatedCost'), costFields, false)}
 
               {/* Payment — staff only */}
               {isStaff && renderSection('payment', t('collaborator.payment'), paymentFields, true)}
