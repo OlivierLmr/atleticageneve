@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from '@web/lib/api'
 import { useAuth } from '@web/lib/auth'
@@ -255,32 +255,70 @@ export default function CandidatesPage() {
   const { t } = useTranslation()
   const { user } = useAuth()
   const queryClient = useQueryClient()
-
-  const [eventFilter, setEventFilter] = useState('')
-  const [statusFilters, setStatusFilters] = useState<Set<NegotiationStatus>>(DEFAULT_STATUSES)
-  const [managerFilter, setManagerFilter] = useState('')
-  const [search, setSearch] = useState('')
-  const [sortCol, setSortCol] = useState<SortCol>('name')
-  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
+  const [searchParams, setSearchParams] = useSearchParams()
   const [statusModal, setStatusModal] = useState<StatusModal | null>(null)
 
+  // Filter state derived from URL search params
+  const eventFilter = searchParams.get('event') ?? ''
+  const managerFilter = searchParams.get('manager') ?? ''
+  const search = searchParams.get('search') ?? ''
+  const sortCol = (searchParams.get('sort') as SortCol) ?? 'name'
+  const sortDir = (searchParams.get('dir') as 'asc' | 'desc') ?? 'asc'
+  const statusFilters = useMemo(() => {
+    const raw = searchParams.get('statuses')
+    if (!raw) return DEFAULT_STATUSES
+    return new Set(raw.split(',') as NegotiationStatus[])
+  }, [searchParams])
+
+  const updateParam = (key: string, value: string) => {
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev)
+        if (value) next.set(key, value)
+        else next.delete(key)
+        return next
+      },
+      { replace: true }
+    )
+  }
+
   const toggleStatus = (s: NegotiationStatus) => {
-    setStatusFilters((prev) => {
-      const next = new Set(prev)
-      if (next.has(s)) next.delete(s)
-      else next.add(s)
-      return next
-    })
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev)
+        const raw = prev.get('statuses')
+        const current = new Set(
+          raw ? (raw.split(',') as NegotiationStatus[]) : [...DEFAULT_STATUSES]
+        )
+        if (current.has(s)) current.delete(s)
+        else current.add(s)
+        const arr = [...current]
+        next.set('statuses', arr.join(','))
+        return next
+      },
+      { replace: true }
+    )
   }
 
   const handleSort = (col: SortCol) => {
-    if (sortCol === col) {
-      setSortDir((prev) => (prev === 'asc' ? 'desc' : 'asc'))
-    } else {
-      setSortCol(col)
-      setSortDir('asc')
-    }
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev)
+        if ((prev.get('sort') ?? 'name') === col) {
+          next.set('dir', (prev.get('dir') ?? 'asc') === 'asc' ? 'desc' : 'asc')
+        } else {
+          next.set('sort', col)
+          next.delete('dir')
+        }
+        return next
+      },
+      { replace: true }
+    )
   }
+
+  const setEventFilter = (v: string) => updateParam('event', v)
+  const setManagerFilter = (v: string) => updateParam('manager', v)
+  const setSearch = (v: string) => updateParam('search', v)
 
   const { data: applications = [], isLoading } = useQuery<ApplicationRow[]>({
     queryKey: ['applications', eventFilter, managerFilter],
