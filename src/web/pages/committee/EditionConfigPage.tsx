@@ -328,7 +328,7 @@ function CostConfigSection({ edition, costConfigs }: { edition: Edition; costCon
             {tierMutation.isPending ? t('common.loading') : t('admin.saveTiers')}
           </button>
           {tierSaved && <span className="text-sm text-green-600">{t('admin.saved')}</span>}
-          {tierMutation.isError && <span className="text-sm text-red-600">{t('common.error')}</span>}
+          {tierMutation.isError && <span className="text-sm text-red-600">{(tierMutation.error as Error)?.message || t('common.error')}</span>}
         </div>
       </div>
 
@@ -382,7 +382,7 @@ function CostConfigSection({ edition, costConfigs }: { edition: Edition; costCon
             {distMutation.isPending ? t('common.loading') : t('admin.saveDistances')}
           </button>
           {distSaved && <span className="text-sm text-green-600">{t('admin.saved')}</span>}
-          {distMutation.isError && <span className="text-sm text-red-600">{t('common.error')}</span>}
+          {distMutation.isError && <span className="text-sm text-red-600">{(distMutation.error as Error)?.message || t('common.error')}</span>}
         </div>
       </div>
     </div>

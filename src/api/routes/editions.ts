@@ -121,8 +121,11 @@ app.put('/:id/cost-tier-configs', requireAuth('committee'), async (c) => {
     })
   }
 
-  // Recalculate estimated costs for all athletes in this edition
-  await recalculateAllAthletesForEdition(db, id)
+  try {
+    await recalculateAllAthletesForEdition(db, id)
+  } catch (err) {
+    console.error('recalculateAllAthletesForEdition failed after saving tier configs:', err)
+  }
 
   const tierConfigs = await db
     .select()
@@ -160,8 +163,11 @@ app.put('/:id/cost-distance-configs', requireAuth('committee'), async (c) => {
     })
   }
 
-  // Recalculate estimated costs for all athletes in this edition
-  await recalculateAllAthletesForEdition(db, id)
+  try {
+    await recalculateAllAthletesForEdition(db, id)
+  } catch (err) {
+    console.error('recalculateAllAthletesForEdition failed after saving distance configs:', err)
+  }
 
   const distanceConfigs = await db
     .select()
