@@ -273,9 +273,16 @@ const MIGRATION_0003_STMTS = [
   'ALTER TABLE interaction ADD COLUMN email_log_id TEXT REFERENCES email_log(id)',
 ]
 
-const MIGRATION_0004_STMTS = [
+const MIGRATION_0004_ALTER_STMTS = [
   'ALTER TABLE edition ADD COLUMN manager_tier_bonus INTEGER NOT NULL DEFAULT 1',
   'ALTER TABLE country ADD COLUMN distance_from_gva INTEGER NOT NULL DEFAULT 0',
+]
+
+// NOTE: these were previously run with d1.exec() which can silently fail for
+// multi-line single statements ("incomplete input: SQLITE_ERROR"). They are
+// now run with prepare().run() as recommended. Migration 0005 below acts as a
+// safety net for deployments where 0004 ran but these tables were never created.
+const MIGRATION_0004_CREATE_STMTS = [
   `CREATE TABLE IF NOT EXISTS cost_tier_config (
     id TEXT PRIMARY KEY,
     edition_id TEXT NOT NULL REFERENCES edition(id),
@@ -293,6 +300,10 @@ const MIGRATION_0004_STMTS = [
     nights INTEGER NOT NULL DEFAULT 0
   )`,
 ]
+
+// Safety net: re-creates cost tables using prepare().run() in case migration
+// 0004's d1.exec() silently failed for the multi-line CREATE TABLE statements.
+const MIGRATION_0005_STMTS = MIGRATION_0004_CREATE_STMTS
 
 // Global flag: Worker instances re-use this across requests within the same isolate.
 let migrated = false
@@ -344,14 +355,30 @@ export async function ensureMigrated(d1: D1Database): Promise<void> {
   }
 
   if (!applied.has('0004_cost_estimation')) {
-    for (const stmt of MIGRATION_0004_STMTS) {
+    for (const stmt of MIGRATION_0004_ALTER_STMTS) {
       try {
         await d1.exec(stmt)
       } catch {
-        // Column/table already exists — safe to ignore.
+        // Column already exists — safe to ignore.
+      }
+    }
+    for (const stmt of MIGRATION_0004_CREATE_STMTS) {
+      try {
+        await d1.prepare(stmt).run()
+      } catch {
+        // Table already exists — safe to ignore.
       }
     }
     await d1.prepare('INSERT OR IGNORE INTO d1_migrations (name) VALUES (?)').bind('0004_cost_estimation').run()
+  }
+
+  // Safety net for deployments where migration 0004 ran but the CREATE TABLE
+  // statements failed silently due to d1.exec() mishandling multi-line SQL.
+  if (!applied.has('0005_cost_tables_fix')) {
+    for (const stmt of MIGRATION_0005_STMTS) {
+      await d1.prepare(stmt).run()
+    }
+    await d1.prepare('INSERT OR IGNORE INTO d1_migrations (name) VALUES (?)').bind('0005_cost_tables_fix').run()
   }
 
   migrated = true
