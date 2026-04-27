@@ -70,6 +70,7 @@ export interface Edition {
   weightRanking: number
   weightCost: number
   bonusEap: number
+  managerTierBonus: number
   createdAt: string
   updatedAt: string
 }
@@ -107,6 +108,7 @@ export interface Event {
 export interface Country {
   code: string
   name: string
+  distanceFromGva: number
 }
 
 export interface EapCity {
@@ -328,4 +330,22 @@ export interface AthleteDetail extends Athlete {
   agreements: Agreement[]
   interactions: Interaction[]
   edition: EditionCosts | null
+}
+
+export interface CostTierConfig {
+  id: string
+  editionId: string
+  tier: number
+  rankingMin: number | null
+  rankingMax: number | null
+  appearanceFee: number
+  nightlyRate: number
+}
+
+export interface CostDistanceConfig {
+  id: string
+  editionId: string
+  distanceMax: number | null
+  travelCost: number
+  nights: number
 }

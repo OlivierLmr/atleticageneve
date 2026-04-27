@@ -26,6 +26,7 @@ app.post('/', requireAuth('committee'), async (c) => {
   await db.insert(schema.country).values({
     code: parsed.data.code,
     name: parsed.data.name,
+    distanceFromGva: parsed.data.distanceFromGva ?? 0,
   })
 
   const created = await db.select().from(schema.country).where(eq(schema.country.code, parsed.data.code)).limit(1)

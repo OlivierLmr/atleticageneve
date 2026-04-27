@@ -105,10 +105,6 @@ export const athleteUpdateSchema = z.object({
   departureFlight: z.string().optional().nullable(),
   departureTo: z.string().optional().nullable(),
   departureTime: z.string().optional().nullable(),
-  estTravel: z.number().int().min(0).optional(),
-  estAccommodation: z.number().int().min(0).optional(),
-  estAppearance: z.number().int().min(0).optional(),
-  estTotal: z.number().int().min(0).optional(),
   bankIban: z.string().optional().nullable(),
   paymentStatus: z.enum(['pending', 'done']).optional(),
   paymentAmount: z.number().int().min(0).optional().nullable(),
@@ -226,6 +222,7 @@ export const editionConfigSchema = z.object({
   weightRanking: z.number().int().min(0).max(100).optional(),
   weightCost: z.number().int().min(0).max(100).optional(),
   bonusEap: z.number().int().min(0).max(100).optional(),
+  managerTierBonus: z.number().int().min(0).optional(),
 }).refine((data) => {
   const hasAnyWeight = data.weightPB !== undefined || data.weightSB !== undefined ||
     data.weightRanking !== undefined || data.weightCost !== undefined
@@ -264,7 +261,30 @@ export const eventCatalogSchema = z.object({
 export const countrySchema = z.object({
   code: z.string().length(3),
   name: z.string().min(1),
+  distanceFromGva: z.number().int().min(0).optional(),
 })
+
+// ── Cost Tier Config ──────────────────────────────────────────────────────────
+
+export const costTierConfigSchema = z.object({
+  tier: z.number().int().min(1),
+  rankingMin: z.number().int().min(1).nullable().optional(),
+  rankingMax: z.number().int().min(1).nullable().optional(),
+  appearanceFee: z.number().int().min(0),
+  nightlyRate: z.number().int().min(0),
+})
+
+export const costTierConfigsSchema = z.array(costTierConfigSchema).min(1)
+
+// ── Cost Distance Config ──────────────────────────────────────────────────────
+
+export const costDistanceConfigSchema = z.object({
+  distanceMax: z.number().int().min(0).nullable().optional(),
+  travelCost: z.number().int().min(0),
+  nights: z.number().int().min(0),
+})
+
+export const costDistanceConfigsSchema = z.array(costDistanceConfigSchema).min(1)
 
 // ── EAP city ──────────────────────────────────────────────────────────────────
 

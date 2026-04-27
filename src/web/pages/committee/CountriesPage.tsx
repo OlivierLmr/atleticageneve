@@ -15,18 +15,19 @@ export default function CountriesPage() {
 
   const [code, setCode] = useState('')
   const [name, setName] = useState('')
+  const [distance, setDistance] = useState('')
   const [editingCode, setEditingCode] = useState<string | null>(null)
 
-  const resetForm = () => { setCode(''); setName(''); setEditingCode(null) }
+  const resetForm = () => { setCode(''); setName(''); setDistance(''); setEditingCode(null) }
 
   const addMutation = useMutation({
-    mutationFn: (data: { code: string; name: string }) => api.post('/api/v1/countries', data),
+    mutationFn: (data: { code: string; name: string; distanceFromGva: number }) => api.post('/api/v1/countries', data),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['countries'] }); resetForm() },
   })
 
   const updateMutation = useMutation({
-    mutationFn: ({ code: c, name: n }: { code: string; name: string }) =>
-      api.patch(`/api/v1/countries/${c}`, { name: n }),
+    mutationFn: ({ code: c, name: n, distanceFromGva: d }: { code: string; name: string; distanceFromGva: number }) =>
+      api.patch(`/api/v1/countries/${c}`, { name: n, distanceFromGva: d }),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['countries'] }); resetForm() },
   })
 
@@ -39,15 +40,17 @@ export default function CountriesPage() {
     setEditingCode(c.code)
     setCode(c.code)
     setName(c.name)
+    setDistance(String(c.distanceFromGva))
   }
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     if (!code.trim() || !name.trim()) return
+    const distanceFromGva = Math.max(0, parseInt(distance, 10) || 0)
     if (editingCode) {
-      updateMutation.mutate({ code: editingCode, name: name.trim() })
+      updateMutation.mutate({ code: editingCode, name: name.trim(), distanceFromGva })
     } else {
-      addMutation.mutate({ code: code.trim().toUpperCase(), name: name.trim() })
+      addMutation.mutate({ code: code.trim().toUpperCase(), name: name.trim(), distanceFromGva })
     }
   }
 
@@ -86,6 +89,17 @@ export default function CountriesPage() {
             placeholder="Switzerland"
           />
         </div>
+        <div className="w-32">
+          <label className="block text-xs text-gray-500 mb-1">{t('admin.distanceFromGva')} (km)</label>
+          <input
+            type="number"
+            value={distance}
+            onChange={(e) => setDistance(e.target.value)}
+            min={0}
+            className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-gray-900"
+            placeholder="0"
+          />
+        </div>
         <button
           type="submit"
           disabled={addMutation.isPending || updateMutation.isPending}
@@ -107,6 +121,7 @@ export default function CountriesPage() {
             <tr className="border-b bg-gray-50 text-xs text-gray-500">
               <th className="px-3 py-2 text-left font-medium">{t('admin.countryCode')}</th>
               <th className="px-3 py-2 text-left font-medium">{t('admin.countryName')}</th>
+              <th className="px-3 py-2 text-right font-medium">{t('admin.distanceFromGva')} (km)</th>
               <th className="px-3 py-2 text-right font-medium">{t('common.actions')}</th>
             </tr>
           </thead>
@@ -115,6 +130,7 @@ export default function CountriesPage() {
               <tr key={c.code} className="border-b hover:bg-gray-50">
                 <td className="px-3 py-2 font-mono">{c.code}</td>
                 <td className="px-3 py-2">{c.name}</td>
+                <td className="px-3 py-2 text-right font-mono">{c.distanceFromGva.toLocaleString()}</td>
                 <td className="px-3 py-2 text-right space-x-2">
                   <button onClick={() => startEdit(c)}
                     className="text-xs text-blue-600 hover:text-blue-800">
@@ -131,7 +147,7 @@ export default function CountriesPage() {
             ))}
             {countries.length === 0 && (
               <tr>
-                <td colSpan={3} className="px-3 py-4 text-center text-gray-400 text-xs">
+                <td colSpan={4} className="px-3 py-4 text-center text-gray-400 text-xs">
                   {t('common.none')}
                 </td>
               </tr>

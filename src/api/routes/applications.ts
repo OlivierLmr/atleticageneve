@@ -1,5 +1,5 @@
 import { Hono } from 'hono'
-import { eq, and, sql, isNull } from 'drizzle-orm'
+import { eq, and, sql, isNull, desc } from 'drizzle-orm'
 import * as schema from '../db/schema'
 import { participationStatusChangeSchema } from '@shared/validation'
 import { PARTICIPATION_TRANSITIONS } from '@shared/constants'
@@ -283,6 +283,15 @@ applications.post('/:id/score', async (c) => {
     bonusEap: edition.bonusEap,
   } : undefined
 
+  // Use agreement totalCost if negotiation has started, else use estTotal
+  const latestAgreements = await db
+    .select()
+    .from(schema.agreement)
+    .where(eq(schema.agreement.athleteId, app.athleteId))
+    .orderBy(desc(schema.agreement.version))
+    .limit(1)
+  const effectiveCost = latestAgreements.length > 0 ? latestAgreements[0].totalCost : (ath.estTotal ?? 0)
+
   // Determine perfType from catalog discipline
   const perfType = catalog.discipline === 'Course' ? 'MIN' as const : 'MAX' as const
 
@@ -290,7 +299,7 @@ applications.post('/:id/score', async (c) => {
     personalBest: waPerf.personalBest ?? 0,
     seasonBest: waPerf.seasonBest ?? 0,
     worldRanking: waPerf.worldRanking ?? 100,
-    estimatedCostTotal: ath.estTotal ?? 0,
+    estimatedCostTotal: effectiveCost,
     isEap: ath.isEap,
     isSwiss: ath.isSwiss,
     perfType,
