@@ -274,7 +274,7 @@ export const costTierConfigSchema = z.object({
   nightlyRate: z.number().int().min(0),
 })
 
-export const costTierConfigsSchema = z.array(costTierConfigSchema).min(1)
+export const costTierConfigsSchema = z.array(costTierConfigSchema)
 
 // ── Cost Distance Config ──────────────────────────────────────────────────────
 
@@ -284,7 +284,7 @@ export const costDistanceConfigSchema = z.object({
   nights: z.number().int().min(0),
 })
 
-export const costDistanceConfigsSchema = z.array(costDistanceConfigSchema).min(1)
+export const costDistanceConfigsSchema = z.array(costDistanceConfigSchema)
 
 // ── EAP city ──────────────────────────────────────────────────────────────────
 

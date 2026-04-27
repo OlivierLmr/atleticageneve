@@ -209,9 +209,9 @@ function CostConfigSection({ edition, costConfigs }: { edition: Edition; costCon
 
   const saveTiers = () => {
     const payload = tiers.map(t => ({
-      tier: t.tier,
-      rankingMin: t.rankingMin ? parseInt(t.rankingMin, 10) : null,
-      rankingMax: t.rankingMax ? parseInt(t.rankingMax, 10) : null,
+      tier: parseInt(String(t.tier), 10),
+      rankingMin: t.rankingMin !== '' ? parseInt(t.rankingMin, 10) : null,
+      rankingMax: t.rankingMax !== '' ? parseInt(t.rankingMax, 10) : null,
       appearanceFee: parseInt(t.appearanceFee, 10) || 0,
       nightlyRate: parseInt(t.nightlyRate, 10) || 0,
     }))
@@ -227,7 +227,7 @@ function CostConfigSection({ edition, costConfigs }: { edition: Edition; costCon
 
   const saveDistances = () => {
     const payload = distances.map(d => ({
-      distanceMax: d.distanceMax ? parseInt(d.distanceMax, 10) : null,
+      distanceMax: d.distanceMax !== '' ? parseInt(d.distanceMax, 10) : null,
       travelCost: parseInt(d.travelCost, 10) || 0,
       nights: parseInt(d.nights, 10) || 0,
     }))
