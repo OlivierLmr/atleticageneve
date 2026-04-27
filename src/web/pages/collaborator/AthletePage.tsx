@@ -904,17 +904,21 @@ export default function AthletePage() {
         <div className="max-w-7xl mx-auto px-6 py-4">
           {/* Top row: navigation + language */}
           <div className="flex items-center justify-between mb-3">
-            <Link
-              to={
-                isCommittee ? '/committee/candidates' :
-                user?.role === 'manager' ? '/manager/portal' :
-                user?.role === 'athlete' ? '/athlete/portal' :
-                '/collaborator/candidates'
-              }
-              className="text-sm text-gray-400 hover:text-gray-600"
-            >
-              ← {t('common.back')}
-            </Link>
+            {(isCommittee || user?.role === 'collaborator') ? (
+              <button
+                onClick={() => navigate(-1)}
+                className="text-sm text-gray-400 hover:text-gray-600"
+              >
+                ← {t('common.back')}
+              </button>
+            ) : (
+              <Link
+                to={user?.role === 'manager' ? '/manager/portal' : '/athlete/portal'}
+                className="text-sm text-gray-400 hover:text-gray-600"
+              >
+                ← {t('common.back')}
+              </Link>
+            )}
             <LanguageSwitcher />
           </div>
 
