@@ -24,21 +24,22 @@ hotels.get('/', async (c) => {
     .from(schema.hotel)
     .where(eq(schema.hotel.editionId, editions[0].id))
 
-  // Include hotel_room sub-items for each hotel
-  const results = []
-  for (const h of hotelRows) {
-    const rooms = await db
-      .select()
-      .from(schema.hotelRoom)
-      .where(eq(schema.hotelRoom.hotelId, h.id))
+  // Fetch all rooms in one query, then group by hotel
+  const allRooms = await db
+    .select()
+    .from(schema.hotelRoom)
 
-    results.push({
-      ...h,
-      rooms,
-    })
+  const roomsByHotel = new Map<string, typeof allRooms>()
+  for (const room of allRooms) {
+    const list = roomsByHotel.get(room.hotelId) ?? []
+    list.push(room)
+    roomsByHotel.set(room.hotelId, list)
   }
 
-  return c.json(results)
+  return c.json(hotelRows.map(h => ({
+    ...h,
+    rooms: roomsByHotel.get(h.id) ?? [],
+  })))
 })
 
 // ── POST /hotels — create hotel (committee only) ────────────────────────────
