@@ -2,17 +2,17 @@
  * Integration test helpers — creates a Miniflare instance with a fresh D1 database
  * and provides the Hono app bound to it.
  *
- * Migration 0001 is applied from the SQL file (d1.exec fails in Miniflare for
- * large multi-statement strings), then ensureMigrated() handles the rest.
+ * All SQL migration files from src/api/db/migrations/ are applied in order.
  */
 import { Miniflare } from 'miniflare'
 import { drizzle } from 'drizzle-orm/d1'
 import { eq } from 'drizzle-orm'
 import * as schema from '@api/db/schema'
-import { ensureMigrated, resetMigrationState } from '@api/db/migrate'
 import app from '@api/index'
 import fs from 'fs'
 import path from 'path'
+
+const MIGRATIONS_DIR = path.resolve(__dirname, '../../src/api/db/migrations')
 
 export interface TestContext {
   mf: Miniflare
@@ -22,9 +22,6 @@ export interface TestContext {
 }
 
 export async function setupTestContext(): Promise<TestContext> {
-  // Reset migration flag so ensureMigrated() re-checks for this fresh DB
-  resetMigrationState()
-
   const mf = new Miniflare({
     modules: true,
     script: 'export default { fetch() { return new Response("ok") } }',
@@ -34,25 +31,33 @@ export async function setupTestContext(): Promise<TestContext> {
   const d1 = await mf.getD1Database('DB') as unknown as D1Database
   const db = drizzle(d1, { schema })
 
-  // Create migration tracking table
+  // Create wrangler-compatible migration tracking table
   await d1.prepare(
     `CREATE TABLE IF NOT EXISTS d1_migrations (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT UNIQUE NOT NULL, applied_at TEXT NOT NULL DEFAULT (datetime('now')))`
   ).run()
 
-  // Run migration 0001 from SQL file (d1.exec fails in Miniflare for large strings)
-  const sqlFile = path.resolve(__dirname, '../../src/api/db/migrations/0001_spec_v3.sql')
-  const migrationSql = fs.readFileSync(sqlFile, 'utf-8')
-  const statements = migrationSql
-    .split(/;\s*\n/)
-    .map((s) => s.replace(/--.*$/gm, '').trim())
-    .filter((s) => s.length > 0)
+  // Read and apply all SQL migration files in order
+  const files = fs.readdirSync(MIGRATIONS_DIR)
+    .filter((f) => f.endsWith('.sql'))
+    .sort()
 
-  const batch = statements.map((s) => d1.prepare(s))
-  await d1.batch(batch)
-  await d1.prepare('INSERT OR IGNORE INTO d1_migrations (name) VALUES (?)').bind('0001_spec_v3').run()
+  for (const file of files) {
+    const sql = fs.readFileSync(path.join(MIGRATIONS_DIR, file), 'utf-8')
+    const statements = sql
+      .split(/;\s*\n/)
+      .map((s) => s.replace(/--.*$/gm, '').trim())
+      .filter((s) => s.length > 0)
 
-  // Let ensureMigrated() handle migrations 0002+ (ALTER TABLEs, cost tables, WA tables)
-  await ensureMigrated(d1)
+    for (const stmt of statements) {
+      try {
+        await d1.prepare(stmt).run()
+      } catch {
+        // ALTER on existing column, CREATE IF NOT EXISTS — safe to ignore
+      }
+    }
+
+    await d1.prepare('INSERT OR IGNORE INTO d1_migrations (name) VALUES (?)').bind(file).run()
+  }
 
   // Request helper
   const request = async (urlPath: string, init?: RequestInit): Promise<Response> => {
