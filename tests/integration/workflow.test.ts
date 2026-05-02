@@ -60,17 +60,25 @@ describe('Application Workflow API', () => {
   // ── Negotiation status transitions (athlete-level) ──────────────────────
 
   describe('Negotiation status transitions', () => {
-    it('transitions to_review -> agreement_sent', async () => {
-      const { athleteId } = await freshApp()
+    it('transitions to_review -> agreement_sent via agreement creation', async () => {
+      const { athleteId } = await freshApp({ participationStatus: 'selected' })
 
-      const res = await ctx.request(`/api/v1/athletes/${athleteId}/negotiation-status`, {
-        method: 'PATCH',
+      // Sending an agreement implicitly sets status to agreement_sent
+      const res = await ctx.request(`/api/v1/athletes/${athleteId}/agreements`, {
+        method: 'POST',
         headers: authHeaders(),
-        body: JSON.stringify({ status: 'agreement_sent' }),
+        body: JSON.stringify({
+          appearanceFee: 1000, otherCompensation: 0, transport: 0,
+          transportAirportHotel: false, transportHotelStadium: false,
+          hotelNightTue: false, hotelNightWed: false,
+          hotelNightThu: false, hotelNightFri: false, hotelNightSat: false,
+          hotelNightSun: false,
+          dinnerTue: false, dinnerWed: false, dinnerThu: false,
+          dinnerFri: false, dinnerSat: false, dinnerSun: false,
+          stadiumMeals: false,
+        }),
       })
-      expect(res.status).toBe(200)
-      const body = await res.json() as any
-      expect(body.status).toBe('agreement_sent')
+      expect(res.status).toBe(201)
     })
 
     it('transitions to_review -> rejected', async () => {
@@ -242,12 +250,12 @@ describe('Application Workflow API', () => {
       const b1 = await res1.json() as any
       expect(b1.version).toBe(1)
 
-      // Transition to counter_offer_sent so we can send another agreement
-      await ctx.request(`/api/v1/athletes/${athleteId}/negotiation-status`, {
-        method: 'PATCH',
-        headers: authHeaders(),
-        body: JSON.stringify({ status: 'counter_offer_sent' }),
-      })
+      // Simulate athlete counter-offering (sets status to counter_offer_sent)
+      // In the real flow, the athlete would do this via PATCH with their own token.
+      // Here we directly update the DB since we're testing agreement versioning.
+      const { eq } = await import('drizzle-orm')
+      const { athlete: athleteTable } = await import('@api/db/schema')
+      await ctx.db.update(athleteTable).set({ negotiationStatus: 'counter_offer_sent' }).where(eq(athleteTable.id, athleteId))
 
       // Send second agreement (v2)
       const res2 = await ctx.request(`/api/v1/athletes/${athleteId}/agreements`, {

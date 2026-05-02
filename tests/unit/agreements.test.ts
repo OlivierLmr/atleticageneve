@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { NEGOTIATION_TRANSITIONS } from '@shared/constants'
+import { NEGOTIATION_TRANSITIONS, ATHLETE_TRANSITIONS } from '@shared/constants'
 import { agreementSchema, negotiationStatusChangeSchema } from '@shared/validation'
 import type { NegotiationStatus } from '@shared/types'
 
@@ -218,27 +218,27 @@ describe('agreementSchema validation', () => {
 })
 
 describe('workflow transitions for agreement flow', () => {
-  it('to_review allows agreement_sent', () => {
-    expect(NEGOTIATION_TRANSITIONS.to_review).toContain('agreement_sent')
+  // Agreement sending is done via the agreement route (POST /agreements),
+  // not via a status transition. The status moves implicitly.
+  // Athlete-side transitions are in ATHLETE_TRANSITIONS.
+
+  it('agreement_sent allows confirmed (athlete)', () => {
+    expect(ATHLETE_TRANSITIONS.agreement_sent).toContain('confirmed')
   })
 
-  it('agreement_sent allows confirmed', () => {
-    expect(NEGOTIATION_TRANSITIONS.agreement_sent).toContain('confirmed')
+  it('agreement_sent allows counter_offer_sent (athlete)', () => {
+    expect(ATHLETE_TRANSITIONS.agreement_sent).toContain('counter_offer_sent')
   })
 
-  it('agreement_sent allows counter_offer_sent', () => {
-    expect(NEGOTIATION_TRANSITIONS.agreement_sent).toContain('counter_offer_sent')
+  it('counter_offer_sent allows rejected (collaborator)', () => {
+    expect(NEGOTIATION_TRANSITIONS.counter_offer_sent).toContain('rejected')
   })
 
-  it('counter_offer_sent allows agreement_sent (revised offer)', () => {
-    expect(NEGOTIATION_TRANSITIONS.counter_offer_sent).toContain('agreement_sent')
+  it('confirmed allows withdrawn (athlete)', () => {
+    expect(ATHLETE_TRANSITIONS.confirmed).toContain('withdrawn')
   })
 
-  it('confirmed only allows withdrawn', () => {
-    expect(NEGOTIATION_TRANSITIONS.confirmed).toEqual(['withdrawn'])
-  })
-
-  it('rejected and withdrawn are terminal', () => {
+  it('rejected and withdrawn are terminal (base)', () => {
     expect(NEGOTIATION_TRANSITIONS.rejected).toEqual([])
     expect(NEGOTIATION_TRANSITIONS.withdrawn).toEqual([])
   })
@@ -263,24 +263,21 @@ describe('workflow transitions for agreement flow', () => {
 // ── Counter-offer flow tests ─────────────────────────────────────────────────
 
 describe('counter-offer workflow', () => {
-  it('agreement_sent allows counter_offer_sent', () => {
-    expect(NEGOTIATION_TRANSITIONS.agreement_sent).toContain('counter_offer_sent')
-  })
-
-  it('counter_offer_sent allows revised agreement_sent', () => {
-    expect(NEGOTIATION_TRANSITIONS.counter_offer_sent).toContain('agreement_sent')
+  it('agreement_sent allows counter_offer_sent (athlete)', () => {
+    expect(ATHLETE_TRANSITIONS.agreement_sent).toContain('counter_offer_sent')
   })
 
   it('counter_offer_sent does not allow direct confirm', () => {
     expect(NEGOTIATION_TRANSITIONS.counter_offer_sent).not.toContain('confirmed')
+    expect(ATHLETE_TRANSITIONS.counter_offer_sent).not.toContain('confirmed')
   })
 
-  it('counter_offer_sent allows rejection', () => {
+  it('counter_offer_sent allows rejection (collaborator)', () => {
     expect(NEGOTIATION_TRANSITIONS.counter_offer_sent).toContain('rejected')
   })
 
-  it('counter_offer_sent allows withdrawal', () => {
-    expect(NEGOTIATION_TRANSITIONS.counter_offer_sent).toContain('withdrawn')
+  it('counter_offer_sent allows withdrawal (athlete)', () => {
+    expect(ATHLETE_TRANSITIONS.counter_offer_sent).toContain('withdrawn')
   })
 })
 
@@ -316,25 +313,21 @@ describe('counter-offer validation', () => {
 // ── Multi-round negotiation ──────────────────────────────────────────────────
 
 describe('multi-round negotiation path', () => {
-  it('supports full negotiation: to_review -> agreement_sent -> counter_offer_sent -> agreement_sent -> confirmed', () => {
-    const path: NegotiationStatus[] = ['to_review', 'agreement_sent', 'counter_offer_sent', 'agreement_sent', 'confirmed']
+  it('supports athlete accepting agreement: agreement_sent -> confirmed', () => {
+    expect(ATHLETE_TRANSITIONS.agreement_sent).toContain('confirmed')
+  })
 
-    for (let i = 0; i < path.length - 1; i++) {
-      const from = path[i]
-      const to = path[i + 1]
-      expect(
-        NEGOTIATION_TRANSITIONS[from],
-        `Expected ${from} -> ${to} to be valid`
-      ).toContain(to)
-    }
+  it('supports athlete counter-offering then withdrawing', () => {
+    expect(ATHLETE_TRANSITIONS.agreement_sent).toContain('counter_offer_sent')
+    expect(ATHLETE_TRANSITIONS.counter_offer_sent).toContain('withdrawn')
   })
 
   it('supports early rejection: to_review -> rejected', () => {
     expect(NEGOTIATION_TRANSITIONS.to_review).toContain('rejected')
   })
 
-  it('supports withdrawal after confirmation: confirmed -> withdrawn', () => {
-    expect(NEGOTIATION_TRANSITIONS.confirmed).toContain('withdrawn')
+  it('supports withdrawal after confirmation: confirmed -> withdrawn (athlete)', () => {
+    expect(ATHLETE_TRANSITIONS.confirmed).toContain('withdrawn')
   })
 })
 

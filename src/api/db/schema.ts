@@ -254,6 +254,15 @@ export const emailLog = sqliteTable('email_log', {
   relatedAthleteId: text('related_athlete_id').references(() => athlete.id),
 })
 
+// ── WA Discipline Mapping ────────────────────────────────────────────────────
+
+export const waDisciplineMap = sqliteTable('wa_discipline_map', {
+  id: id(),
+  waName: text('wa_name').notNull(),
+  waRankingSlug: text('wa_ranking_slug'),
+  catalogName: text('catalog_name').notNull(),
+})
+
 // ── WA Performance ────────────────────────────────────────────────────────────
 
 export const waPerformance = sqliteTable('wa_performance', {

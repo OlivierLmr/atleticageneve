@@ -745,8 +745,8 @@ export default function AthletePage() {
 
   const statusMutation = useMutation({
     mutationFn: (status: NegotiationStatus) =>
-      api.patch(`/api/v1/athletes/${id}/negotiation-status`, { status }),
-    onSuccess: (data: { emailPreview?: { subject: string; body: string } }) => {
+      api.patch<{ emailPreview?: { subject: string; body: string } }>(`/api/v1/athletes/${id}/negotiation-status`, { status }),
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['athlete', id] })
       setConfirmDialog(null)
       if (data?.emailPreview) setEmailPreview(data.emailPreview)
@@ -755,14 +755,14 @@ export default function AthletePage() {
 
   const agreementMutation = useMutation({
     mutationFn: (data: AgreementFormDraft) =>
-      api.post(`/api/v1/athletes/${id}/agreements`, {
+      api.post<{ emailPreview?: { subject: string; body: string } }>(`/api/v1/athletes/${id}/agreements`, {
         ...data,
         appearanceFee: data.appearanceFee === '' ? 0 : data.appearanceFee,
         otherCompensation: data.otherCompensation === '' ? 0 : data.otherCompensation,
         transport: data.transport === '' ? 0 : data.transport,
         hotelRoomId: data.hotelRoomId || undefined,
       }),
-    onSuccess: (data: { emailPreview?: { subject: string; body: string } }) => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['athlete', id] })
       setShowAgreementForm(false)
       if (data?.emailPreview) setEmailPreview(data.emailPreview)
@@ -807,12 +807,17 @@ export default function AthletePage() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['athlete', id] }),
   })
 
+  const waFetchMutation = useMutation({
+    mutationFn: () => api.post<{ fetched: number; matched: number; errors: string[] }>(`/api/v1/wa-performance/fetch/${id}`),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['athlete', id] }),
+  })
+
   const counterOfferMutation = useMutation({
     mutationFn: async (text: string) => {
       await api.post(`/api/v1/athletes/${id}/interactions`, { type: 'counter_offer', content: text })
-      return api.patch(`/api/v1/athletes/${id}/negotiation-status`, { status: 'counter_offer_sent' })
+      return api.patch<{ emailPreview?: { subject: string; body: string } }>(`/api/v1/athletes/${id}/negotiation-status`, { status: 'counter_offer_sent' })
     },
-    onSuccess: (data: { emailPreview?: { subject: string; body: string } }) => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['athlete', id] })
       setShowCounterOfferModal(false)
       setCounterOfferText('')
@@ -958,10 +963,22 @@ export default function AthletePage() {
                   </span>
                 )}
                 {athlete.waProfileUrl && (
-                  <a href={athlete.waProfileUrl} target="_blank" rel="noopener noreferrer"
-                    className="text-xs text-blue-600 hover:text-blue-800" title="World Athletics">
-                    WA ↗
-                  </a>
+                  <>
+                    <a href={athlete.waProfileUrl} target="_blank" rel="noopener noreferrer"
+                      className="text-xs text-blue-600 hover:text-blue-800" title="World Athletics">
+                      WA ↗
+                    </a>
+                    {isStaff && (
+                      <button
+                        onClick={() => waFetchMutation.mutate()}
+                        disabled={waFetchMutation.isPending}
+                        className="text-xs text-blue-600 hover:text-blue-800 disabled:opacity-50"
+                        title={t('wa.fetch')}
+                      >
+                        {waFetchMutation.isPending ? t('wa.fetching') : '↻ WA'}
+                      </button>
+                    )}
+                  </>
                 )}
                 {/* Cost summary — staff only */}
                 {isStaff && (

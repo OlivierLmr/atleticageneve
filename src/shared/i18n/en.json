@@ -395,7 +395,20 @@
     "addRow": "Add row",
     "noLimit": "no limit",
     "saveTiers": "Save tiers",
-    "saveDistances": "Save distances"
+    "saveDistances": "Save distances",
+    "waDisciplineMap": "WA Discipline Mapping",
+    "waDisciplineMapHint": "Maps World Athletics discipline names to local event catalog names for auto-scraping.",
+    "waName": "WA Discipline Name",
+    "waRankingSlug": "WA Ranking Slug",
+    "catalogName": "Catalog Name",
+    "saveMappings": "Save mappings"
+  },
+  "wa": {
+    "fetch": "Refresh WA Data",
+    "fetching": "Fetching...",
+    "fetchSuccess": "WA data updated: {{matched}} events matched from {{fetched}} scraped",
+    "fetchError": "Failed to fetch WA data",
+    "noUrl": "No WA profile URL"
   },
   "emailPreview": {
     "title": "Email preview",

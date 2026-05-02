@@ -395,7 +395,20 @@
     "addRow": "Ajouter une ligne",
     "noLimit": "sans limite",
     "saveTiers": "Enregistrer les niveaux",
-    "saveDistances": "Enregistrer les tranches"
+    "saveDistances": "Enregistrer les tranches",
+    "waDisciplineMap": "Mapping disciplines WA",
+    "waDisciplineMapHint": "Correspondance entre les noms de disciplines World Athletics et le catalogue local pour le scraping automatique.",
+    "waName": "Nom discipline WA",
+    "waRankingSlug": "Slug classement WA",
+    "catalogName": "Nom catalogue",
+    "saveMappings": "Enregistrer les mappings"
+  },
+  "wa": {
+    "fetch": "Actualiser données WA",
+    "fetching": "Récupération...",
+    "fetchSuccess": "Données WA mises à jour : {{matched}} épreuves trouvées sur {{fetched}} récupérées",
+    "fetchError": "Échec de la récupération des données WA",
+    "noUrl": "Pas d'URL de profil WA"
   },
   "emailPreview": {
     "title": "Aperçu du mail envoyé",

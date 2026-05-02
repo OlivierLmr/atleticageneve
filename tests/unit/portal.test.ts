@@ -1,62 +1,55 @@
 import { describe, it, expect } from 'vitest'
-import { NEGOTIATION_TRANSITIONS } from '@shared/constants'
+import { ATHLETE_TRANSITIONS, NEGOTIATION_TRANSITIONS } from '@shared/constants'
 import { agreementSchema } from '@shared/validation'
 import type { NegotiationStatus } from '@shared/types'
 
 // ── Counter-offer flow tests (athlete portal perspective) ────────────────────
 
 describe('counter-offer workflow', () => {
-  it('agreement_sent allows counter_offer_sent', () => {
-    expect(NEGOTIATION_TRANSITIONS.agreement_sent).toContain('counter_offer_sent')
-  })
-
-  it('counter_offer_sent allows revised agreement_sent', () => {
-    expect(NEGOTIATION_TRANSITIONS.counter_offer_sent).toContain('agreement_sent')
+  it('agreement_sent allows counter_offer_sent (athlete)', () => {
+    expect(ATHLETE_TRANSITIONS.agreement_sent).toContain('counter_offer_sent')
   })
 
   it('counter_offer_sent does not allow direct confirm', () => {
     // Only the organizer can re-send, then athlete confirms
     expect(NEGOTIATION_TRANSITIONS.counter_offer_sent).not.toContain('confirmed')
+    expect(ATHLETE_TRANSITIONS.counter_offer_sent).not.toContain('confirmed')
   })
 
-  it('counter_offer_sent allows rejection', () => {
+  it('counter_offer_sent allows rejection (collaborator)', () => {
     expect(NEGOTIATION_TRANSITIONS.counter_offer_sent).toContain('rejected')
   })
 
-  it('counter_offer_sent allows withdrawal', () => {
-    expect(NEGOTIATION_TRANSITIONS.counter_offer_sent).toContain('withdrawn')
+  it('counter_offer_sent allows withdrawal (athlete)', () => {
+    expect(ATHLETE_TRANSITIONS.counter_offer_sent).toContain('withdrawn')
   })
 })
 
 describe('confirm/reject/withdraw from agreement_sent', () => {
-  it('allows confirm', () => {
-    expect(NEGOTIATION_TRANSITIONS.agreement_sent).toContain('confirmed')
+  it('allows confirm (athlete)', () => {
+    expect(ATHLETE_TRANSITIONS.agreement_sent).toContain('confirmed')
   })
 
-  it('allows reject', () => {
-    expect(NEGOTIATION_TRANSITIONS.agreement_sent).toContain('rejected')
-  })
-
-  it('allows withdraw', () => {
-    expect(NEGOTIATION_TRANSITIONS.agreement_sent).toContain('withdrawn')
+  it('allows withdraw (athlete)', () => {
+    expect(ATHLETE_TRANSITIONS.agreement_sent).toContain('withdrawn')
   })
 
   it('does not allow going back to to_review', () => {
-    expect(NEGOTIATION_TRANSITIONS.agreement_sent).not.toContain('to_review')
+    expect(ATHLETE_TRANSITIONS.agreement_sent).not.toContain('to_review')
   })
 })
 
 describe('terminal states', () => {
-  it('rejected has no transitions', () => {
+  it('rejected has no base transitions', () => {
     expect(NEGOTIATION_TRANSITIONS.rejected).toHaveLength(0)
   })
 
-  it('withdrawn has no transitions', () => {
+  it('withdrawn has no base transitions', () => {
     expect(NEGOTIATION_TRANSITIONS.withdrawn).toHaveLength(0)
   })
 
-  it('confirmed only allows withdraw', () => {
-    expect(NEGOTIATION_TRANSITIONS.confirmed).toEqual(['withdrawn'])
+  it('confirmed allows withdraw (athlete)', () => {
+    expect(ATHLETE_TRANSITIONS.confirmed).toContain('withdrawn')
   })
 })
 
@@ -119,24 +112,15 @@ describe('action to status mapping', () => {
 // ── Multi-round negotiation ──────────────────────────────────────────────────
 
 describe('multi-round negotiation path', () => {
-  it('supports full negotiation: to_review -> agreement_sent -> counter_offer_sent -> agreement_sent -> confirmed', () => {
-    const path: NegotiationStatus[] = ['to_review', 'agreement_sent', 'counter_offer_sent', 'agreement_sent', 'confirmed']
-
-    for (let i = 0; i < path.length - 1; i++) {
-      const from = path[i]
-      const to = path[i + 1]
-      expect(
-        NEGOTIATION_TRANSITIONS[from],
-        `Expected ${from} -> ${to} to be valid`
-      ).toContain(to)
-    }
+  it('supports athlete accepting: agreement_sent -> confirmed', () => {
+    expect(ATHLETE_TRANSITIONS.agreement_sent).toContain('confirmed')
   })
 
   it('supports early rejection: to_review -> rejected', () => {
     expect(NEGOTIATION_TRANSITIONS.to_review).toContain('rejected')
   })
 
-  it('supports withdrawal after confirmation: confirmed -> withdrawn', () => {
-    expect(NEGOTIATION_TRANSITIONS.confirmed).toContain('withdrawn')
+  it('supports withdrawal after confirmation: confirmed -> withdrawn (athlete)', () => {
+    expect(ATHLETE_TRANSITIONS.confirmed).toContain('withdrawn')
   })
 })

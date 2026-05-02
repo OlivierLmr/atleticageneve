@@ -2,31 +2,17 @@
  * Integration test helpers — creates a Miniflare instance with a fresh D1 database
  * and provides the Hono app bound to it.
  *
- * SPEC v3: event_catalog, country, eap_city reference tables; agreement replaces contractOffer;
- * event references catalog via catalogId; hotel split into hotel + hotel_room.
+ * Migration 0001 is applied from the SQL file (d1.exec fails in Miniflare for
+ * large multi-statement strings), then ensureMigrated() handles the rest.
  */
 import { Miniflare } from 'miniflare'
 import { drizzle } from 'drizzle-orm/d1'
 import { eq } from 'drizzle-orm'
 import * as schema from '@api/db/schema'
-import { resetMigrationState } from '@api/db/migrate'
+import { ensureMigrated, resetMigrationState } from '@api/db/migrate'
 import app from '@api/index'
 import fs from 'fs'
 import path from 'path'
-
-const MIGRATION_PATHS = [
-  { file: path.resolve(__dirname, '../../src/api/db/migrations/0001_spec_v3.sql'), name: '0001_spec_v3' },
-]
-
-// MIGRATION_0002 ALTER statements — must match src/api/db/migrate.ts
-const MIGRATION_0002_STMTS = [
-  'ALTER TABLE athlete ADD COLUMN club TEXT',
-  'ALTER TABLE email_log ADD COLUMN html_body TEXT',
-]
-
-const MIGRATION_0003_STMTS = [
-  'ALTER TABLE interaction ADD COLUMN email_log_id TEXT REFERENCES email_log(id)',
-]
 
 export interface TestContext {
   mf: Miniflare
@@ -53,40 +39,20 @@ export async function setupTestContext(): Promise<TestContext> {
     `CREATE TABLE IF NOT EXISTS d1_migrations (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT UNIQUE NOT NULL, applied_at TEXT NOT NULL DEFAULT (datetime('now')))`
   ).run()
 
-  // Run migration 0001 from SQL file
-  for (const { file, name } of MIGRATION_PATHS) {
-    const migrationSql = fs.readFileSync(file, 'utf-8')
-    const statements = migrationSql
-      .split(/;\s*\n/)
-      .map((s) => s.replace(/--.*$/gm, '').trim())
-      .filter((s) => s.length > 0)
+  // Run migration 0001 from SQL file (d1.exec fails in Miniflare for large strings)
+  const sqlFile = path.resolve(__dirname, '../../src/api/db/migrations/0001_spec_v3.sql')
+  const migrationSql = fs.readFileSync(sqlFile, 'utf-8')
+  const statements = migrationSql
+    .split(/;\s*\n/)
+    .map((s) => s.replace(/--.*$/gm, '').trim())
+    .filter((s) => s.length > 0)
 
-    const batch = statements.map((s) => d1.prepare(s))
-    await d1.batch(batch)
+  const batch = statements.map((s) => d1.prepare(s))
+  await d1.batch(batch)
+  await d1.prepare('INSERT OR IGNORE INTO d1_migrations (name) VALUES (?)').bind('0001_spec_v3').run()
 
-    // Record migration as applied so ensureMigrated() skips it
-    await d1.prepare('INSERT OR IGNORE INTO d1_migrations (name) VALUES (?)').bind(name).run()
-  }
-
-  // Run migration 0002 (ALTER TABLE statements)
-  for (const stmt of MIGRATION_0002_STMTS) {
-    try {
-      await d1.prepare(stmt).run()
-    } catch {
-      // Column already exists — safe to ignore
-    }
-  }
-  await d1.prepare('INSERT OR IGNORE INTO d1_migrations (name) VALUES (?)').bind('0002_spec_v4').run()
-
-  // Run migration 0003 (ALTER TABLE statements)
-  for (const stmt of MIGRATION_0003_STMTS) {
-    try {
-      await d1.prepare(stmt).run()
-    } catch {
-      // Column already exists — safe to ignore
-    }
-  }
-  await d1.prepare('INSERT OR IGNORE INTO d1_migrations (name) VALUES (?)').bind('0003_interaction_email').run()
+  // Let ensureMigrated() handle migrations 0002+ (ALTER TABLEs, cost tables, WA tables)
+  await ensureMigrated(d1)
 
   // Request helper
   const request = async (urlPath: string, init?: RequestInit): Promise<Response> => {
@@ -159,7 +125,6 @@ export async function createEventCatalog(
   overrides: Partial<typeof schema.eventCatalog.$inferInsert> & { id: string } = { id: 'cat-100m-M' }
 ): Promise<string> {
   const id = overrides.id
-  // Check if already exists to allow re-use
   const existing = await ctx.db.select().from(schema.eventCatalog).where(
     eq(schema.eventCatalog.id, id)
   )
@@ -183,7 +148,6 @@ export async function createEvent(
   const id = overrides.id ?? `evt-${crypto.randomUUID().slice(0, 8)}`
   const catalogId = overrides.catalogId ?? 'cat-100m-M'
 
-  // Ensure catalog entry exists
   await createEventCatalog(ctx, { id: catalogId })
 
   await ctx.db.insert(schema.event).values({
@@ -196,7 +160,7 @@ export async function createEvent(
     swissQuota: 1,
     eapQuota: 1,
     ...overrides,
-    catalogId, // override any catalogId from overrides with the resolved one
+    catalogId,
   })
   return id
 }

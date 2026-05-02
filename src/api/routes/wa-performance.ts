@@ -5,60 +5,26 @@ import { waPerformanceSchema } from '@shared/validation'
 import { computeScore } from '@shared/scoring'
 import { requireAuth } from '../middleware/auth'
 import { recalculateAthleteEstimatedCost } from '../services/costEstimation'
+import { fetchAndUpsertWaData } from '../services/wa-scraper'
 import type { Env } from '../index'
+import type { DrizzleD1Database } from 'drizzle-orm/d1'
 import type { PerfType, EditionWeights } from '@shared/types'
+
+type Db = DrizzleD1Database<typeof schema>
 
 const waPerformance = new Hono<Env>()
 
 waPerformance.use('*', requireAuth('collaborator', 'committee'))
 
-// ── GET /wa-performance?athleteId=X — list performances for an athlete ───────
+// ── Shared upsert helper ─────────────────────────────────────────────────────
 
-waPerformance.get('/', async (c) => {
-  const db = c.get('db')
-  const athleteId = c.req.query('athleteId')
+export async function upsertWaPerformance(
+  db: Db,
+  data: { athleteId: string; eventId: string; personalBest: number | null; seasonBest: number | null; worldRanking: number | null },
+): Promise<void> {
+  const { athleteId, eventId, personalBest, seasonBest, worldRanking } = data
 
-  if (!athleteId) {
-    return c.json({ error: 'athleteId query parameter is required' }, 400)
-  }
-
-  // Join with event + catalog to return event name/discipline
-  const results = await db
-    .select({
-      performance: schema.waPerformance,
-      event: schema.event,
-      catalog: schema.eventCatalog,
-    })
-    .from(schema.waPerformance)
-    .innerJoin(schema.event, eq(schema.waPerformance.eventId, schema.event.id))
-    .innerJoin(schema.eventCatalog, eq(schema.event.catalogId, schema.eventCatalog.id))
-    .where(eq(schema.waPerformance.athleteId, athleteId))
-
-  return c.json(results.map(r => ({
-    ...r.performance,
-    event: {
-      id: r.event.id,
-      name: r.catalog.name,
-      discipline: r.catalog.discipline,
-      gender: r.catalog.gender,
-    },
-  })))
-})
-
-// ── POST /wa-performance — upsert PB/SB/ranking for athlete+event ────────────
-
-waPerformance.post('/', async (c) => {
-  const db = c.get('db')
-  const body = await c.req.json()
-
-  const parsed = waPerformanceSchema.safeParse(body)
-  if (!parsed.success) {
-    return c.json({ error: 'Invalid data', details: parsed.error.flatten() }, 400)
-  }
-
-  const { athleteId, eventId, personalBest, seasonBest, worldRanking } = parsed.data
-
-  // Check if record exists
+  // Upsert wa_performance row
   const existing = await db
     .select()
     .from(schema.waPerformance)
@@ -67,8 +33,6 @@ waPerformance.post('/', async (c) => {
       eq(schema.waPerformance.eventId, eventId),
     ))
     .limit(1)
-
-  let resultId: string
 
   if (existing.length > 0) {
     await db
@@ -79,12 +43,9 @@ waPerformance.post('/', async (c) => {
         worldRanking: worldRanking ?? existing[0].worldRanking,
       })
       .where(eq(schema.waPerformance.id, existing[0].id))
-
-    resultId = existing[0].id
   } else {
-    resultId = crypto.randomUUID()
     await db.insert(schema.waPerformance).values({
-      id: resultId,
+      id: crypto.randomUUID(),
       athleteId,
       eventId,
       personalBest: personalBest ?? null,
@@ -93,7 +54,7 @@ waPerformance.post('/', async (c) => {
     })
   }
 
-  // Auto-propagate: copy PB/SB/ranking to matching application
+  // Auto-propagate to application
   const finalPB = personalBest ?? existing?.[0]?.personalBest ?? null
   const finalSB = seasonBest ?? existing?.[0]?.seasonBest ?? null
   const finalRanking = worldRanking ?? existing?.[0]?.worldRanking ?? null
@@ -121,14 +82,11 @@ waPerformance.post('/', async (c) => {
 
     // Auto-recompute score if we have enough data
     if (finalPB != null && finalSB != null && finalRanking != null) {
-      // Recalculate estimated cost first (worldRanking may have changed tier)
       await recalculateAthleteEstimatedCost(db, athleteId)
 
-      // Get edition weights
       const editions = await db.select().from(schema.edition).limit(1)
       const edition = editions[0]
 
-      // Get event + catalog for minima and discipline
       const eventRows = await db
         .select({
           event: schema.event,
@@ -139,7 +97,6 @@ waPerformance.post('/', async (c) => {
         .where(eq(schema.event.id, eventId))
         .limit(1)
 
-      // Get fresh athlete data (cost may have been updated)
       const athleteRows = await db
         .select()
         .from(schema.athlete)
@@ -151,7 +108,6 @@ waPerformance.post('/', async (c) => {
         const catalog = eventRows[0].catalog
         const ath = athleteRows[0]
 
-        // Use agreement totalCost if negotiation has started, else use estTotal
         const latestAgreements = await db
           .select()
           .from(schema.agreement)
@@ -160,7 +116,6 @@ waPerformance.post('/', async (c) => {
           .limit(1)
         const effectiveCost = latestAgreements.length > 0 ? latestAgreements[0].totalCost : ath.estTotal
 
-        // Derive perfType from discipline
         const perfType: PerfType = catalog.discipline === 'Course' ? 'MIN' : 'MAX'
 
         const weights: EditionWeights = {
@@ -194,8 +149,76 @@ waPerformance.post('/', async (c) => {
       }
     }
   }
+}
 
-  return c.json({ id: resultId, updated: existing.length > 0 }, existing.length > 0 ? 200 : 201)
+// ── GET /wa-performance?athleteId=X — list performances for an athlete ───────
+
+waPerformance.get('/', async (c) => {
+  const db = c.get('db')
+  const athleteId = c.req.query('athleteId')
+
+  if (!athleteId) {
+    return c.json({ error: 'athleteId query parameter is required' }, 400)
+  }
+
+  const results = await db
+    .select({
+      performance: schema.waPerformance,
+      event: schema.event,
+      catalog: schema.eventCatalog,
+    })
+    .from(schema.waPerformance)
+    .innerJoin(schema.event, eq(schema.waPerformance.eventId, schema.event.id))
+    .innerJoin(schema.eventCatalog, eq(schema.event.catalogId, schema.eventCatalog.id))
+    .where(eq(schema.waPerformance.athleteId, athleteId))
+
+  return c.json(results.map(r => ({
+    ...r.performance,
+    event: {
+      id: r.event.id,
+      name: r.catalog.name,
+      discipline: r.catalog.discipline,
+      gender: r.catalog.gender,
+    },
+  })))
+})
+
+// ── POST /wa-performance — upsert PB/SB/ranking for athlete+event ────────────
+
+waPerformance.post('/', async (c) => {
+  const db = c.get('db')
+  const body = await c.req.json()
+
+  const parsed = waPerformanceSchema.safeParse(body)
+  if (!parsed.success) {
+    return c.json({ error: 'Invalid data', details: parsed.error.flatten() }, 400)
+  }
+
+  await upsertWaPerformance(db, {
+    athleteId: parsed.data.athleteId,
+    eventId: parsed.data.eventId,
+    personalBest: parsed.data.personalBest ?? null,
+    seasonBest: parsed.data.seasonBest ?? null,
+    worldRanking: parsed.data.worldRanking ?? null,
+  })
+  return c.json({ ok: true })
+})
+
+// ── POST /wa-performance/fetch/:athleteId — scrape WA profile + upsert ───────
+
+waPerformance.post('/fetch/:athleteId', async (c) => {
+  const db = c.get('db')
+  const { athleteId } = c.req.param()
+
+  try {
+    const result = await fetchAndUpsertWaData(db, athleteId, upsertWaPerformance)
+    return c.json(result)
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    if (message === 'Athlete not found') return c.json({ error: message }, 404)
+    if (message === 'No WA profile URL') return c.json({ error: message }, 400)
+    return c.json({ error: message }, 500)
+  }
 })
 
 export default waPerformance

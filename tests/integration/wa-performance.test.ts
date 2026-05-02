@@ -51,10 +51,9 @@ describe('WA Performance API', () => {
           worldRanking: 15,
         }),
       })
-      expect(res.status).toBe(201)
+      expect(res.status).toBe(200)
       const body = await res.json() as any
-      expect(body.id).toBeDefined()
-      expect(body.updated).toBe(false)
+      expect(body.ok).toBe(true)
     })
 
     it('updates existing record on same athlete+event', async () => {
@@ -70,7 +69,7 @@ describe('WA Performance API', () => {
       })
       expect(res.status).toBe(200)
       const body = await res.json() as any
-      expect(body.updated).toBe(true)
+      expect(body.ok).toBe(true)
     })
 
     it('rejects missing athleteId', async () => {
@@ -121,6 +120,26 @@ describe('WA Performance API', () => {
         headers: { Authorization: `Bearer ${collabToken}` },
       })
       expect(res.status).toBe(400)
+    })
+  })
+
+  describe('POST /api/v1/wa-performance/fetch/:athleteId', () => {
+    it('returns 400 for athlete without WA profile URL', async () => {
+      const res = await ctx.request(`/api/v1/wa-performance/fetch/${athleteId}`, {
+        method: 'POST',
+        headers: authHeaders(),
+      })
+      expect(res.status).toBe(400)
+      const body = await res.json() as any
+      expect(body.error).toBe('No WA profile URL')
+    })
+
+    it('returns 404 for non-existent athlete', async () => {
+      const res = await ctx.request('/api/v1/wa-performance/fetch/non-existent-id', {
+        method: 'POST',
+        headers: authHeaders(),
+      })
+      expect(res.status).toBe(404)
     })
   })
 

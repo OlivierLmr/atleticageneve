@@ -9,6 +9,8 @@ import { sendEmail, sendMagicLinkEmail, buildTransitionEmail } from '../services
 import type { EmailContent } from '../services/email'
 import { generateToken, magicLinkExpiresAt } from '../services/auth'
 import { recalculateAthleteEstimatedCost } from '../services/costEstimation'
+import { fetchAndUpsertWaData } from '../services/wa-scraper'
+import { upsertWaPerformance } from './wa-performance'
 import type { Env } from '../index'
 import type { NegotiationStatus } from '@shared/types'
 
@@ -90,6 +92,11 @@ athletes.post('/', zValidator('json', athleteRegistrationSchema), async (c) => {
 
   // Auto-calculate estimated costs
   await recalculateAthleteEstimatedCost(db, athleteId)
+
+  // Auto-fetch WA performance data if profile URL provided
+  if (data.waProfileUrl) {
+    fetchAndUpsertWaData(db, athleteId, upsertWaPerformance).catch(() => {})
+  }
 
   // If email provided, create a user record so the athlete can log in later
   let magicLinkSent = false
@@ -227,6 +234,11 @@ athletes.post('/batch', requireAuth('manager'), zValidator('json', batchAthleteR
     }
 
     await recalculateAthleteEstimatedCost(db, athleteId)
+
+    // Auto-fetch WA performance data if profile URL provided
+    if (data.waProfileUrl) {
+      fetchAndUpsertWaData(db, athleteId, upsertWaPerformance).catch(() => {})
+    }
 
     results.push({ athleteId, applicationIds, firstName: data.firstName, lastName: data.lastName, eventIds: validEventIds })
   }

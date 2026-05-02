@@ -181,4 +181,40 @@ app.put('/:id/cost-distance-configs', requireAuth('committee'), async (c) => {
   }))
 })
 
+// ── WA Discipline Mapping CRUD (committee only) ─────────────────────────────
+
+app.get('/wa-discipline-map', requireAuth('committee'), async (c) => {
+  const db = c.get('db')
+  const rows = await db.select().from(schema.waDisciplineMap)
+  return c.json(rows)
+})
+
+app.post('/wa-discipline-map', requireAuth('committee'), async (c) => {
+  const db = c.get('db')
+  const body = await c.req.json() as { waName?: string; waRankingSlug?: string; catalogName?: string }
+
+  if (!body.waName || !body.catalogName) {
+    return c.json({ error: 'waName and catalogName are required' }, 400)
+  }
+
+  const id = crypto.randomUUID()
+  await db.insert(schema.waDisciplineMap).values({
+    id,
+    waName: body.waName,
+    waRankingSlug: body.waRankingSlug ?? null,
+    catalogName: body.catalogName,
+  })
+
+  const rows = await db.select().from(schema.waDisciplineMap).where(eq(schema.waDisciplineMap.id, id))
+  return c.json(rows[0], 201)
+})
+
+app.delete('/wa-discipline-map/:id', requireAuth('committee'), async (c) => {
+  const db = c.get('db')
+  const { id } = c.req.param()
+
+  await db.delete(schema.waDisciplineMap).where(eq(schema.waDisciplineMap.id, id))
+  return c.json({ ok: true })
+})
+
 export default app
