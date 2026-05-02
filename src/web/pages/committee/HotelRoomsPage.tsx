@@ -77,7 +77,10 @@ export default function HotelRoomsPage() {
 
   const deleteHotelMutation = useMutation({
     mutationFn: (id: string) => api.delete(`/api/v1/hotels/${id}`),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['hotels', 'hotel-rooms'] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['hotels'] })
+      queryClient.invalidateQueries({ queryKey: ['hotel-rooms'] })
+    },
   })
 
   // ── Handlers ────────────────────────────────────────────────────────

@@ -17,13 +17,11 @@ export const PARTICIPATION_COLORS: Record<ParticipationStatus, string> = {
 
 export function formatPerf(value: number | null | undefined): string {
   if (value == null) return '—'
-  // Times (under 1000) are in seconds — format as mm:ss.cc or ss.cc
-  if (value < 100) return value.toFixed(2)
-  if (value < 1000) {
-    const min = Math.floor(value / 60)
-    const sec = (value % 60).toFixed(2).padStart(5, '0')
-    return min > 0 ? `${min}:${sec}` : sec
-  }
-  // Distances/heights in cm — format as m.cm
-  return (value / 100).toFixed(2)
+  // Distances/heights stored in cm (≥1000 means ≥10m) — format as m.cm
+  if (value >= 1000) return (value / 100).toFixed(2)
+  // Times in seconds — format as ss.cc or m:ss.cc
+  if (value < 60) return value.toFixed(2)
+  const min = Math.floor(value / 60)
+  const sec = (value % 60).toFixed(2).padStart(5, '0')
+  return `${min}:${sec}`
 }

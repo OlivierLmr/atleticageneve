@@ -192,7 +192,7 @@ export default function ManagerRegisterPage() {
                       )}
                     </td>
                     <td className="px-1 py-1"><input className={inputCls} value={row.waProfileUrl} onChange={e => updateRow(row.key, 'waProfileUrl', e.target.value)} placeholder="worldathletics.org/..." /></td>
-                    <td className="px-1 py-1">
+                    <td className="px-1 py-1 relative">
                       {!row.gender ? (
                         <span className="text-gray-400 text-xs">{t('athlete.gender')}...</span>
                       ) : (
