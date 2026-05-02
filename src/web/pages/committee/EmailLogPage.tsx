@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { Fragment, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useQuery } from '@tanstack/react-query'
 import { api } from '@web/lib/api'
@@ -42,9 +42,8 @@ export default function EmailLogPage() {
             </thead>
             <tbody>
               {emails.map((email) => (
-                <>
+                <Fragment key={email.id}>
                   <tr
-                    key={email.id}
                     className="border-b hover:bg-gray-50 cursor-pointer"
                     onClick={() => setExpandedId(expandedId === email.id ? null : email.id)}
                   >
@@ -62,7 +61,7 @@ export default function EmailLogPage() {
                       </td>
                     </tr>
                   )}
-                </>
+                </Fragment>
               ))}
             </tbody>
           </table>

@@ -1,4 +1,5 @@
 import { Hono } from 'hono'
+import { zValidator } from '@hono/zod-validator'
 import { eq } from 'drizzle-orm'
 import * as schema from '../db/schema'
 import { hotelSchema } from '@shared/validation'
@@ -23,33 +24,29 @@ hotels.get('/', async (c) => {
     .from(schema.hotel)
     .where(eq(schema.hotel.editionId, editions[0].id))
 
-  // Include hotel_room sub-items for each hotel
-  const results = []
-  for (const h of hotelRows) {
-    const rooms = await db
-      .select()
-      .from(schema.hotelRoom)
-      .where(eq(schema.hotelRoom.hotelId, h.id))
+  // Fetch all rooms in one query, then group by hotel
+  const allRooms = await db
+    .select()
+    .from(schema.hotelRoom)
 
-    results.push({
-      ...h,
-      rooms,
-    })
+  const roomsByHotel = new Map<string, typeof allRooms>()
+  for (const room of allRooms) {
+    const list = roomsByHotel.get(room.hotelId) ?? []
+    list.push(room)
+    roomsByHotel.set(room.hotelId, list)
   }
 
-  return c.json(results)
+  return c.json(hotelRows.map(h => ({
+    ...h,
+    rooms: roomsByHotel.get(h.id) ?? [],
+  })))
 })
 
 // ── POST /hotels — create hotel (committee only) ────────────────────────────
 
-hotels.post('/', requireAuth('committee'), async (c) => {
+hotels.post('/', requireAuth('committee'), zValidator('json', hotelSchema), async (c) => {
   const db = c.get('db')
-  const body = await c.req.json()
-
-  const parsed = hotelSchema.safeParse(body)
-  if (!parsed.success) {
-    return c.json({ error: 'Invalid data', details: parsed.error.flatten() }, 400)
-  }
+  const data = c.req.valid('json')
 
   // Get current edition
   const editions = await db.select().from(schema.edition).limit(1)
@@ -61,7 +58,7 @@ hotels.post('/', requireAuth('committee'), async (c) => {
   await db.insert(schema.hotel).values({
     id,
     editionId: editions[0].id,
-    name: parsed.data.name,
+    name: data.name,
   })
 
   return c.json({ id }, 201)
@@ -69,22 +66,17 @@ hotels.post('/', requireAuth('committee'), async (c) => {
 
 // ── PATCH /hotels/:id — update hotel (committee only) ───────────────────────
 
-hotels.patch('/:id', requireAuth('committee'), async (c) => {
+hotels.patch('/:id', requireAuth('committee'), zValidator('json', hotelSchema), async (c) => {
   const db = c.get('db')
   const id = c.req.param('id')!
-  const body = await c.req.json()
-
-  const parsed = hotelSchema.safeParse(body)
-  if (!parsed.success) {
-    return c.json({ error: 'Invalid data', details: parsed.error.flatten() }, 400)
-  }
+  const data = c.req.valid('json')
 
   const existing = await db.select().from(schema.hotel).where(eq(schema.hotel.id, id)).limit(1)
   if (existing.length === 0) {
     return c.json({ error: 'Hotel not found' }, 404)
   }
 
-  await db.update(schema.hotel).set({ name: parsed.data.name }).where(eq(schema.hotel.id, id))
+  await db.update(schema.hotel).set({ name: data.name }).where(eq(schema.hotel.id, id))
 
   return c.json({ id })
 })
@@ -104,7 +96,7 @@ hotels.delete('/:id', requireAuth('committee'), async (c) => {
   await db.delete(schema.hotelRoom).where(eq(schema.hotelRoom.hotelId, id))
   await db.delete(schema.hotel).where(eq(schema.hotel.id, id))
 
-  return c.json({ deleted: true })
+  return c.json({ success: true })
 })
 
 export default hotels

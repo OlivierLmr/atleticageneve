@@ -206,9 +206,9 @@ export default function DashboardPage() {
                     <div key={s.selectorId} className="flex items-center justify-between text-xs">
                       <span className="font-medium">{s.name}</span>
                       <div className="flex gap-2">
-                        <span className="text-yellow-600">{s.toReview} rev</span>
-                        <span className="text-blue-600">{s.inNegotiation} neg</span>
-                        <span className="text-green-600">{s.confirmed} conf</span>
+                        <span className="text-yellow-600">{s.toReview} {t('dashboard.revShort')}</span>
+                        <span className="text-blue-600">{s.inNegotiation} {t('dashboard.negShort')}</span>
+                        <span className="text-green-600">{s.confirmed} {t('dashboard.confShort')}</span>
                       </div>
                     </div>
                   ))}

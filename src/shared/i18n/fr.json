@@ -33,7 +33,10 @@
     "unknown": "Inconnu",
     "inProgress": "En cours",
     "pending": "En attente",
-    "done": "Terminé"
+    "done": "Terminé",
+    "cancelEdit": "Annuler",
+    "viewEmail": "Voir l'email",
+    "confirmDelete": "Êtes-vous sûr de vouloir supprimer cet élément ?"
   },
   "auth": {
     "login": "Se connecter",
@@ -326,7 +329,10 @@
     "hotelOccupancy": "Occupation hôtelière",
     "selectors": "Sélectionneurs",
     "costBreakdown": "Ventilation des coûts",
-    "applicationPipeline": "Pipeline des candidatures"
+    "applicationPipeline": "Pipeline des candidatures",
+    "revShort": "rév",
+    "negShort": "nég",
+    "confShort": "conf"
   },
   "night": {
     "tue": "Mar",

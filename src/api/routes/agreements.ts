@@ -1,10 +1,12 @@
 import { Hono } from 'hono'
+import { zValidator } from '@hono/zod-validator'
 import { eq, desc } from 'drizzle-orm'
 import * as schema from '../db/schema'
 import { agreementSchema } from '@shared/validation'
 import { requireAuth } from '../middleware/auth'
 import { sendEmail, buildTransitionEmail } from '../services/email'
 import { formatAgreementTerms } from '@shared/agreementFormatter'
+import { calculateTotalCost } from '../lib/helpers'
 import type { Env } from '../index'
 import type { NegotiationStatus, ParticipationStatus } from '@shared/types'
 
@@ -12,75 +14,13 @@ const agreements = new Hono<Env>()
 
 agreements.use('*', requireAuth('collaborator', 'committee'))
 
-// ── Helper: calculate total cost from agreement fields + hotel room + edition ─
-
-interface CostParams {
-  appearanceFee: number
-  otherCompensation: number
-  transport: number
-  transportAirportHotel: boolean
-  transportHotelStadium: boolean
-  hotelNightTue: boolean
-  hotelNightWed: boolean
-  hotelNightThu: boolean
-  hotelNightFri: boolean
-  hotelNightSat: boolean
-  hotelNightSun: boolean
-  dinnerTue: boolean
-  dinnerWed: boolean
-  dinnerThu: boolean
-  dinnerFri: boolean
-  dinnerSat: boolean
-  dinnerSun: boolean
-  stadiumMeals: boolean
-}
-
-interface RoomCosts {
-  costPerNight: number
-  dinnerCost: number
-}
-
-interface EditionCosts {
-  stadiumMealCost: number
-  transportAirportHotelCost: number
-  transportHotelStadiumCost: number
-}
-
-export function calculateTotalCost(data: CostParams, roomCosts: RoomCosts, editionCosts: EditionCosts): number {
-  const nights = [
-    data.hotelNightTue, data.hotelNightWed, data.hotelNightThu,
-    data.hotelNightFri, data.hotelNightSat, data.hotelNightSun,
-  ].filter(Boolean).length
-
-  const dinners = [
-    data.dinnerTue, data.dinnerWed, data.dinnerThu,
-    data.dinnerFri, data.dinnerSat, data.dinnerSun,
-  ].filter(Boolean).length
-
-  let total = data.appearanceFee + data.otherCompensation + data.transport
-  total += nights * roomCosts.costPerNight
-  total += dinners * roomCosts.dinnerCost
-  if (data.stadiumMeals) total += editionCosts.stadiumMealCost
-  if (data.transportAirportHotel) total += editionCosts.transportAirportHotelCost
-  if (data.transportHotelStadium) total += editionCosts.transportHotelStadiumCost
-
-  return total
-}
-
 // ── POST /athletes/:athleteId/agreements — create a new agreement offer ───────
 
-agreements.post('/:athleteId/agreements', async (c) => {
+agreements.post('/:athleteId/agreements', zValidator('json', agreementSchema), async (c) => {
   const db = c.get('db')
   const user = c.get('user')!
   const athleteId = c.req.param('athleteId')
-
-  // Parse body
-  const body = await c.req.json()
-  const parsed = agreementSchema.safeParse(body)
-  if (!parsed.success) {
-    return c.json({ error: 'Invalid agreement data', details: parsed.error.flatten() }, 400)
-  }
-  const data = parsed.data
+  const data = c.req.valid('json')
 
   // Verify athlete exists
   const athRows = await db.select().from(schema.athlete).where(eq(schema.athlete.id, athleteId)).limit(1)
@@ -135,7 +75,7 @@ agreements.post('/:athleteId/agreements', async (c) => {
   const edition = editions[0]
 
   // Get hotel room costs and hotel name if specified
-  let roomCosts: RoomCosts = { costPerNight: 0, dinnerCost: 0 }
+  let roomCosts = { costPerNight: 0, dinnerCost: 0 }
   let hotelName: string | null = null
   let hotelRoomType: string | null = null
   if (data.hotelRoomId) {
@@ -155,7 +95,7 @@ agreements.post('/:athleteId/agreements', async (c) => {
     }
   }
 
-  const editionCosts: EditionCosts = {
+  const editionCosts = {
     stadiumMealCost: edition.stadiumMealCost,
     transportAirportHotelCost: edition.transportAirportHotelCost,
     transportHotelStadiumCost: edition.transportHotelStadiumCost,

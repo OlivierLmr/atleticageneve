@@ -4,7 +4,7 @@ import en from '@shared/i18n/en.json'
 import fr from '@shared/i18n/fr.json'
 
 const savedLang = typeof window !== 'undefined'
-  ? localStorage.getItem('lang') ?? navigator.language.startsWith('fr') ? 'fr' : 'en'
+  ? (localStorage.getItem('lang') ?? (navigator.language.startsWith('fr') ? 'fr' : 'en'))
   : 'en'
 
 i18n

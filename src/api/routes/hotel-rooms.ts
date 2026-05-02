@@ -1,8 +1,9 @@
 import { Hono } from 'hono'
+import { zValidator } from '@hono/zod-validator'
 import { eq } from 'drizzle-orm'
 import * as schema from '../db/schema'
 import { requireAuth } from '../middleware/auth'
-import { hotelRoomSchema } from '@shared/validation'
+import { hotelRoomSchema, hotelRoomUpdateSchema } from '@shared/validation'
 import type { Env } from '../index'
 
 const app = new Hono<Env>()
@@ -26,15 +27,11 @@ app.get('/', requireAuth('committee', 'collaborator'), async (c) => {
 })
 
 // POST /hotel-rooms — committee only
-app.post('/', requireAuth('committee'), async (c) => {
+app.post('/', requireAuth('committee'), zValidator('json', hotelRoomSchema), async (c) => {
   const db = c.get('db')
-  const body = await c.req.json()
-  const parsed = hotelRoomSchema.safeParse(body)
-  if (!parsed.success) {
-    return c.json({ error: 'Validation failed', details: parsed.error.flatten() }, 400)
-  }
+  const data = c.req.valid('json')
 
-  const hotels = await db.select().from(schema.hotel).where(eq(schema.hotel.id, parsed.data.hotelId)).limit(1)
+  const hotels = await db.select().from(schema.hotel).where(eq(schema.hotel.id, data.hotelId)).limit(1)
   if (hotels.length === 0) {
     return c.json({ error: 'Hotel not found' }, 404)
   }
@@ -42,11 +39,11 @@ app.post('/', requireAuth('committee'), async (c) => {
   const id = crypto.randomUUID()
   await db.insert(schema.hotelRoom).values({
     id,
-    hotelId: parsed.data.hotelId,
-    roomType: parsed.data.roomType,
-    costPerNight: parsed.data.costPerNight,
-    dinnerCost: parsed.data.dinnerCost,
-    reservedRooms: parsed.data.reservedRooms,
+    hotelId: data.hotelId,
+    roomType: data.roomType,
+    costPerNight: data.costPerNight,
+    dinnerCost: data.dinnerCost,
+    reservedRooms: data.reservedRooms,
   })
 
   const created = await db.select().from(schema.hotelRoom).where(eq(schema.hotelRoom.id, id)).limit(1)
@@ -54,27 +51,21 @@ app.post('/', requireAuth('committee'), async (c) => {
 })
 
 // PATCH /hotel-rooms/:id — committee only
-app.patch('/:id', requireAuth('committee'), async (c) => {
+app.patch('/:id', requireAuth('committee'), zValidator('json', hotelRoomUpdateSchema), async (c) => {
   const db = c.get('db')
   const { id } = c.req.param()
+  const data = c.req.valid('json')
 
   const existing = await db.select().from(schema.hotelRoom).where(eq(schema.hotelRoom.id, id)).limit(1)
   if (existing.length === 0) {
     return c.json({ error: 'Hotel room not found' }, 404)
   }
 
-  const body = await c.req.json()
-  const updates: Record<string, unknown> = {}
-  if (body.roomType !== undefined) updates.roomType = body.roomType
-  if (body.costPerNight !== undefined) updates.costPerNight = body.costPerNight
-  if (body.dinnerCost !== undefined) updates.dinnerCost = body.dinnerCost
-  if (body.reservedRooms !== undefined) updates.reservedRooms = body.reservedRooms
-
-  if (Object.keys(updates).length === 0) {
+  if (Object.keys(data).length === 0) {
     return c.json({ error: 'No fields to update' }, 400)
   }
 
-  await db.update(schema.hotelRoom).set(updates).where(eq(schema.hotelRoom.id, id))
+  await db.update(schema.hotelRoom).set(data).where(eq(schema.hotelRoom.id, id))
   const updated = await db.select().from(schema.hotelRoom).where(eq(schema.hotelRoom.id, id)).limit(1)
   return c.json(updated[0])
 })

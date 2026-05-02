@@ -1,4 +1,5 @@
 import { Hono } from 'hono'
+import { zValidator } from '@hono/zod-validator'
 import { eq, and, desc } from 'drizzle-orm'
 import * as schema from '../db/schema'
 import { waPerformanceSchema } from '@shared/validation'
@@ -6,11 +7,9 @@ import { computeScore } from '@shared/scoring'
 import { requireAuth } from '../middleware/auth'
 import { recalculateAthleteEstimatedCost } from '../services/costEstimation'
 import { fetchAndUpsertWaData } from '../services/wa-scraper'
+import { perfType, editionWeights } from '../lib/helpers'
+import type { Db } from '../lib/helpers'
 import type { Env } from '../index'
-import type { DrizzleD1Database } from 'drizzle-orm/d1'
-import type { PerfType, EditionWeights } from '@shared/types'
-
-type Db = DrizzleD1Database<typeof schema>
 
 const waPerformance = new Hono<Env>()
 
@@ -116,16 +115,6 @@ export async function upsertWaPerformance(
           .limit(1)
         const effectiveCost = latestAgreements.length > 0 ? latestAgreements[0].totalCost : ath.estTotal
 
-        const perfType: PerfType = catalog.discipline === 'Course' ? 'MIN' : 'MAX'
-
-        const weights: EditionWeights = {
-          weightPB: edition.weightPB,
-          weightSB: edition.weightSB,
-          weightRanking: edition.weightRanking,
-          weightCost: edition.weightCost,
-          bonusEap: edition.bonusEap,
-        }
-
         const scoreResult = computeScore({
           personalBest: finalPB,
           seasonBest: finalSB,
@@ -133,11 +122,11 @@ export async function upsertWaPerformance(
           estimatedCostTotal: effectiveCost,
           isEap: ath.isEap,
           isSwiss: ath.isSwiss,
-          perfType,
+          perfType: perfType(catalog.discipline),
           intMinima: evt.intMinima,
           swissMinima: evt.swissMinima,
           eapMinima: evt.eapMinima,
-        }, weights)
+        }, editionWeights(edition))
 
         await db
           .update(schema.application)
@@ -185,23 +174,18 @@ waPerformance.get('/', async (c) => {
 
 // ── POST /wa-performance — upsert PB/SB/ranking for athlete+event ────────────
 
-waPerformance.post('/', async (c) => {
+waPerformance.post('/', zValidator('json', waPerformanceSchema), async (c) => {
   const db = c.get('db')
-  const body = await c.req.json()
-
-  const parsed = waPerformanceSchema.safeParse(body)
-  if (!parsed.success) {
-    return c.json({ error: 'Invalid data', details: parsed.error.flatten() }, 400)
-  }
+  const data = c.req.valid('json')
 
   await upsertWaPerformance(db, {
-    athleteId: parsed.data.athleteId,
-    eventId: parsed.data.eventId,
-    personalBest: parsed.data.personalBest ?? null,
-    seasonBest: parsed.data.seasonBest ?? null,
-    worldRanking: parsed.data.worldRanking ?? null,
+    athleteId: data.athleteId,
+    eventId: data.eventId,
+    personalBest: data.personalBest ?? null,
+    seasonBest: data.seasonBest ?? null,
+    worldRanking: data.worldRanking ?? null,
   })
-  return c.json({ ok: true })
+  return c.json({ success: true })
 })
 
 // ── POST /wa-performance/fetch/:athleteId — scrape WA profile + upsert ───────

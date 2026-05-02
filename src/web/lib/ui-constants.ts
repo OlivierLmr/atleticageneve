@@ -15,15 +15,19 @@ export const PARTICIPATION_COLORS: Record<ParticipationStatus, string> = {
   not_selected: 'bg-red-100 text-red-800',
 }
 
+export const inputCls =
+  'w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-gray-900'
+
+export const labelCls =
+  'block text-xs font-medium text-gray-500 mb-1'
+
 export function formatPerf(value: number | null | undefined): string {
   if (value == null) return '—'
-  // Times (under 1000) are in seconds — format as mm:ss.cc or ss.cc
-  if (value < 100) return value.toFixed(2)
-  if (value < 1000) {
-    const min = Math.floor(value / 60)
-    const sec = (value % 60).toFixed(2).padStart(5, '0')
-    return min > 0 ? `${min}:${sec}` : sec
-  }
-  // Distances/heights in cm — format as m.cm
-  return (value / 100).toFixed(2)
+  // Distances/heights stored in cm (≥1000 means ≥10m) — format as m.cm
+  if (value >= 1000) return (value / 100).toFixed(2)
+  // Times in seconds — format as ss.cc or m:ss.cc
+  if (value < 60) return value.toFixed(2)
+  const min = Math.floor(value / 60)
+  const sec = (value % 60).toFixed(2).padStart(5, '0')
+  return `${min}:${sec}`
 }

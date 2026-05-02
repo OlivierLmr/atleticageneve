@@ -456,7 +456,7 @@ function WaDisciplineMapSection() {
                   <td className="px-2 py-1.5">
                     <button
                       type="button"
-                      onClick={() => deleteMutation.mutate(m.id)}
+                      onClick={() => { if (confirm(t('common.confirmDelete'))) deleteMutation.mutate(m.id) }}
                       disabled={deleteMutation.isPending}
                       className="text-xs text-red-600 hover:text-red-800"
                     >

@@ -1,10 +1,12 @@
 import { Hono } from 'hono'
+import { zValidator } from '@hono/zod-validator'
 import { eq, and, sql, isNull, desc, inArray } from 'drizzle-orm'
 import * as schema from '../db/schema'
-import { participationStatusChangeSchema } from '@shared/validation'
+import { participationStatusChangeSchema, interactionSchema } from '@shared/validation'
 import { PARTICIPATION_TRANSITIONS } from '@shared/constants'
 import { computeScore } from '@shared/scoring'
 import { requireAuth } from '../middleware/auth'
+import { perfType, editionWeights } from '../lib/helpers'
 import type { Env } from '../index'
 import type { ParticipationStatus } from '@shared/types'
 
@@ -187,17 +189,11 @@ applications.get('/:id', async (c) => {
 
 // ── PATCH /applications/:id/participation-status — change participationStatus ─
 
-applications.patch('/:id/participation-status', async (c) => {
+applications.patch('/:id/participation-status', zValidator('json', participationStatusChangeSchema), async (c) => {
   const db = c.get('db')
   const user = c.get('user')!
   const id = c.req.param('id')
-
-  const body = await c.req.json()
-  const parsed = participationStatusChangeSchema.safeParse(body)
-  if (!parsed.success) {
-    return c.json({ error: 'Invalid participation status', details: parsed.error.flatten() }, 400)
-  }
-  const newStatus = parsed.data.participationStatus as ParticipationStatus
+  const newStatus = c.req.valid('json').participationStatus as ParticipationStatus
 
   // Get application
   const apps = await db
@@ -302,13 +298,7 @@ applications.post('/:id/score', async (c) => {
   // Get edition for weights
   const editions = await db.select().from(schema.edition).limit(1)
   const edition = editions[0]
-  const weights = edition ? {
-    weightPB: edition.weightPB,
-    weightSB: edition.weightSB,
-    weightRanking: edition.weightRanking,
-    weightCost: edition.weightCost,
-    bonusEap: edition.bonusEap,
-  } : undefined
+  const weights = edition ? editionWeights(edition) : undefined
 
   // Use agreement totalCost if negotiation has started, else use estTotal
   const latestAgreements = await db
@@ -319,9 +309,6 @@ applications.post('/:id/score', async (c) => {
     .limit(1)
   const effectiveCost = latestAgreements.length > 0 ? latestAgreements[0].totalCost : (ath.estTotal ?? 0)
 
-  // Determine perfType from catalog discipline
-  const perfType = catalog.discipline === 'Course' ? 'MIN' as const : 'MAX' as const
-
   const scoreResult = computeScore({
     personalBest: waPerf.personalBest ?? 0,
     seasonBest: waPerf.seasonBest ?? 0,
@@ -329,7 +316,7 @@ applications.post('/:id/score', async (c) => {
     estimatedCostTotal: effectiveCost,
     isEap: ath.isEap,
     isSwiss: ath.isSwiss,
-    perfType,
+    perfType: perfType(catalog.discipline),
     intMinima: evt.intMinima,
     swissMinima: evt.swissMinima,
     eapMinima: evt.eapMinima,
@@ -353,23 +340,11 @@ applications.post('/:id/score', async (c) => {
 
 // ── POST /applications/:id/interactions — add an interaction ─────────────────
 
-applications.post('/:id/interactions', async (c) => {
+applications.post('/:id/interactions', zValidator('json', interactionSchema), async (c) => {
   const db = c.get('db')
   const user = c.get('user')!
   const id = c.req.param('id')
-  const body = await c.req.json()
-
-  const type = body.type
-  const content = body.content
-
-  if (!type || !content) {
-    return c.json({ error: 'type and content are required' }, 400)
-  }
-
-  const validTypes = ['email', 'call', 'note']
-  if (!validTypes.includes(type)) {
-    return c.json({ error: `type must be one of: ${validTypes.join(', ')}` }, 400)
-  }
+  const { type, content } = c.req.valid('json')
 
   // Verify application exists and get athleteId
   const apps = await db

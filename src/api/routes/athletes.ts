@@ -2,7 +2,7 @@ import { Hono } from 'hono'
 import { zValidator } from '@hono/zod-validator'
 import { and, eq, sql } from 'drizzle-orm'
 import * as schema from '../db/schema'
-import { athleteRegistrationSchema, batchAthleteRegistrationSchema, athleteUpdateSchema, negotiationStatusChangeSchema } from '@shared/validation'
+import { athleteRegistrationSchema, batchAthleteRegistrationSchema, athleteUpdateSchema, negotiationStatusChangeSchema, interactionSchema } from '@shared/validation'
 import { NEGOTIATION_TRANSITIONS, COMMITTEE_EXTRA_TRANSITIONS, ATHLETE_TRANSITIONS } from '@shared/constants'
 import { requireAuth } from '../middleware/auth'
 import { sendEmail, sendMagicLinkEmail, buildTransitionEmail } from '../services/email'
@@ -11,6 +11,7 @@ import { generateToken, magicLinkExpiresAt } from '../services/auth'
 import { recalculateAthleteEstimatedCost } from '../services/costEstimation'
 import { fetchAndUpsertWaData } from '../services/wa-scraper'
 import { upsertWaPerformance } from './wa-performance'
+import { isStaff } from '../lib/helpers'
 import type { Env } from '../index'
 import type { NegotiationStatus } from '@shared/types'
 
@@ -58,8 +59,8 @@ athletes.post('/', zValidator('json', athleteRegistrationSchema), async (c) => {
     athleteEmail: data.athleteEmail,
     athletePhone: data.athletePhone ?? null,
     eapCity: data.eapCity ?? null,
-    iRunClean: data.iRunClean ? 'yes' : 'unknown',
-    dopingFree: data.dopingFree ? 'yes' : 'unknown',
+    iRunClean: data.iRunClean,
+    dopingFree: data.dopingFree,
     participantNotes: data.participantNotes ?? null,
     additionalNotes: data.additionalNotes ?? null,
     negotiationStatus: 'to_review',
@@ -268,8 +269,8 @@ athletes.get('/:id', requireAuth('athlete', 'manager', 'collaborator', 'committe
   const ath = athRows[0]
 
   // Ownership check for athlete/manager roles
-  const isStaff = ['collaborator', 'committee'].includes(user.role)
-  if (!isStaff) {
+  const staff = isStaff(user.role)
+  if (!staff) {
     const isOwner = ath.userId === user.id
     const isManager = ath.managerId === user.id
     if (!isOwner && !isManager) {
@@ -332,7 +333,7 @@ athletes.get('/:id', requireAuth('athlete', 'manager', 'collaborator', 'committe
   }))
 
   // Strip totalCost from agreements for athlete/manager view
-  const agreements = isStaff
+  const agreements = staff
     ? rawAgreements
     : rawAgreements.map(a => ({ ...a, totalCost: undefined }))
 
@@ -351,7 +352,7 @@ athletes.get('/:id', requireAuth('athlete', 'manager', 'collaborator', 'committe
     ...ath,
     managerName,
     // Hide cost estimates from athlete/manager
-    ...(isStaff ? {} : { estTravel: undefined, estAccommodation: undefined, estAppearance: undefined, estTotal: undefined }),
+    ...(staff ? {} : { estTravel: undefined, estAccommodation: undefined, estAppearance: undefined, estTotal: undefined }),
     applications,
     agreements,
     interactions,
@@ -387,8 +388,8 @@ athletes.patch('/:id', requireAuth('athlete', 'manager', 'collaborator', 'commit
   // Access control: owner, their manager, or collaborator/committee
   const isOwner = ath.userId === user.id
   const isManager = ath.managerId === user.id
-  const isStaff = ['collaborator', 'committee'].includes(user.role)
-  if (!isOwner && !isManager && !isStaff) {
+  const staff = isStaff(user.role)
+  if (!isOwner && !isManager && !staff) {
     return c.json({ error: 'Not authorized to update this athlete' }, 403)
   }
 
@@ -409,17 +410,11 @@ athletes.patch('/:id', requireAuth('athlete', 'manager', 'collaborator', 'commit
 
 // ── PATCH /athletes/:id/negotiation-status — change negotiation status ───────
 
-athletes.patch('/:id/negotiation-status', requireAuth('athlete', 'manager', 'collaborator', 'committee'), async (c) => {
+athletes.patch('/:id/negotiation-status', requireAuth('athlete', 'manager', 'collaborator', 'committee'), zValidator('json', negotiationStatusChangeSchema), async (c) => {
   const db = c.get('db')
   const user = c.get('user')!
   const id = c.req.param('id')!
-
-  const body = await c.req.json()
-  const parsed = negotiationStatusChangeSchema.safeParse(body)
-  if (!parsed.success) {
-    return c.json({ error: 'Invalid status', details: parsed.error.flatten() }, 400)
-  }
-  const newStatus = parsed.data.status as NegotiationStatus
+  const newStatus = c.req.valid('json').status as NegotiationStatus
 
   // Get athlete
   const athRows = await db.select().from(schema.athlete).where(eq(schema.athlete.id, id)).limit(1)
@@ -429,10 +424,10 @@ athletes.patch('/:id/negotiation-status', requireAuth('athlete', 'manager', 'col
   const ath = athRows[0]
   const currentStatus = ath.negotiationStatus as NegotiationStatus
 
-  const isStaff = ['collaborator', 'committee'].includes(user.role)
+  const staff = isStaff(user.role)
 
   // Ownership check for athlete/manager
-  if (!isStaff) {
+  if (!staff) {
     if (ath.userId !== user.id && ath.managerId !== user.id) {
       return c.json({ error: 'Not authorized to act on this athlete' }, 403)
     }
@@ -440,7 +435,7 @@ athletes.patch('/:id/negotiation-status', requireAuth('athlete', 'manager', 'col
 
   // Validate transition based on role
   let allowed: NegotiationStatus[]
-  if (isStaff) {
+  if (staff) {
     const baseAllowed = NEGOTIATION_TRANSITIONS[currentStatus] ?? []
     const extraAllowed = user.role === 'committee' ? (COMMITTEE_EXTRA_TRANSITIONS[currentStatus] ?? []) : []
     allowed = [...baseAllowed, ...extraAllowed]
@@ -513,7 +508,7 @@ athletes.patch('/:id/negotiation-status', requireAuth('athlete', 'manager', 'col
   let emailLogId: string | null = null
 
   // Staff-initiated transitions: email goes to athlete/manager
-  if (isStaff && transitionEmail) {
+  if (staff && transitionEmail) {
     const emailTo = ath.athleteEmail ?? managerEmail
     if (emailTo) {
       emailLogId = await sendEmail({
@@ -527,7 +522,7 @@ athletes.patch('/:id/negotiation-status', requireAuth('athlete', 'manager', 'col
   }
 
   // Athlete/manager-initiated transitions: notify edition notification email
-  if (!isStaff && edition?.notificationEmail && transitionEmail) {
+  if (!staff && edition?.notificationEmail && transitionEmail) {
     emailLogId = await sendEmail({
       db,
       to: edition.notificationEmail,
@@ -596,24 +591,11 @@ athletes.post('/:id/restore', requireAuth('committee'), async (c) => {
 
 // ── POST /athletes/:id/interactions — add interaction at athlete level ────────
 
-athletes.post('/:id/interactions', requireAuth('athlete', 'manager', 'collaborator', 'committee'), async (c) => {
+athletes.post('/:id/interactions', requireAuth('athlete', 'manager', 'collaborator', 'committee'), zValidator('json', interactionSchema), async (c) => {
   const db = c.get('db')
   const user = c.get('user')!
   const id = c.req.param('id')!
-  const body = await c.req.json()
-
-  const type = body.type
-  const content = body.content
-  const applicationId = body.applicationId ?? null
-
-  if (!type || !content) {
-    return c.json({ error: 'type and content are required' }, 400)
-  }
-
-  const validTypes: string[] = ['email', 'call', 'note', 'counter_offer', 'status_change', 'agreement']
-  if (!validTypes.includes(type)) {
-    return c.json({ error: `type must be one of: ${validTypes.join(', ')}` }, 400)
-  }
+  const { type, content, applicationId } = c.req.valid('json')
 
   // Verify athlete exists
   const athRows = await db.select().from(schema.athlete).where(eq(schema.athlete.id, id)).limit(1)
@@ -623,8 +605,8 @@ athletes.post('/:id/interactions', requireAuth('athlete', 'manager', 'collaborat
   const ath = athRows[0]
 
   // Ownership check for athlete/manager
-  const isStaff = ['collaborator', 'committee'].includes(user.role)
-  if (!isStaff) {
+  const staff = isStaff(user.role)
+  if (!staff) {
     if (ath.userId !== user.id && ath.managerId !== user.id) {
       return c.json({ error: 'Not authorized' }, 403)
     }

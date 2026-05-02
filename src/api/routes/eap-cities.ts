@@ -1,4 +1,5 @@
 import { Hono } from 'hono'
+import { zValidator } from '@hono/zod-validator'
 import { eq } from 'drizzle-orm'
 import * as schema from '../db/schema'
 import { requireAuth } from '../middleware/auth'
@@ -15,19 +16,15 @@ app.get('/', async (c) => {
 })
 
 // POST /eap-cities — committee only
-app.post('/', requireAuth('committee'), async (c) => {
+app.post('/', requireAuth('committee'), zValidator('json', eapCitySchema), async (c) => {
   const db = c.get('db')
-  const body = await c.req.json()
-  const parsed = eapCitySchema.safeParse(body)
-  if (!parsed.success) {
-    return c.json({ error: 'Validation failed', details: parsed.error.flatten() }, 400)
-  }
+  const data = c.req.valid('json')
 
   const id = crypto.randomUUID()
   await db.insert(schema.eapCity).values({
     id,
-    name: parsed.data.name,
-    countryCode: parsed.data.countryCode,
+    name: data.name,
+    countryCode: data.countryCode,
   })
 
   const created = await db.select().from(schema.eapCity).where(eq(schema.eapCity.id, id)).limit(1)
@@ -35,21 +32,17 @@ app.post('/', requireAuth('committee'), async (c) => {
 })
 
 // PATCH /eap-cities/:id — committee only
-app.patch('/:id', requireAuth('committee'), async (c) => {
+app.patch('/:id', requireAuth('committee'), zValidator('json', eapCitySchema.partial()), async (c) => {
   const db = c.get('db')
   const { id } = c.req.param()
-  const body = await c.req.json()
-  const parsed = eapCitySchema.partial().safeParse(body)
-  if (!parsed.success) {
-    return c.json({ error: 'Validation failed', details: parsed.error.flatten() }, 400)
-  }
+  const data = c.req.valid('json')
 
   const existing = await db.select().from(schema.eapCity).where(eq(schema.eapCity.id, id)).limit(1)
   if (existing.length === 0) {
     return c.json({ error: 'EAP city not found' }, 404)
   }
 
-  await db.update(schema.eapCity).set(parsed.data).where(eq(schema.eapCity.id, id))
+  await db.update(schema.eapCity).set(data).where(eq(schema.eapCity.id, id))
   const updated = await db.select().from(schema.eapCity).where(eq(schema.eapCity.id, id)).limit(1)
   return c.json(updated[0])
 })

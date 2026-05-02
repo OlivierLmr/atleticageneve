@@ -53,7 +53,7 @@ describe('WA Performance API', () => {
       })
       expect(res.status).toBe(200)
       const body = await res.json() as any
-      expect(body.ok).toBe(true)
+      expect(body.success).toBe(true)
     })
 
     it('updates existing record on same athlete+event', async () => {
@@ -69,7 +69,7 @@ describe('WA Performance API', () => {
       })
       expect(res.status).toBe(200)
       const body = await res.json() as any
-      expect(body.ok).toBe(true)
+      expect(body.success).toBe(true)
     })
 
     it('rejects missing athleteId', async () => {

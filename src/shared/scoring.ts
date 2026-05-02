@@ -1,6 +1,6 @@
 import type { PerfType, Recommendation, ScoreBreakdown, EditionWeights } from './types'
 
-export interface ScoringInput {
+interface ScoringInput {
   personalBest: number
   seasonBest: number
   worldRanking: number
@@ -21,7 +21,7 @@ function perfScore(perf: number, perfType: PerfType, minima: number): number {
   }
 }
 
-export const DEFAULT_WEIGHTS: EditionWeights = {
+const DEFAULT_WEIGHTS: EditionWeights = {
   weightPB: 25, weightSB: 35, weightRanking: 30, weightCost: 10, bonusEap: 5,
 }
 

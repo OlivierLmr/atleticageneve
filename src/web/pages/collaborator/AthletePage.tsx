@@ -7,7 +7,7 @@ import { api } from '@web/lib/api'
 import { useAuth } from '@web/lib/auth'
 import { LanguageSwitcher } from '@web/App'
 import { NEGOTIATION_TRANSITIONS, COMMITTEE_EXTRA_TRANSITIONS, ATHLETE_TRANSITIONS, NIGHT_LABELS, DINNER_LABELS } from '@shared/constants'
-import { STATUS_COLORS, formatPerf } from '@web/lib/ui-constants'
+import { STATUS_COLORS, formatPerf, inputCls, labelCls } from '@web/lib/ui-constants'
 import { computeScore } from '@shared/scoring'
 import type {
   NegotiationStatus,
@@ -126,6 +126,7 @@ function CollapsibleSection({ title, isOpen, onToggle, canEdit, isEditing, onTog
   canEdit?: boolean; isEditing?: boolean; onToggleEdit?: () => void
   children: React.ReactNode
 }) {
+  const { t } = useTranslation()
   return (
     <div className="bg-white rounded-lg border">
       <button onClick={onToggle} className="w-full flex items-center justify-between p-3 text-sm font-semibold hover:bg-gray-50">
@@ -135,7 +136,7 @@ function CollapsibleSection({ title, isOpen, onToggle, canEdit, isEditing, onTog
             <span
               onClick={e => { e.stopPropagation(); onToggleEdit?.() }}
               className={`text-xs cursor-pointer px-1.5 py-0.5 rounded ${isEditing ? 'text-blue-600 bg-blue-50' : 'text-gray-400 hover:text-gray-600'}`}
-              title={isEditing ? 'Cancel edit' : 'Edit'}
+              title={isEditing ? t('common.cancelEdit') : t('common.edit')}
             >
               ✎
             </span>
@@ -196,8 +197,6 @@ function AthleteFieldEditor({ athlete, fields, onSave, isPending, error, t }: {
     }
     return init
   })
-
-  const inputCls = 'w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-gray-900'
 
   return (
     <div className="space-y-2">
@@ -318,6 +317,7 @@ function CounterOfferCard({ interaction }: { interaction: Interaction }) {
 }
 
 function InteractionCard({ interaction, onViewEmail }: { interaction: Interaction; onViewEmail?: (emailLogId: string) => void }) {
+  const { t } = useTranslation()
   const typeIcons: Record<string, string> = {
     status_change: '●',
     agreement: '■',
@@ -350,7 +350,7 @@ function InteractionCard({ interaction, onViewEmail }: { interaction: Interactio
       <div className="flex-1 min-w-0">
         <p className="text-xs text-gray-900">
           {interaction.content}
-          {hasEmail && <span className="ml-1 text-indigo-500" title="View email">✉</span>}
+          {hasEmail && <span className="ml-1 text-indigo-500" title={t('common.viewEmail')}>✉</span>}
         </p>
         <p className="text-[10px] text-gray-400 mt-0.5">
           {interaction.authorName} — {new Date(interaction.createdAt).toLocaleString()}
@@ -513,8 +513,6 @@ function BannerEventRow({ app, athlete, edition, isStaff, onParticipationChange,
     selected: 'bg-green-100 text-green-800',
     not_selected: 'bg-red-100 text-red-800',
   }
-
-  const inputCls = 'w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-gray-900'
 
   return (
     <div className="flex items-center gap-3 py-1.5 border-b border-gray-100 last:border-0">
@@ -873,9 +871,6 @@ export default function AthletePage() {
     && athlete.applications.every(a => a.participationStatus !== 'pending')
   const hasAtLeastOneSelected = athlete.applications.some(a => a.participationStatus === 'selected')
   const canSendAgreement = allDecided && hasAtLeastOneSelected
-
-  const inputCls = 'w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-gray-900'
-  const labelCls = 'block text-xs font-medium text-gray-500 mb-1'
 
   const toggleSection = (name: string) => setOpenSection(openSection === name ? null : name)
 

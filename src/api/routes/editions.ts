@@ -1,8 +1,9 @@
 import { Hono } from 'hono'
+import { zValidator } from '@hono/zod-validator'
 import { eq } from 'drizzle-orm'
 import * as schema from '../db/schema'
 import { requireAuth } from '../middleware/auth'
-import { editionConfigSchema, costTierConfigsSchema, costDistanceConfigsSchema } from '@shared/validation'
+import { editionConfigSchema, costTierConfigsSchema, costDistanceConfigsSchema, waDisciplineMapSchema } from '@shared/validation'
 import { recalculateAllAthletesForEdition } from '../services/costEstimation'
 import type { Env } from '../index'
 
@@ -19,22 +20,16 @@ app.get('/current', async (c) => {
 })
 
 // PATCH /editions/:id — committee only
-app.patch('/:id', requireAuth('committee'), async (c) => {
+app.patch('/:id', requireAuth('committee'), zValidator('json', editionConfigSchema), async (c) => {
   const db = c.get('db')
   const { id } = c.req.param()
-
-  const body = await c.req.json()
-  const parsed = editionConfigSchema.safeParse(body)
-  if (!parsed.success) {
-    return c.json({ error: 'Validation failed', details: parsed.error.flatten() }, 400)
-  }
 
   const editions = await db.select().from(schema.edition).where(eq(schema.edition.id, id)).limit(1)
   if (editions.length === 0) {
     return c.json({ error: 'Edition not found' }, 404)
   }
 
-  const data = parsed.data
+  const data = c.req.valid('json')
   const updates: Record<string, unknown> = {}
 
   if (data.name !== undefined) updates.name = data.name
@@ -92,7 +87,7 @@ app.get('/:id/cost-configs', requireAuth('committee'), async (c) => {
 })
 
 // PUT /editions/:id/cost-tier-configs — replace all tier configs (committee only)
-app.put('/:id/cost-tier-configs', requireAuth('committee'), async (c) => {
+app.put('/:id/cost-tier-configs', requireAuth('committee'), zValidator('json', costTierConfigsSchema), async (c) => {
   const db = c.get('db')
   const { id } = c.req.param()
 
@@ -101,16 +96,9 @@ app.put('/:id/cost-tier-configs', requireAuth('committee'), async (c) => {
     return c.json({ error: 'Edition not found' }, 404)
   }
 
-  const body = await c.req.json()
-  const parsed = costTierConfigsSchema.safeParse(body)
-  if (!parsed.success) {
-    return c.json({ error: 'Validation failed', details: parsed.error.flatten() }, 400)
-  }
-
-  // Replace all tier configs for this edition
-  await db.delete(schema.costTierConfig).where(eq(schema.costTierConfig.editionId, id))
-  for (const config of parsed.data) {
-    await db.insert(schema.costTierConfig).values({
+  // Replace all tier configs atomically
+  const tierInserts = c.req.valid('json').map(config =>
+    db.insert(schema.costTierConfig).values({
       id: crypto.randomUUID(),
       editionId: id,
       tier: config.tier,
@@ -119,7 +107,11 @@ app.put('/:id/cost-tier-configs', requireAuth('committee'), async (c) => {
       appearanceFee: config.appearanceFee,
       nightlyRate: config.nightlyRate,
     })
-  }
+  )
+  await db.batch([
+    db.delete(schema.costTierConfig).where(eq(schema.costTierConfig.editionId, id)) as any,
+    ...tierInserts,
+  ] as any)
 
   try {
     await recalculateAllAthletesForEdition(db, id)
@@ -136,7 +128,7 @@ app.put('/:id/cost-tier-configs', requireAuth('committee'), async (c) => {
 })
 
 // PUT /editions/:id/cost-distance-configs — replace all distance configs (committee only)
-app.put('/:id/cost-distance-configs', requireAuth('committee'), async (c) => {
+app.put('/:id/cost-distance-configs', requireAuth('committee'), zValidator('json', costDistanceConfigsSchema), async (c) => {
   const db = c.get('db')
   const { id } = c.req.param()
 
@@ -145,23 +137,20 @@ app.put('/:id/cost-distance-configs', requireAuth('committee'), async (c) => {
     return c.json({ error: 'Edition not found' }, 404)
   }
 
-  const body = await c.req.json()
-  const parsed = costDistanceConfigsSchema.safeParse(body)
-  if (!parsed.success) {
-    return c.json({ error: 'Validation failed', details: parsed.error.flatten() }, 400)
-  }
-
-  // Replace all distance configs for this edition
-  await db.delete(schema.costDistanceConfig).where(eq(schema.costDistanceConfig.editionId, id))
-  for (const config of parsed.data) {
-    await db.insert(schema.costDistanceConfig).values({
+  // Replace all distance configs atomically
+  const distInserts = c.req.valid('json').map(config =>
+    db.insert(schema.costDistanceConfig).values({
       id: crypto.randomUUID(),
       editionId: id,
       distanceMax: config.distanceMax ?? null,
       travelCost: config.travelCost,
       nights: config.nights,
     })
-  }
+  )
+  await db.batch([
+    db.delete(schema.costDistanceConfig).where(eq(schema.costDistanceConfig.editionId, id)) as any,
+    ...distInserts,
+  ] as any)
 
   try {
     await recalculateAllAthletesForEdition(db, id)
@@ -189,20 +178,16 @@ app.get('/wa-discipline-map', requireAuth('committee'), async (c) => {
   return c.json(rows)
 })
 
-app.post('/wa-discipline-map', requireAuth('committee'), async (c) => {
+app.post('/wa-discipline-map', requireAuth('committee'), zValidator('json', waDisciplineMapSchema), async (c) => {
   const db = c.get('db')
-  const body = await c.req.json() as { waName?: string; waRankingSlug?: string; catalogName?: string }
-
-  if (!body.waName || !body.catalogName) {
-    return c.json({ error: 'waName and catalogName are required' }, 400)
-  }
+  const data = c.req.valid('json')
 
   const id = crypto.randomUUID()
   await db.insert(schema.waDisciplineMap).values({
     id,
-    waName: body.waName,
-    waRankingSlug: body.waRankingSlug ?? null,
-    catalogName: body.catalogName,
+    waName: data.waName,
+    waRankingSlug: data.waRankingSlug ?? null,
+    catalogName: data.catalogName,
   })
 
   const rows = await db.select().from(schema.waDisciplineMap).where(eq(schema.waDisciplineMap.id, id))
@@ -214,7 +199,7 @@ app.delete('/wa-discipline-map/:id', requireAuth('committee'), async (c) => {
   const { id } = c.req.param()
 
   await db.delete(schema.waDisciplineMap).where(eq(schema.waDisciplineMap.id, id))
-  return c.json({ ok: true })
+  return c.json({ success: true })
 })
 
 export default app

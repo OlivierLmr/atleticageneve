@@ -3,14 +3,12 @@
  * Replace with a real provider (Resend, SendGrid, etc.) for production.
  */
 
-import type { DrizzleD1Database } from 'drizzle-orm/d1'
 import * as schema from '../db/schema'
+import type { Db } from '../lib/helpers'
 import type { NegotiationStatus } from '@shared/types'
 
-type DB = DrizzleD1Database<typeof schema>
-
 interface EmailParams {
-  db: DB
+  db: Db
   to: string
   subject: string
   body: string
@@ -49,7 +47,7 @@ export interface EmailContent {
   htmlBody: string
 }
 
-export async function sendMagicLinkEmail(db: DB, email: string, token: string, baseUrl: string, lang: 'en' | 'fr' = 'en'): Promise<EmailContent> {
+export async function sendMagicLinkEmail(db: Db, email: string, token: string, baseUrl: string, lang: 'en' | 'fr' = 'en'): Promise<EmailContent> {
   const link = `${baseUrl}/auth/verify?token=${token}`
   const subject = lang === 'fr' ? 'Votre candidature — Atletica Genève' : 'Your application — Atletica Geneve'
   const body = lang === 'fr'
@@ -164,52 +162,4 @@ export function buildTransitionEmail(params: {
     default:
       return null
   }
-}
-
-export async function sendStatusChangeEmail(
-  db: DB,
-  email: string,
-  athleteName: string,
-  status: string,
-  portalUrl: string,
-  lang: 'en' | 'fr' = 'en',
-  magicLinkUrl?: string,
-  relatedAthleteId?: string,
-): Promise<string> {
-  const statusLabels: Record<string, Record<string, string>> = {
-    en: {
-      to_review: 'Under review',
-      agreement_sent: 'Agreement sent',
-      counter_offer_sent: 'Counter-offer received',
-      confirmed: 'Confirmed',
-      rejected: 'Not selected',
-      withdrawn: 'Withdrawn',
-    },
-    fr: {
-      to_review: "En cours d'examen",
-      agreement_sent: 'Accord envoyé',
-      counter_offer_sent: 'Contre-proposition reçue',
-      confirmed: 'Confirmé',
-      rejected: 'Non retenu',
-      withdrawn: 'Retiré',
-    },
-  }
-
-  const label = statusLabels[lang]?.[status] ?? status
-  const subject = lang === 'fr'
-    ? `Mise à jour candidature — ${athleteName}`
-    : `Application update — ${athleteName}`
-
-  const linkUrl = magicLinkUrl ?? portalUrl
-  const linkLabel = lang === 'fr' ? 'Accéder au portail' : 'Access portal'
-
-  const body = lang === 'fr'
-    ? `Bonjour,\n\nLa candidature de ${athleteName} a été mise à jour.\nNouveau statut : ${label}\n\nConsultez le portail : ${linkUrl}\n\nAtletica Genève`
-    : `Hello,\n\nThe application for ${athleteName} has been updated.\nNew status: ${label}\n\nView the portal: ${linkUrl}\n\nAtletica Geneve`
-
-  const htmlBody = lang === 'fr'
-    ? `<p>Bonjour,</p><p>La candidature de <strong>${athleteName}</strong> a été mise à jour.</p><p>Nouveau statut : <strong>${label}</strong></p><p><a href="${linkUrl}">${linkLabel}</a></p><p>Atletica Genève</p>`
-    : `<p>Hello,</p><p>The application for <strong>${athleteName}</strong> has been updated.</p><p>New status: <strong>${label}</strong></p><p><a href="${linkUrl}">${linkLabel}</a></p><p>Atletica Geneve</p>`
-
-  return sendEmail({ db, to: email, subject, body, htmlBody, lang, relatedAthleteId })
 }

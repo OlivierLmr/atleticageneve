@@ -1,8 +1,6 @@
 import { eq } from 'drizzle-orm'
-import type { DrizzleD1Database } from 'drizzle-orm/d1'
 import * as schema from '../db/schema'
-
-type Db = DrizzleD1Database<typeof schema>
+import type { Db } from '../lib/helpers'
 
 export async function recalculateAthleteEstimatedCost(db: Db, athleteId: string): Promise<void> {
   const athletes = await db.select().from(schema.athlete).where(eq(schema.athlete.id, athleteId)).limit(1)
@@ -14,9 +12,9 @@ export async function recalculateAthleteEstimatedCost(db: Db, athleteId: string)
   if (editions.length === 0) return
   const edition = editions[0]
 
-  // Derive distance from country
+  // Use athlete's explicit distance; fall back to country default only if unset (0)
   let distanceFromGva = ath.distanceFromGva
-  if (ath.nationality) {
+  if (!distanceFromGva && ath.nationality) {
     const countries = await db.select().from(schema.country).where(eq(schema.country.code, ath.nationality)).limit(1)
     if (countries.length > 0) {
       distanceFromGva = countries[0].distanceFromGva
