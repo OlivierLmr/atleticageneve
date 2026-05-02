@@ -18,10 +18,9 @@ export async function hashPassword(password: string): Promise<string> {
 }
 
 export async function verifyPassword(password: string, stored: string): Promise<boolean> {
-  // Handle legacy bcrypt hashes from seed data (prefix $2a$ or $2b$)
+  // Reject legacy bcrypt hashes — they must be re-hashed via password reset
   if (stored.startsWith('$2a$') || stored.startsWith('$2b$')) {
-    // For seed data, accept the known password "atletica2026"
-    return password === 'atletica2026'
+    return false
   }
 
   const [saltB64, hashB64] = stored.split(':')

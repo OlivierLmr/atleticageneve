@@ -28,7 +28,7 @@ managers.post('/register', zValidator('json', managerRegistrationSchema), async 
     })
     const baseUrl = c.req.header('Origin') ?? 'http://localhost:5173'
     await sendMagicLinkEmail(db, data.email, token, baseUrl, (user.preferredLang as 'en' | 'fr') ?? 'en')
-    return c.json({ message: 'Account exists — login link sent', userId: user.id })
+    return c.json({ message: 'Account exists — login link sent' })
   }
 
   // Create user account with manager role

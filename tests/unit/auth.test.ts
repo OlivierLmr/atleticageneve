@@ -31,17 +31,11 @@ describe('hashPassword / verifyPassword', () => {
     expect(hash).toMatch(/^[A-Za-z0-9+/=]+:[A-Za-z0-9+/=]+$/)
   })
 
-  // Legacy bcrypt hashes from seed data
-  it('accepts the known seed password for bcrypt hashes', async () => {
+  // Legacy bcrypt hashes are rejected — must re-hash via password reset
+  it('rejects any password for bcrypt hashes', async () => {
     const bcryptHash = '$2a$10$LxQvJKqYsHzKQxOZqR5cGeZ.pMNFLXTg5KGHVNJnWJxGmxlL2yGfq'
-    const valid = await verifyPassword('atletica2026', bcryptHash)
-    expect(valid).toBe(true)
-  })
-
-  it('rejects wrong password for bcrypt hashes', async () => {
-    const bcryptHash = '$2a$10$LxQvJKqYsHzKQxOZqR5cGeZ.pMNFLXTg5KGHVNJnWJxGmxlL2yGfq'
-    const valid = await verifyPassword('wrongpassword', bcryptHash)
-    expect(valid).toBe(false)
+    expect(await verifyPassword('atletica2026', bcryptHash)).toBe(false)
+    expect(await verifyPassword('wrongpassword', bcryptHash)).toBe(false)
   })
 
   it('rejects malformed stored hash', async () => {
