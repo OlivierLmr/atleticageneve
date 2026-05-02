@@ -96,10 +96,9 @@ app.put('/:id/cost-tier-configs', requireAuth('committee'), zValidator('json', c
     return c.json({ error: 'Edition not found' }, 404)
   }
 
-  // Replace all tier configs for this edition
-  await db.delete(schema.costTierConfig).where(eq(schema.costTierConfig.editionId, id))
-  for (const config of c.req.valid('json')) {
-    await db.insert(schema.costTierConfig).values({
+  // Replace all tier configs atomically
+  const tierInserts = c.req.valid('json').map(config =>
+    db.insert(schema.costTierConfig).values({
       id: crypto.randomUUID(),
       editionId: id,
       tier: config.tier,
@@ -108,7 +107,11 @@ app.put('/:id/cost-tier-configs', requireAuth('committee'), zValidator('json', c
       appearanceFee: config.appearanceFee,
       nightlyRate: config.nightlyRate,
     })
-  }
+  )
+  await db.batch([
+    db.delete(schema.costTierConfig).where(eq(schema.costTierConfig.editionId, id)) as any,
+    ...tierInserts,
+  ] as any)
 
   try {
     await recalculateAllAthletesForEdition(db, id)
@@ -134,17 +137,20 @@ app.put('/:id/cost-distance-configs', requireAuth('committee'), zValidator('json
     return c.json({ error: 'Edition not found' }, 404)
   }
 
-  // Replace all distance configs for this edition
-  await db.delete(schema.costDistanceConfig).where(eq(schema.costDistanceConfig.editionId, id))
-  for (const config of c.req.valid('json')) {
-    await db.insert(schema.costDistanceConfig).values({
+  // Replace all distance configs atomically
+  const distInserts = c.req.valid('json').map(config =>
+    db.insert(schema.costDistanceConfig).values({
       id: crypto.randomUUID(),
       editionId: id,
       distanceMax: config.distanceMax ?? null,
       travelCost: config.travelCost,
       nights: config.nights,
     })
-  }
+  )
+  await db.batch([
+    db.delete(schema.costDistanceConfig).where(eq(schema.costDistanceConfig.editionId, id)) as any,
+    ...distInserts,
+  ] as any)
 
   try {
     await recalculateAllAthletesForEdition(db, id)
