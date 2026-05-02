@@ -126,6 +126,7 @@ function CollapsibleSection({ title, isOpen, onToggle, canEdit, isEditing, onTog
   canEdit?: boolean; isEditing?: boolean; onToggleEdit?: () => void
   children: React.ReactNode
 }) {
+  const { t } = useTranslation()
   return (
     <div className="bg-white rounded-lg border">
       <button onClick={onToggle} className="w-full flex items-center justify-between p-3 text-sm font-semibold hover:bg-gray-50">
@@ -135,7 +136,7 @@ function CollapsibleSection({ title, isOpen, onToggle, canEdit, isEditing, onTog
             <span
               onClick={e => { e.stopPropagation(); onToggleEdit?.() }}
               className={`text-xs cursor-pointer px-1.5 py-0.5 rounded ${isEditing ? 'text-blue-600 bg-blue-50' : 'text-gray-400 hover:text-gray-600'}`}
-              title={isEditing ? 'Cancel edit' : 'Edit'}
+              title={isEditing ? t('common.cancelEdit') : t('common.edit')}
             >
               ✎
             </span>
@@ -316,6 +317,7 @@ function CounterOfferCard({ interaction }: { interaction: Interaction }) {
 }
 
 function InteractionCard({ interaction, onViewEmail }: { interaction: Interaction; onViewEmail?: (emailLogId: string) => void }) {
+  const { t } = useTranslation()
   const typeIcons: Record<string, string> = {
     status_change: '●',
     agreement: '■',
@@ -348,7 +350,7 @@ function InteractionCard({ interaction, onViewEmail }: { interaction: Interactio
       <div className="flex-1 min-w-0">
         <p className="text-xs text-gray-900">
           {interaction.content}
-          {hasEmail && <span className="ml-1 text-indigo-500" title="View email">✉</span>}
+          {hasEmail && <span className="ml-1 text-indigo-500" title={t('common.viewEmail')}>✉</span>}
         </p>
         <p className="text-[10px] text-gray-400 mt-0.5">
           {interaction.authorName} — {new Date(interaction.createdAt).toLocaleString()}

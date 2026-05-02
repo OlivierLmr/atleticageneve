@@ -33,7 +33,9 @@
     "unknown": "Unknown",
     "inProgress": "In progress",
     "pending": "Pending",
-    "done": "Done"
+    "done": "Done",
+    "cancelEdit": "Cancel edit",
+    "viewEmail": "View email"
   },
   "auth": {
     "login": "Log in",
@@ -326,7 +328,10 @@
     "hotelOccupancy": "Hotel Occupancy",
     "selectors": "Selectors",
     "costBreakdown": "Cost Breakdown",
-    "applicationPipeline": "Application Pipeline"
+    "applicationPipeline": "Application Pipeline",
+    "revShort": "rev",
+    "negShort": "neg",
+    "confShort": "conf"
   },
   "night": {
     "tue": "Tue",
