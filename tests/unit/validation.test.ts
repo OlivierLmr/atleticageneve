@@ -103,9 +103,9 @@ describe('athleteRegistrationSchema', () => {
     expect(result.isEap).toBe(false)
   })
 
-  it('defaults iRunClean to false', () => {
+  it('defaults iRunClean to unknown', () => {
     const result = athleteRegistrationSchema.parse(validAthlete)
-    expect(result.iRunClean).toBe(false)
+    expect(result.iRunClean).toBe('unknown')
   })
 
   it('requires athleteEmail', () => {
