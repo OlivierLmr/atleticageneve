@@ -1,4 +1,5 @@
 import { Hono } from 'hono'
+import { zValidator } from '@hono/zod-validator'
 import { eq } from 'drizzle-orm'
 import * as schema from '../db/schema'
 import { requireAuth } from '../middleware/auth'
@@ -15,40 +16,32 @@ app.get('/', async (c) => {
 })
 
 // POST /countries — committee only
-app.post('/', requireAuth('committee'), async (c) => {
+app.post('/', requireAuth('committee'), zValidator('json', countrySchema), async (c) => {
   const db = c.get('db')
-  const body = await c.req.json()
-  const parsed = countrySchema.safeParse(body)
-  if (!parsed.success) {
-    return c.json({ error: 'Validation failed', details: parsed.error.flatten() }, 400)
-  }
+  const data = c.req.valid('json')
 
   await db.insert(schema.country).values({
-    code: parsed.data.code,
-    name: parsed.data.name,
-    distanceFromGva: parsed.data.distanceFromGva ?? 0,
+    code: data.code,
+    name: data.name,
+    distanceFromGva: data.distanceFromGva ?? 0,
   })
 
-  const created = await db.select().from(schema.country).where(eq(schema.country.code, parsed.data.code)).limit(1)
+  const created = await db.select().from(schema.country).where(eq(schema.country.code, data.code)).limit(1)
   return c.json(created[0], 201)
 })
 
 // PATCH /countries/:code — committee only
-app.patch('/:code', requireAuth('committee'), async (c) => {
+app.patch('/:code', requireAuth('committee'), zValidator('json', countrySchema.partial()), async (c) => {
   const db = c.get('db')
   const { code } = c.req.param()
-  const body = await c.req.json()
-  const parsed = countrySchema.partial().safeParse(body)
-  if (!parsed.success) {
-    return c.json({ error: 'Validation failed', details: parsed.error.flatten() }, 400)
-  }
+  const data = c.req.valid('json')
 
   const existing = await db.select().from(schema.country).where(eq(schema.country.code, code)).limit(1)
   if (existing.length === 0) {
     return c.json({ error: 'Country not found' }, 404)
   }
 
-  await db.update(schema.country).set(parsed.data).where(eq(schema.country.code, code))
+  await db.update(schema.country).set(data).where(eq(schema.country.code, code))
   const updated = await db.select().from(schema.country).where(eq(schema.country.code, code)).limit(1)
   return c.json(updated[0])
 })

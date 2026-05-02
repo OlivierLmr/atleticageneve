@@ -1,7 +1,8 @@
 import { Hono } from 'hono'
+import { zValidator } from '@hono/zod-validator'
 import { eq, or, and, desc, max } from 'drizzle-orm'
 import * as schema from '../db/schema'
-import { agreementSchema } from '@shared/validation'
+import { portalRespondSchema } from '@shared/validation'
 import { requireAuth } from '../middleware/auth'
 import { sendEmail } from '../services/email'
 import type { Env } from '../index'
@@ -88,12 +89,11 @@ portal.get('/athlete', requireAuth('athlete', 'manager'), async (c) => {
 })
 
 // POST /portal/athlete/:athleteId/respond — accept, reject, withdraw, or counter-offer
-portal.post('/athlete/:athleteId/respond', requireAuth('athlete', 'manager'), async (c) => {
+portal.post('/athlete/:athleteId/respond', requireAuth('athlete', 'manager'), zValidator('json', portalRespondSchema), async (c) => {
   const db = c.get('db')
   const user = c.get('user')!
   const athleteId = c.req.param('athleteId')!
-  const body = await c.req.json()
-  const action = body.action as string
+  const { action, offer: rawOffer } = c.req.valid('json')
 
   // Get the athlete
   const athRows = await db
@@ -172,11 +172,10 @@ portal.post('/athlete/:athleteId/respond', requireAuth('athlete', 'manager'), as
       return c.json({ error: 'Can only counter-offer from agreement_sent status' }, 400)
     }
 
-    const parsed = agreementSchema.safeParse(body.offer)
-    if (!parsed.success) {
-      return c.json({ error: 'Invalid counter-offer data', details: parsed.error.flatten() }, 400)
+    if (!rawOffer) {
+      return c.json({ error: 'offer is required for counter_offer action' }, 400)
     }
-    const offer = parsed.data
+    const offer = rawOffer
 
     // Get the latest agreement (to_athlete direction) for constraint validation
     const latestAgreements = await db

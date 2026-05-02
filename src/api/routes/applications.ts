@@ -1,7 +1,8 @@
 import { Hono } from 'hono'
+import { zValidator } from '@hono/zod-validator'
 import { eq, and, sql, isNull, desc, inArray } from 'drizzle-orm'
 import * as schema from '../db/schema'
-import { participationStatusChangeSchema } from '@shared/validation'
+import { participationStatusChangeSchema, interactionSchema } from '@shared/validation'
 import { PARTICIPATION_TRANSITIONS } from '@shared/constants'
 import { computeScore } from '@shared/scoring'
 import { requireAuth } from '../middleware/auth'
@@ -187,17 +188,11 @@ applications.get('/:id', async (c) => {
 
 // ── PATCH /applications/:id/participation-status — change participationStatus ─
 
-applications.patch('/:id/participation-status', async (c) => {
+applications.patch('/:id/participation-status', zValidator('json', participationStatusChangeSchema), async (c) => {
   const db = c.get('db')
   const user = c.get('user')!
   const id = c.req.param('id')
-
-  const body = await c.req.json()
-  const parsed = participationStatusChangeSchema.safeParse(body)
-  if (!parsed.success) {
-    return c.json({ error: 'Invalid participation status', details: parsed.error.flatten() }, 400)
-  }
-  const newStatus = parsed.data.participationStatus as ParticipationStatus
+  const newStatus = c.req.valid('json').participationStatus as ParticipationStatus
 
   // Get application
   const apps = await db
@@ -353,23 +348,11 @@ applications.post('/:id/score', async (c) => {
 
 // ── POST /applications/:id/interactions — add an interaction ─────────────────
 
-applications.post('/:id/interactions', async (c) => {
+applications.post('/:id/interactions', zValidator('json', interactionSchema), async (c) => {
   const db = c.get('db')
   const user = c.get('user')!
   const id = c.req.param('id')
-  const body = await c.req.json()
-
-  const type = body.type
-  const content = body.content
-
-  if (!type || !content) {
-    return c.json({ error: 'type and content are required' }, 400)
-  }
-
-  const validTypes = ['email', 'call', 'note']
-  if (!validTypes.includes(type)) {
-    return c.json({ error: `type must be one of: ${validTypes.join(', ')}` }, 400)
-  }
+  const { type, content } = c.req.valid('json')
 
   // Verify application exists and get athleteId
   const apps = await db

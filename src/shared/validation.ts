@@ -302,3 +302,41 @@ export const waPerformanceSchema = z.object({
   seasonBest: z.number().optional(),
   worldRanking: z.number().int().min(1).optional(),
 })
+
+// ── WA Discipline Map ────────────────────────────────────────────────────────
+
+export const waDisciplineMapSchema = z.object({
+  waName: z.string().min(1),
+  waRankingSlug: z.string().optional(),
+  catalogName: z.string().min(1),
+})
+
+// ���─ Interaction ──────────────────────────────────────────────────────────────
+
+export const interactionSchema = z.object({
+  type: z.enum(['email', 'call', 'note', 'counter_offer', 'status_change', 'agreement']),
+  content: z.string().min(1),
+  applicationId: z.string().optional(),
+})
+
+// ── Auth identify / login ────────────────────────────────────────────────────
+
+export const identifySchema = z.object({
+  identifier: z.string().min(1),
+})
+
+export const loginWithPasswordSchema = z.object({
+  identifier: z.string().min(1),
+  password: z.string().min(1),
+})
+
+// ── Portal respond ───────────────────────────────────────────────────────────
+
+export const portalRespondSchema = z.object({
+  action: z.enum(['accept', 'reject', 'withdraw', 'counter_offer']),
+  offer: agreementSchema.optional(),
+})
+
+// ── Hotel room update ────────────────────────────────────────────────────────
+
+export const hotelRoomUpdateSchema = hotelRoomSchema.omit({ hotelId: true }).partial()

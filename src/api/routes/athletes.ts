@@ -2,7 +2,7 @@ import { Hono } from 'hono'
 import { zValidator } from '@hono/zod-validator'
 import { and, eq, sql } from 'drizzle-orm'
 import * as schema from '../db/schema'
-import { athleteRegistrationSchema, batchAthleteRegistrationSchema, athleteUpdateSchema, negotiationStatusChangeSchema } from '@shared/validation'
+import { athleteRegistrationSchema, batchAthleteRegistrationSchema, athleteUpdateSchema, negotiationStatusChangeSchema, interactionSchema } from '@shared/validation'
 import { NEGOTIATION_TRANSITIONS, COMMITTEE_EXTRA_TRANSITIONS, ATHLETE_TRANSITIONS } from '@shared/constants'
 import { requireAuth } from '../middleware/auth'
 import { sendEmail, sendMagicLinkEmail, buildTransitionEmail } from '../services/email'
@@ -409,17 +409,11 @@ athletes.patch('/:id', requireAuth('athlete', 'manager', 'collaborator', 'commit
 
 // ── PATCH /athletes/:id/negotiation-status — change negotiation status ───────
 
-athletes.patch('/:id/negotiation-status', requireAuth('athlete', 'manager', 'collaborator', 'committee'), async (c) => {
+athletes.patch('/:id/negotiation-status', requireAuth('athlete', 'manager', 'collaborator', 'committee'), zValidator('json', negotiationStatusChangeSchema), async (c) => {
   const db = c.get('db')
   const user = c.get('user')!
   const id = c.req.param('id')!
-
-  const body = await c.req.json()
-  const parsed = negotiationStatusChangeSchema.safeParse(body)
-  if (!parsed.success) {
-    return c.json({ error: 'Invalid status', details: parsed.error.flatten() }, 400)
-  }
-  const newStatus = parsed.data.status as NegotiationStatus
+  const newStatus = c.req.valid('json').status as NegotiationStatus
 
   // Get athlete
   const athRows = await db.select().from(schema.athlete).where(eq(schema.athlete.id, id)).limit(1)
@@ -596,24 +590,11 @@ athletes.post('/:id/restore', requireAuth('committee'), async (c) => {
 
 // ── POST /athletes/:id/interactions — add interaction at athlete level ────────
 
-athletes.post('/:id/interactions', requireAuth('athlete', 'manager', 'collaborator', 'committee'), async (c) => {
+athletes.post('/:id/interactions', requireAuth('athlete', 'manager', 'collaborator', 'committee'), zValidator('json', interactionSchema), async (c) => {
   const db = c.get('db')
   const user = c.get('user')!
   const id = c.req.param('id')!
-  const body = await c.req.json()
-
-  const type = body.type
-  const content = body.content
-  const applicationId = body.applicationId ?? null
-
-  if (!type || !content) {
-    return c.json({ error: 'type and content are required' }, 400)
-  }
-
-  const validTypes: string[] = ['email', 'call', 'note', 'counter_offer', 'status_change', 'agreement']
-  if (!validTypes.includes(type)) {
-    return c.json({ error: `type must be one of: ${validTypes.join(', ')}` }, 400)
-  }
+  const { type, content, applicationId } = c.req.valid('json')
 
   // Verify athlete exists
   const athRows = await db.select().from(schema.athlete).where(eq(schema.athlete.id, id)).limit(1)

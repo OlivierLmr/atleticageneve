@@ -1,4 +1,5 @@
 import { Hono } from 'hono'
+import { zValidator } from '@hono/zod-validator'
 import { eq, and, desc } from 'drizzle-orm'
 import * as schema from '../db/schema'
 import { waPerformanceSchema } from '@shared/validation'
@@ -185,21 +186,16 @@ waPerformance.get('/', async (c) => {
 
 // ── POST /wa-performance — upsert PB/SB/ranking for athlete+event ────────────
 
-waPerformance.post('/', async (c) => {
+waPerformance.post('/', zValidator('json', waPerformanceSchema), async (c) => {
   const db = c.get('db')
-  const body = await c.req.json()
-
-  const parsed = waPerformanceSchema.safeParse(body)
-  if (!parsed.success) {
-    return c.json({ error: 'Invalid data', details: parsed.error.flatten() }, 400)
-  }
+  const data = c.req.valid('json')
 
   await upsertWaPerformance(db, {
-    athleteId: parsed.data.athleteId,
-    eventId: parsed.data.eventId,
-    personalBest: parsed.data.personalBest ?? null,
-    seasonBest: parsed.data.seasonBest ?? null,
-    worldRanking: parsed.data.worldRanking ?? null,
+    athleteId: data.athleteId,
+    eventId: data.eventId,
+    personalBest: data.personalBest ?? null,
+    seasonBest: data.seasonBest ?? null,
+    worldRanking: data.worldRanking ?? null,
   })
   return c.json({ ok: true })
 })

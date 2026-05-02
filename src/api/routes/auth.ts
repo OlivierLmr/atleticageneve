@@ -2,7 +2,7 @@ import { Hono } from 'hono'
 import { zValidator } from '@hono/zod-validator'
 import { eq, or } from 'drizzle-orm'
 import * as schema from '../db/schema'
-import { loginSchema, magicLinkRequestSchema, magicLinkVerifySchema } from '@shared/validation'
+import { loginSchema, magicLinkRequestSchema, magicLinkVerifySchema, identifySchema, loginWithPasswordSchema } from '@shared/validation'
 import { verifyPassword, generateToken, sessionExpiresAt, magicLinkExpiresAt } from '../services/auth'
 import { sendMagicLinkEmail } from '../services/email'
 import { requireAuth } from '../middleware/auth'
@@ -92,12 +92,8 @@ auth.post('/magic-link', zValidator('json', magicLinkRequestSchema), async (c) =
 
 // ── POST /auth/identify — unified login: check if password or magic link ──────
 
-auth.post('/identify', async (c) => {
-  const body = await c.req.json() as { identifier?: string }
-  const identifier = body.identifier?.trim()
-  if (!identifier) {
-    return c.json({ error: 'Identifier required' }, 400)
-  }
+auth.post('/identify', zValidator('json', identifySchema), async (c) => {
+  const { identifier } = c.req.valid('json')
 
   const db = c.get('db')
 
@@ -139,13 +135,8 @@ auth.post('/identify', async (c) => {
 
 // ── POST /auth/login-with-password — for identified password users ────────────
 
-auth.post('/login-with-password', async (c) => {
-  const body = await c.req.json() as { identifier?: string; password?: string }
-  const identifier = body.identifier?.trim()
-  const password = body.password
-  if (!identifier || !password) {
-    return c.json({ error: 'Identifier and password required' }, 400)
-  }
+auth.post('/login-with-password', zValidator('json', loginWithPasswordSchema), async (c) => {
+  const { identifier, password } = c.req.valid('json')
 
   const db = c.get('db')
 

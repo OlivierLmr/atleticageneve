@@ -1,4 +1,5 @@
 import { Hono } from 'hono'
+import { zValidator } from '@hono/zod-validator'
 import { eq, desc } from 'drizzle-orm'
 import * as schema from '../db/schema'
 import { agreementSchema } from '@shared/validation'
@@ -69,18 +70,11 @@ export function calculateTotalCost(data: CostParams, roomCosts: RoomCosts, editi
 
 // ── POST /athletes/:athleteId/agreements — create a new agreement offer ───────
 
-agreements.post('/:athleteId/agreements', async (c) => {
+agreements.post('/:athleteId/agreements', zValidator('json', agreementSchema), async (c) => {
   const db = c.get('db')
   const user = c.get('user')!
   const athleteId = c.req.param('athleteId')
-
-  // Parse body
-  const body = await c.req.json()
-  const parsed = agreementSchema.safeParse(body)
-  if (!parsed.success) {
-    return c.json({ error: 'Invalid agreement data', details: parsed.error.flatten() }, 400)
-  }
-  const data = parsed.data
+  const data = c.req.valid('json')
 
   // Verify athlete exists
   const athRows = await db.select().from(schema.athlete).where(eq(schema.athlete.id, athleteId)).limit(1)
