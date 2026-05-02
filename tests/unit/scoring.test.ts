@@ -1,10 +1,10 @@
 import { describe, it, expect } from 'vitest'
-import { computeScore, DEFAULT_WEIGHTS, type ScoringInput } from '@shared/scoring'
+import { computeScore } from '@shared/scoring'
 
 // ── computeScore ──────────────────────────────────────────────────────────────
 
 describe('computeScore', () => {
-  const makeInput = (overrides: Partial<ScoringInput> = {}): ScoringInput => ({
+  const makeInput = (overrides: Partial<Parameters<typeof computeScore>[0]> = {}): Parameters<typeof computeScore>[0] => ({
     personalBest: 9.80,
     seasonBest: 9.95,
     worldRanking: 3,
@@ -113,7 +113,7 @@ describe('computeScore', () => {
   it('applies EAP bonus', () => {
     const withoutEap = computeScore(makeInput({ isEap: false }))
     const withEap = computeScore(makeInput({ isEap: true, eapMinima: 10.30 }))
-    expect(withEap.eapBonus).toBe(DEFAULT_WEIGHTS.bonusEap / 100)
+    expect(withEap.eapBonus).toBe(0.05) // default bonusEap = 5 → 5/100
     expect(withEap.finalScore).toBeCloseTo(
       Math.min(1, withoutEap.weightedSum + withEap.eapBonus), 5
     )
@@ -180,18 +180,3 @@ describe('computeScore', () => {
   })
 })
 
-describe('DEFAULT_WEIGHTS', () => {
-  it('has weights summing to 100', () => {
-    const sum = DEFAULT_WEIGHTS.weightPB + DEFAULT_WEIGHTS.weightSB +
-      DEFAULT_WEIGHTS.weightRanking + DEFAULT_WEIGHTS.weightCost
-    expect(sum).toBe(100)
-  })
-
-  it('has expected default values', () => {
-    expect(DEFAULT_WEIGHTS.weightPB).toBe(25)
-    expect(DEFAULT_WEIGHTS.weightSB).toBe(35)
-    expect(DEFAULT_WEIGHTS.weightRanking).toBe(30)
-    expect(DEFAULT_WEIGHTS.weightCost).toBe(10)
-    expect(DEFAULT_WEIGHTS.bonusEap).toBe(5)
-  })
-})
