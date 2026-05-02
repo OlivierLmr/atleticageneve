@@ -381,5 +381,38 @@ export async function ensureMigrated(d1: D1Database): Promise<void> {
     await d1.prepare('INSERT OR IGNORE INTO d1_migrations (name) VALUES (?)').bind('0005_cost_tables_fix').run()
   }
 
+  if (!applied.has('0006_wa_discipline_map')) {
+    await d1.prepare(`
+      CREATE TABLE IF NOT EXISTS wa_discipline_map (
+        id TEXT PRIMARY KEY,
+        wa_name TEXT NOT NULL,
+        wa_ranking_slug TEXT,
+        catalog_name TEXT NOT NULL
+      )
+    `).run()
+
+    // Seed default mappings
+    const defaults = [
+      ['100 Metres', '100m', '100m'],
+      ['200 Metres', '200m', '200m'],
+      ['400 Metres', '400m', '400m'],
+      ['400 Metres Hurdles', '400mh', '400mH'],
+      ['800 Metres', '800m', '800m'],
+      ['1500 Metres', '1500m', '1500m'],
+      ['5000 Metres', '5000m', '5000m'],
+      ['High Jump', 'high-jump', 'High Jump'],
+      ['Long Jump', 'long-jump', 'Long Jump'],
+      ['Pole Vault', 'pole-vault', 'Pole Vault'],
+      ['Shot Put', 'shot-put', 'Shot Put'],
+    ]
+    for (const [waName, slug, catalogName] of defaults) {
+      await d1.prepare(
+        'INSERT OR IGNORE INTO wa_discipline_map (id, wa_name, wa_ranking_slug, catalog_name) VALUES (?, ?, ?, ?)'
+      ).bind(crypto.randomUUID(), waName, slug, catalogName).run()
+    }
+
+    await d1.prepare('INSERT OR IGNORE INTO d1_migrations (name) VALUES (?)').bind('0006_wa_discipline_map').run()
+  }
+
   migrated = true
 }
