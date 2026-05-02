@@ -3,7 +3,6 @@ import { cors } from 'hono/cors'
 import { logger } from 'hono/logger'
 import { drizzle } from 'drizzle-orm/d1'
 import * as schema from './db/schema'
-import { ensureMigrated } from './db/migrate'
 import authRoutes from './routes/auth'
 import athleteRoutes from './routes/athletes'
 import eventRoutes from './routes/events'
@@ -48,9 +47,7 @@ app.use('*', cors({
   credentials: true,
 }))
 
-// Ensure D1 schema is up to date on every Worker cold-start.
 app.use('/api/*', async (c, next) => {
-  await ensureMigrated(c.env.DB)
   const db = drizzle(c.env.DB, { schema })
   c.set('db', db)
   await next()
