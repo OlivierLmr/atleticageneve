@@ -12,9 +12,9 @@ export async function recalculateAthleteEstimatedCost(db: Db, athleteId: string)
   if (editions.length === 0) return
   const edition = editions[0]
 
-  // Derive distance from country
+  // Use athlete's explicit distance; fall back to country default only if unset (0)
   let distanceFromGva = ath.distanceFromGva
-  if (ath.nationality) {
+  if (!distanceFromGva && ath.nationality) {
     const countries = await db.select().from(schema.country).where(eq(schema.country.code, ath.nationality)).limit(1)
     if (countries.length > 0) {
       distanceFromGva = countries[0].distanceFromGva
