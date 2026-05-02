@@ -3,8 +3,8 @@
 // and parses PB, SB, and world ranking per discipline.
 
 import { eq } from 'drizzle-orm'
-import type { DrizzleD1Database } from 'drizzle-orm/d1'
 import * as schema from '../db/schema'
+import type { Db } from '../lib/helpers'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -196,8 +196,6 @@ export async function scrapeWaProfile(
 }
 
 // ── Fetch + Upsert Orchestrator ──────────────────────────────────────────────
-
-type Db = DrizzleD1Database<typeof schema>
 
 export async function fetchAndUpsertWaData(
   db: Db,

@@ -3,14 +3,12 @@
  * Replace with a real provider (Resend, SendGrid, etc.) for production.
  */
 
-import type { DrizzleD1Database } from 'drizzle-orm/d1'
 import * as schema from '../db/schema'
+import type { Db } from '../lib/helpers'
 import type { NegotiationStatus } from '@shared/types'
 
-type DB = DrizzleD1Database<typeof schema>
-
 interface EmailParams {
-  db: DB
+  db: Db
   to: string
   subject: string
   body: string
@@ -49,7 +47,7 @@ export interface EmailContent {
   htmlBody: string
 }
 
-export async function sendMagicLinkEmail(db: DB, email: string, token: string, baseUrl: string, lang: 'en' | 'fr' = 'en'): Promise<EmailContent> {
+export async function sendMagicLinkEmail(db: Db, email: string, token: string, baseUrl: string, lang: 'en' | 'fr' = 'en'): Promise<EmailContent> {
   const link = `${baseUrl}/auth/verify?token=${token}`
   const subject = lang === 'fr' ? 'Votre candidature — Atletica Genève' : 'Your application — Atletica Geneve'
   const body = lang === 'fr'
@@ -167,7 +165,7 @@ export function buildTransitionEmail(params: {
 }
 
 export async function sendStatusChangeEmail(
-  db: DB,
+  db: Db,
   email: string,
   athleteName: string,
   status: string,

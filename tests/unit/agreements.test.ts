@@ -1,56 +1,8 @@
 import { describe, it, expect } from 'vitest'
 import { NEGOTIATION_TRANSITIONS, ATHLETE_TRANSITIONS } from '@shared/constants'
 import { agreementSchema, negotiationStatusChangeSchema } from '@shared/validation'
+import { calculateTotalCost } from '../../src/api/lib/helpers'
 import type { NegotiationStatus } from '@shared/types'
-
-// ── Agreement cost calculation (mirrors server-side logic) ──────────────────
-
-interface RoomCosts {
-  costPerNight: number
-  dinnerCost: number
-}
-
-interface EditionCosts {
-  stadiumMealCost: number
-  transportAirportHotelCost: number
-  transportHotelStadiumCost: number
-}
-
-function calculateTotalCost(data: {
-  appearanceFee: number
-  otherCompensation: number
-  transport: number
-  transportAirportHotel: boolean
-  transportHotelStadium: boolean
-  hotelNightTue: boolean
-  hotelNightWed: boolean
-  hotelNightThu: boolean
-  hotelNightFri: boolean
-  hotelNightSat: boolean
-  hotelNightSun: boolean
-  dinnerTue: boolean
-  dinnerWed: boolean
-  dinnerThu: boolean
-  dinnerFri: boolean
-  dinnerSat: boolean
-  dinnerSun: boolean
-  stadiumMeals: boolean
-}, room: RoomCosts | null, edition: EditionCosts): number {
-  const nights = [
-    data.hotelNightTue, data.hotelNightWed, data.hotelNightThu,
-    data.hotelNightFri, data.hotelNightSat, data.hotelNightSun,
-  ].filter(Boolean).length
-  const dinners = [
-    data.dinnerTue, data.dinnerWed, data.dinnerThu,
-    data.dinnerFri, data.dinnerSat, data.dinnerSun,
-  ].filter(Boolean).length
-  return data.appearanceFee + data.otherCompensation + data.transport +
-    (room ? nights * room.costPerNight : 0) +
-    (room ? dinners * room.dinnerCost : 0) +
-    (data.stadiumMeals ? edition.stadiumMealCost : 0) +
-    (data.transportAirportHotel ? edition.transportAirportHotelCost : 0) +
-    (data.transportHotelStadium ? edition.transportHotelStadiumCost : 0)
-}
 
 describe('agreement cost calculation', () => {
   const room: RoomCosts = { costPerNight: 180, dinnerCost: 80 }
@@ -169,10 +121,11 @@ describe('agreement cost calculation', () => {
     expect(total).toBe(6 * 180)
   })
 
-  it('handles null room (no hotel selected)', () => {
+  it('handles zero-cost room (no hotel selected)', () => {
+    const noRoom = { costPerNight: 0, dinnerCost: 0 }
     const total = calculateTotalCost(
       { ...base, hotelNightFri: true, dinnerFri: true },
-      null, edition
+      noRoom, edition
     )
     expect(total).toBe(0)
   })

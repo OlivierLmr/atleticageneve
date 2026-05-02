@@ -4,8 +4,8 @@ import { eq, and } from 'drizzle-orm'
 import * as schema from '../db/schema'
 import { eventCreateSchema, eventUpdateSchema } from '@shared/validation'
 import { requireAuth } from '../middleware/auth'
+import { perfType } from '../lib/helpers'
 import type { Env } from '../index'
-import type { PerfType } from '@shared/types'
 
 const events = new Hono<Env>()
 
@@ -30,13 +30,12 @@ events.get('/', async (c) => {
   }
 
   return c.json(filtered.map(r => {
-    const perfType: PerfType = r.catalog.discipline === 'Course' ? 'MIN' : 'MAX'
     return {
       ...r.event,
       name: r.catalog.name,
       discipline: r.catalog.discipline,
       gender: r.catalog.gender,
-      perfType,
+      perfType: perfType(r.catalog.discipline),
     }
   }))
 })
@@ -62,14 +61,12 @@ events.get('/:id', async (c) => {
   }
 
   const r = results[0]
-  const perfType: PerfType = r.catalog.discipline === 'Course' ? 'MIN' : 'MAX'
-
   return c.json({
     ...r.event,
     name: r.catalog.name,
     discipline: r.catalog.discipline,
     gender: r.catalog.gender,
-    perfType,
+    perfType: perfType(r.catalog.discipline),
   })
 })
 

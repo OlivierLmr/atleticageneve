@@ -4,6 +4,7 @@ import { eq, or, and, desc, max } from 'drizzle-orm'
 import * as schema from '../db/schema'
 import { portalRespondSchema } from '@shared/validation'
 import { requireAuth } from '../middleware/auth'
+import { calculateTotalCost } from '../lib/helpers'
 import { sendEmail } from '../services/email'
 import type { Env } from '../index'
 import type { NegotiationStatus } from '@shared/types'
@@ -212,35 +213,46 @@ portal.post('/athlete/:athleteId/respond', requireAuth('athlete', 'manager'), zV
 
     const nextVersion = (maxVersionResult[0]?.maxVersion ?? 0) + 1
 
-    // Calculate totalCost
+    // Calculate totalCost using shared helper
     const editions = await db.select().from(schema.edition).limit(1)
     const edition = editions[0]
 
-    let hotelCostPerNight = 0
-    let dinnerCost = 0
+    let roomCosts = { costPerNight: 0, dinnerCost: 0 }
     if (offer.hotelRoomId) {
       const rooms = await db.select().from(schema.hotelRoom).where(eq(schema.hotelRoom.id, offer.hotelRoomId)).limit(1)
       if (rooms.length > 0) {
-        hotelCostPerNight = rooms[0].costPerNight
-        dinnerCost = rooms[0].dinnerCost
+        roomCosts = { costPerNight: rooms[0].costPerNight, dinnerCost: rooms[0].dinnerCost }
       }
     }
 
-    // Count hotel nights
-    const nightFields = ['hotelNightTue', 'hotelNightWed', 'hotelNightThu', 'hotelNightFri', 'hotelNightSat', 'hotelNightSun'] as const
-    const nightCount = nightFields.filter(f => offer[f]).length
-
-    // Count dinners
-    const dinnerFields = ['dinnerTue', 'dinnerWed', 'dinnerThu', 'dinnerFri', 'dinnerSat', 'dinnerSun'] as const
-    const dinnerCount = dinnerFields.filter(f => offer[f]).length
-
-    const hotelTotal = nightCount * hotelCostPerNight
-    const dinnerTotal = dinnerCount * dinnerCost
-    const stadiumMealTotal = offer.stadiumMeals ? (edition?.stadiumMealCost ?? 0) : 0
-    const transportAH = offer.transportAirportHotel ? (edition?.transportAirportHotelCost ?? 0) : 0
-    const transportHS = offer.transportHotelStadium ? (edition?.transportHotelStadiumCost ?? 0) : 0
-    const totalCost = (offer.appearanceFee ?? 0) + (offer.otherCompensation ?? 0) + (offer.transport ?? 0)
-      + hotelTotal + dinnerTotal + stadiumMealTotal + transportAH + transportHS
+    const totalCost = calculateTotalCost(
+      {
+        appearanceFee: offer.appearanceFee ?? 0,
+        otherCompensation: offer.otherCompensation ?? 0,
+        transport: offer.transport ?? 0,
+        transportAirportHotel: offer.transportAirportHotel ?? false,
+        transportHotelStadium: offer.transportHotelStadium ?? false,
+        hotelNightTue: offer.hotelNightTue ?? false,
+        hotelNightWed: offer.hotelNightWed ?? false,
+        hotelNightThu: offer.hotelNightThu ?? false,
+        hotelNightFri: offer.hotelNightFri ?? false,
+        hotelNightSat: offer.hotelNightSat ?? false,
+        hotelNightSun: offer.hotelNightSun ?? false,
+        dinnerTue: offer.dinnerTue ?? false,
+        dinnerWed: offer.dinnerWed ?? false,
+        dinnerThu: offer.dinnerThu ?? false,
+        dinnerFri: offer.dinnerFri ?? false,
+        dinnerSat: offer.dinnerSat ?? false,
+        dinnerSun: offer.dinnerSun ?? false,
+        stadiumMeals: offer.stadiumMeals ?? false,
+      },
+      roomCosts,
+      {
+        stadiumMealCost: edition?.stadiumMealCost ?? 0,
+        transportAirportHotelCost: edition?.transportAirportHotelCost ?? 0,
+        transportHotelStadiumCost: edition?.transportHotelStadiumCost ?? 0,
+      },
+    )
 
     await db.insert(schema.agreement).values({
       athleteId,

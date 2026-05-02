@@ -1,8 +1,6 @@
 import { eq } from 'drizzle-orm'
-import type { DrizzleD1Database } from 'drizzle-orm/d1'
 import * as schema from '../db/schema'
-
-type Db = DrizzleD1Database<typeof schema>
+import type { Db } from '../lib/helpers'
 
 export async function recalculateAthleteEstimatedCost(db: Db, athleteId: string): Promise<void> {
   const athletes = await db.select().from(schema.athlete).where(eq(schema.athlete.id, athleteId)).limit(1)

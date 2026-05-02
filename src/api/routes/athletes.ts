@@ -11,6 +11,7 @@ import { generateToken, magicLinkExpiresAt } from '../services/auth'
 import { recalculateAthleteEstimatedCost } from '../services/costEstimation'
 import { fetchAndUpsertWaData } from '../services/wa-scraper'
 import { upsertWaPerformance } from './wa-performance'
+import { isStaff } from '../lib/helpers'
 import type { Env } from '../index'
 import type { NegotiationStatus } from '@shared/types'
 
@@ -268,8 +269,8 @@ athletes.get('/:id', requireAuth('athlete', 'manager', 'collaborator', 'committe
   const ath = athRows[0]
 
   // Ownership check for athlete/manager roles
-  const isStaff = ['collaborator', 'committee'].includes(user.role)
-  if (!isStaff) {
+  const staff = isStaff(user.role)
+  if (!staff) {
     const isOwner = ath.userId === user.id
     const isManager = ath.managerId === user.id
     if (!isOwner && !isManager) {
@@ -332,7 +333,7 @@ athletes.get('/:id', requireAuth('athlete', 'manager', 'collaborator', 'committe
   }))
 
   // Strip totalCost from agreements for athlete/manager view
-  const agreements = isStaff
+  const agreements = staff
     ? rawAgreements
     : rawAgreements.map(a => ({ ...a, totalCost: undefined }))
 
@@ -351,7 +352,7 @@ athletes.get('/:id', requireAuth('athlete', 'manager', 'collaborator', 'committe
     ...ath,
     managerName,
     // Hide cost estimates from athlete/manager
-    ...(isStaff ? {} : { estTravel: undefined, estAccommodation: undefined, estAppearance: undefined, estTotal: undefined }),
+    ...(staff ? {} : { estTravel: undefined, estAccommodation: undefined, estAppearance: undefined, estTotal: undefined }),
     applications,
     agreements,
     interactions,
@@ -387,8 +388,8 @@ athletes.patch('/:id', requireAuth('athlete', 'manager', 'collaborator', 'commit
   // Access control: owner, their manager, or collaborator/committee
   const isOwner = ath.userId === user.id
   const isManager = ath.managerId === user.id
-  const isStaff = ['collaborator', 'committee'].includes(user.role)
-  if (!isOwner && !isManager && !isStaff) {
+  const staff = isStaff(user.role)
+  if (!isOwner && !isManager && !staff) {
     return c.json({ error: 'Not authorized to update this athlete' }, 403)
   }
 
@@ -423,10 +424,10 @@ athletes.patch('/:id/negotiation-status', requireAuth('athlete', 'manager', 'col
   const ath = athRows[0]
   const currentStatus = ath.negotiationStatus as NegotiationStatus
 
-  const isStaff = ['collaborator', 'committee'].includes(user.role)
+  const staff = isStaff(user.role)
 
   // Ownership check for athlete/manager
-  if (!isStaff) {
+  if (!staff) {
     if (ath.userId !== user.id && ath.managerId !== user.id) {
       return c.json({ error: 'Not authorized to act on this athlete' }, 403)
     }
@@ -434,7 +435,7 @@ athletes.patch('/:id/negotiation-status', requireAuth('athlete', 'manager', 'col
 
   // Validate transition based on role
   let allowed: NegotiationStatus[]
-  if (isStaff) {
+  if (staff) {
     const baseAllowed = NEGOTIATION_TRANSITIONS[currentStatus] ?? []
     const extraAllowed = user.role === 'committee' ? (COMMITTEE_EXTRA_TRANSITIONS[currentStatus] ?? []) : []
     allowed = [...baseAllowed, ...extraAllowed]
@@ -507,7 +508,7 @@ athletes.patch('/:id/negotiation-status', requireAuth('athlete', 'manager', 'col
   let emailLogId: string | null = null
 
   // Staff-initiated transitions: email goes to athlete/manager
-  if (isStaff && transitionEmail) {
+  if (staff && transitionEmail) {
     const emailTo = ath.athleteEmail ?? managerEmail
     if (emailTo) {
       emailLogId = await sendEmail({
@@ -521,7 +522,7 @@ athletes.patch('/:id/negotiation-status', requireAuth('athlete', 'manager', 'col
   }
 
   // Athlete/manager-initiated transitions: notify edition notification email
-  if (!isStaff && edition?.notificationEmail && transitionEmail) {
+  if (!staff && edition?.notificationEmail && transitionEmail) {
     emailLogId = await sendEmail({
       db,
       to: edition.notificationEmail,
@@ -604,8 +605,8 @@ athletes.post('/:id/interactions', requireAuth('athlete', 'manager', 'collaborat
   const ath = athRows[0]
 
   // Ownership check for athlete/manager
-  const isStaff = ['collaborator', 'committee'].includes(user.role)
-  if (!isStaff) {
+  const staff = isStaff(user.role)
+  if (!staff) {
     if (ath.userId !== user.id && ath.managerId !== user.id) {
       return c.json({ error: 'Not authorized' }, 403)
     }

@@ -6,6 +6,7 @@ import { participationStatusChangeSchema, interactionSchema } from '@shared/vali
 import { PARTICIPATION_TRANSITIONS } from '@shared/constants'
 import { computeScore } from '@shared/scoring'
 import { requireAuth } from '../middleware/auth'
+import { perfType, editionWeights } from '../lib/helpers'
 import type { Env } from '../index'
 import type { ParticipationStatus } from '@shared/types'
 
@@ -297,13 +298,7 @@ applications.post('/:id/score', async (c) => {
   // Get edition for weights
   const editions = await db.select().from(schema.edition).limit(1)
   const edition = editions[0]
-  const weights = edition ? {
-    weightPB: edition.weightPB,
-    weightSB: edition.weightSB,
-    weightRanking: edition.weightRanking,
-    weightCost: edition.weightCost,
-    bonusEap: edition.bonusEap,
-  } : undefined
+  const weights = edition ? editionWeights(edition) : undefined
 
   // Use agreement totalCost if negotiation has started, else use estTotal
   const latestAgreements = await db
@@ -314,9 +309,6 @@ applications.post('/:id/score', async (c) => {
     .limit(1)
   const effectiveCost = latestAgreements.length > 0 ? latestAgreements[0].totalCost : (ath.estTotal ?? 0)
 
-  // Determine perfType from catalog discipline
-  const perfType = catalog.discipline === 'Course' ? 'MIN' as const : 'MAX' as const
-
   const scoreResult = computeScore({
     personalBest: waPerf.personalBest ?? 0,
     seasonBest: waPerf.seasonBest ?? 0,
@@ -324,7 +316,7 @@ applications.post('/:id/score', async (c) => {
     estimatedCostTotal: effectiveCost,
     isEap: ath.isEap,
     isSwiss: ath.isSwiss,
-    perfType,
+    perfType: perfType(catalog.discipline),
     intMinima: evt.intMinima,
     swissMinima: evt.swissMinima,
     eapMinima: evt.eapMinima,

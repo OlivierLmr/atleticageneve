@@ -7,11 +7,9 @@ import { computeScore } from '@shared/scoring'
 import { requireAuth } from '../middleware/auth'
 import { recalculateAthleteEstimatedCost } from '../services/costEstimation'
 import { fetchAndUpsertWaData } from '../services/wa-scraper'
+import { perfType, editionWeights } from '../lib/helpers'
+import type { Db } from '../lib/helpers'
 import type { Env } from '../index'
-import type { DrizzleD1Database } from 'drizzle-orm/d1'
-import type { PerfType, EditionWeights } from '@shared/types'
-
-type Db = DrizzleD1Database<typeof schema>
 
 const waPerformance = new Hono<Env>()
 
@@ -117,16 +115,6 @@ export async function upsertWaPerformance(
           .limit(1)
         const effectiveCost = latestAgreements.length > 0 ? latestAgreements[0].totalCost : ath.estTotal
 
-        const perfType: PerfType = catalog.discipline === 'Course' ? 'MIN' : 'MAX'
-
-        const weights: EditionWeights = {
-          weightPB: edition.weightPB,
-          weightSB: edition.weightSB,
-          weightRanking: edition.weightRanking,
-          weightCost: edition.weightCost,
-          bonusEap: edition.bonusEap,
-        }
-
         const scoreResult = computeScore({
           personalBest: finalPB,
           seasonBest: finalSB,
@@ -134,11 +122,11 @@ export async function upsertWaPerformance(
           estimatedCostTotal: effectiveCost,
           isEap: ath.isEap,
           isSwiss: ath.isSwiss,
-          perfType,
+          perfType: perfType(catalog.discipline),
           intMinima: evt.intMinima,
           swissMinima: evt.swissMinima,
           eapMinima: evt.eapMinima,
-        }, weights)
+        }, editionWeights(edition))
 
         await db
           .update(schema.application)
