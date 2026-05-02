@@ -185,7 +185,7 @@ waPerformance.post('/', zValidator('json', waPerformanceSchema), async (c) => {
     seasonBest: data.seasonBest ?? null,
     worldRanking: data.worldRanking ?? null,
   })
-  return c.json({ ok: true })
+  return c.json({ success: true })
 })
 
 // ── POST /wa-performance/fetch/:athleteId — scrape WA profile + upsert ───────

@@ -193,7 +193,7 @@ app.delete('/wa-discipline-map/:id', requireAuth('committee'), async (c) => {
   const { id } = c.req.param()
 
   await db.delete(schema.waDisciplineMap).where(eq(schema.waDisciplineMap.id, id))
-  return c.json({ ok: true })
+  return c.json({ success: true })
 })
 
 export default app

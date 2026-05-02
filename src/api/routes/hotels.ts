@@ -95,7 +95,7 @@ hotels.delete('/:id', requireAuth('committee'), async (c) => {
   await db.delete(schema.hotelRoom).where(eq(schema.hotelRoom.hotelId, id))
   await db.delete(schema.hotel).where(eq(schema.hotel.id, id))
 
-  return c.json({ deleted: true })
+  return c.json({ success: true })
 })
 
 export default hotels
