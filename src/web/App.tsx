@@ -70,9 +70,15 @@ function ProtectedRoute({ children, roles }: { children: ReactNode; roles?: User
   return <>{children}</>
 }
 
-// ── Committee layout with navigation ─────────────────────────────────────────
+// ── Shared staff layout with navigation ──────────────────────────────────────
 
-const COMMITTEE_NAV = [
+interface NavItem {
+  to: string
+  key: string
+  activePrefix?: string  // also highlight when pathname starts with this
+}
+
+const COMMITTEE_NAV: NavItem[] = [
   { to: '/committee/dashboard', key: 'nav.dashboard' },
   { to: '/committee/edition-config', key: 'nav.edition' },
   { to: '/committee/events', key: 'nav.events' },
@@ -81,10 +87,14 @@ const COMMITTEE_NAV = [
   { to: '/committee/eap-cities', key: 'nav.eapCities' },
   { to: '/committee/hotel-rooms', key: 'nav.hotelRooms' },
   { to: '/committee/emails', key: 'nav.emailLog' },
-  { to: '/committee/candidates', key: 'nav.candidates' },
+  { to: '/committee/candidates', key: 'nav.candidates', activePrefix: '/committee/athletes/' },
 ]
 
-function CommitteeLayout() {
+const COLLABORATOR_NAV: NavItem[] = [
+  { to: '/collaborator/candidates', key: 'nav.candidates' },
+]
+
+function AppLayout({ navItems }: { navItems: NavItem[] }) {
   const { user, logout } = useAuth()
   const { t } = useTranslation()
   const location = useLocation()
@@ -94,62 +104,8 @@ function CommitteeLayout() {
       <nav className="bg-white border-b">
         <div className="max-w-7xl mx-auto px-6 flex items-center justify-between h-12">
           <div className="flex items-center gap-1 overflow-x-auto">
-            {COMMITTEE_NAV.map(({ to, key }) => {
-              const active = location.pathname === to || (to === '/committee/candidates' && location.pathname.startsWith('/committee/athletes/'))
-              return (
-                <Link
-                  key={to}
-                  to={to}
-                  className={`px-3 py-1.5 text-sm rounded-md whitespace-nowrap ${
-                    active
-                      ? 'bg-gray-900 text-white font-medium'
-                      : 'text-gray-600 hover:bg-gray-100'
-                  }`}
-                >
-                  {t(key)}
-                </Link>
-              )
-            })}
-          </div>
-          <div className="flex items-center gap-3 shrink-0 ml-4">
-            {user && (
-              <span className="text-xs text-gray-400">
-                {user.firstName} {user.lastName}
-              </span>
-            )}
-            <LanguageSwitcher />
-            <button
-              onClick={() => logout()}
-              className="text-xs text-gray-400 hover:text-gray-600"
-            >
-              {t('auth.logout')}
-            </button>
-          </div>
-        </div>
-      </nav>
-      <Outlet />
-    </div>
-  )
-}
-
-// ── Collaborator layout with navigation ──────────────────────────────────────
-
-function CollaboratorLayout() {
-  const { user, logout } = useAuth()
-  const { t } = useTranslation()
-  const location = useLocation()
-
-  const navItems = [
-    { to: '/collaborator/candidates', key: 'nav.candidates' },
-  ]
-
-  return (
-    <div className="min-h-screen bg-gray-50">
-      <nav className="bg-white border-b">
-        <div className="max-w-7xl mx-auto px-6 flex items-center justify-between h-12">
-          <div className="flex items-center gap-1">
-            {navItems.map(({ to, key }) => {
-              const active = location.pathname === to
+            {navItems.map(({ to, key, activePrefix }) => {
+              const active = location.pathname === to || (activePrefix != null && location.pathname.startsWith(activePrefix))
               return (
                 <Link
                   key={to}
@@ -447,7 +403,7 @@ export default function App() {
             {/* Collaborator — requires collaborator role */}
             <Route path="/collaborator" element={
               <ProtectedRoute roles={['collaborator']}>
-                <CollaboratorLayout />
+                <AppLayout navItems={COLLABORATOR_NAV} />
               </ProtectedRoute>
             }>
               <Route path="candidates" element={<CandidatesPage />} />
@@ -457,7 +413,7 @@ export default function App() {
             {/* Committee — requires committee role (uses CommitteeLayout with nav) */}
             <Route path="/committee" element={
               <ProtectedRoute roles={['committee']}>
-                <CommitteeLayout />
+                <AppLayout navItems={COMMITTEE_NAV} />
               </ProtectedRoute>
             }>
               <Route path="dashboard" element={<DashboardPage />} />

@@ -15,6 +15,12 @@ export const PARTICIPATION_COLORS: Record<ParticipationStatus, string> = {
   not_selected: 'bg-red-100 text-red-800',
 }
 
+export const inputCls =
+  'w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-gray-900'
+
+export const labelCls =
+  'block text-xs font-medium text-gray-500 mb-1'
+
 export function formatPerf(value: number | null | undefined): string {
   if (value == null) return '—'
   // Distances/heights stored in cm (≥1000 means ≥10m) — format as m.cm

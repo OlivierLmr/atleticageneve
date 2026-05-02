@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from '@web/lib/api'
+import { inputCls, labelCls } from '@web/lib/ui-constants'
 import type { EventCatalog } from '@shared/types'
 
 interface EditionEvent {
@@ -150,8 +151,6 @@ export default function EventsPage() {
     }
   }
 
-  const inputCls = 'w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-gray-900'
-  const labelCls = 'block text-xs font-medium text-gray-500 mb-1'
   const isPending = createMutation.isPending || updateMutation.isPending
   const error = createMutation.error || updateMutation.error
 

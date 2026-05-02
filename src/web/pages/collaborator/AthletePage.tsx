@@ -7,7 +7,7 @@ import { api } from '@web/lib/api'
 import { useAuth } from '@web/lib/auth'
 import { LanguageSwitcher } from '@web/App'
 import { NEGOTIATION_TRANSITIONS, COMMITTEE_EXTRA_TRANSITIONS, ATHLETE_TRANSITIONS, NIGHT_LABELS, DINNER_LABELS } from '@shared/constants'
-import { STATUS_COLORS, formatPerf } from '@web/lib/ui-constants'
+import { STATUS_COLORS, formatPerf, inputCls, labelCls } from '@web/lib/ui-constants'
 import { computeScore } from '@shared/scoring'
 import type {
   NegotiationStatus,
@@ -196,8 +196,6 @@ function AthleteFieldEditor({ athlete, fields, onSave, isPending, error, t }: {
     }
     return init
   })
-
-  const inputCls = 'w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-gray-900'
 
   return (
     <div className="space-y-2">
@@ -513,8 +511,6 @@ function BannerEventRow({ app, athlete, edition, isStaff, onParticipationChange,
     selected: 'bg-green-100 text-green-800',
     not_selected: 'bg-red-100 text-red-800',
   }
-
-  const inputCls = 'w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-gray-900'
 
   return (
     <div className="flex items-center gap-3 py-1.5 border-b border-gray-100 last:border-0">
@@ -873,9 +869,6 @@ export default function AthletePage() {
     && athlete.applications.every(a => a.participationStatus !== 'pending')
   const hasAtLeastOneSelected = athlete.applications.some(a => a.participationStatus === 'selected')
   const canSendAgreement = allDecided && hasAtLeastOneSelected
-
-  const inputCls = 'w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-gray-900'
-  const labelCls = 'block text-xs font-medium text-gray-500 mb-1'
 
   const toggleSection = (name: string) => setOpenSection(openSection === name ? null : name)
 
