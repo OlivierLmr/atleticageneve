@@ -140,7 +140,7 @@ export default function EapCitiesPage() {
                     {t('common.edit')}
                   </button>
                   <button
-                    onClick={() => deleteMutation.mutate(city.id)}
+                    onClick={() => { if (confirm(t('common.confirmDelete'))) deleteMutation.mutate(city.id) }}
                     className="text-xs text-red-600 hover:text-red-800"
                   >
                     {t('common.delete')}

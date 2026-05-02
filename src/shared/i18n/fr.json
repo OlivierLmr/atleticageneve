@@ -35,7 +35,8 @@
     "pending": "En attente",
     "done": "Terminé",
     "cancelEdit": "Annuler",
-    "viewEmail": "Voir l'email"
+    "viewEmail": "Voir l'email",
+    "confirmDelete": "Êtes-vous sûr de vouloir supprimer cet élément ?"
   },
   "auth": {
     "login": "Se connecter",

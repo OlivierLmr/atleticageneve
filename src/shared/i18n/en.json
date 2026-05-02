@@ -35,7 +35,8 @@
     "pending": "Pending",
     "done": "Done",
     "cancelEdit": "Cancel edit",
-    "viewEmail": "View email"
+    "viewEmail": "View email",
+    "confirmDelete": "Are you sure you want to delete this item?"
   },
   "auth": {
     "login": "Log in",

@@ -137,7 +137,7 @@ export default function CountriesPage() {
                     {t('common.edit')}
                   </button>
                   <button
-                    onClick={() => deleteMutation.mutate(c.code)}
+                    onClick={() => { if (confirm(t('common.confirmDelete'))) deleteMutation.mutate(c.code) }}
                     className="text-xs text-red-600 hover:text-red-800"
                   >
                     {t('common.delete')}
