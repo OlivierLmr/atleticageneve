@@ -95,8 +95,11 @@ athletes.post('/', zValidator('json', athleteRegistrationSchema), async (c) => {
   await recalculateAthleteEstimatedCost(db, athleteId)
 
   // Auto-fetch WA performance data if profile URL provided
+  // waitUntil keeps the Worker alive after the response is sent
   if (data.waProfileUrl) {
-    fetchAndUpsertWaData(db, athleteId, upsertWaPerformance).catch(() => {})
+    c.executionCtx.waitUntil(
+      fetchAndUpsertWaData(db, athleteId, upsertWaPerformance).catch(() => {})
+    )
   }
 
   // If email provided, create a user record so the athlete can log in later
@@ -237,8 +240,11 @@ athletes.post('/batch', requireAuth('manager'), zValidator('json', batchAthleteR
     await recalculateAthleteEstimatedCost(db, athleteId)
 
     // Auto-fetch WA performance data if profile URL provided
+    // waitUntil keeps the Worker alive after the response is sent
     if (data.waProfileUrl) {
-      fetchAndUpsertWaData(db, athleteId, upsertWaPerformance).catch(() => {})
+      c.executionCtx.waitUntil(
+        fetchAndUpsertWaData(db, athleteId, upsertWaPerformance).catch(() => {})
+      )
     }
 
     results.push({ athleteId, applicationIds, firstName: data.firstName, lastName: data.lastName, eventIds: validEventIds })
