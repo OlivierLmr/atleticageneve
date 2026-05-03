@@ -21,7 +21,20 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
 
   if (!res.ok) {
     const body = await res.json().catch(() => ({ error: res.statusText })) as { error?: unknown }
-    const errorMessage = typeof body.error === 'string' ? body.error : res.statusText
+    let errorMessage: string
+    if (typeof body.error === 'string') {
+      errorMessage = body.error || res.statusText || 'Request failed'
+    } else if (body.error && typeof body.error === 'object') {
+      const issues = (body.error as Record<string, unknown>).issues
+      if (Array.isArray(issues) && issues.length > 0) {
+        const first = issues[0] as Record<string, unknown>
+        errorMessage = typeof first.message === 'string' ? first.message : 'Validation error'
+      } else {
+        errorMessage = res.statusText || 'Request failed'
+      }
+    } else {
+      errorMessage = res.statusText || 'Request failed'
+    }
     throw new ApiError(res.status, errorMessage)
   }
 
