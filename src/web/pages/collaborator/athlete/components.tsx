@@ -115,7 +115,12 @@ export function AthleteFieldEditor({ athlete, fields, onSave, isPending, error, 
         </div>
       ))}
       <button
-        onClick={() => onSave(form)}
+        onClick={() => {
+          const cleaned = Object.fromEntries(
+            Object.entries(form).map(([k, v]) => [k, v === '' ? null : v])
+          )
+          onSave(cleaned)
+        }}
         disabled={isPending}
         className="mt-2 text-xs bg-gray-900 text-white px-3 py-1 rounded hover:bg-gray-800 disabled:opacity-50"
       >

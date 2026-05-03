@@ -11,7 +11,7 @@ export function PersonalTab({ athlete, isStaff, isAthleteOrManager, staffUsers, 
   isAthleteOrManager: boolean
   staffUsers: StaffUser[]
   mutations: {
-    athleteUpdate: { mutate: (data: Record<string, unknown>) => void; isPending: boolean; error: Error | null }
+    athleteUpdate: { mutate: (data: Record<string, unknown>, options?: { onSuccess?: () => void }) => void; isPending: boolean; error: Error | null }
     internalNotes: { mutate: (notes: string) => void; isPending: boolean }
   }
 }) {
@@ -104,7 +104,9 @@ export function PersonalTab({ athlete, isStaff, isAthleteOrManager, staffUsers, 
         <AthleteFieldEditor
           athlete={athlete}
           fields={fields}
-          onSave={(data) => { mutations.athleteUpdate.mutate(data); setEditingSection(null) }}
+          onSave={(data) => {
+            mutations.athleteUpdate.mutate(data, { onSuccess: () => setEditingSection(null) })
+          }}
           isPending={mutations.athleteUpdate.isPending}
           error={mutations.athleteUpdate.error}
           t={t}
