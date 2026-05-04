@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import React, { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { api } from '@web/lib/api'
 import { computeScore } from '@shared/scoring'
@@ -9,11 +9,12 @@ import type { ApplicationRow } from './types'
 
 // ── ScoringPopup ────────────────────────────────────────────────────────────
 
-export function ScoringPopup({ app, athlete, edition, t }: {
+export function ScoringPopup({ app, athlete, edition, t, style }: {
   app: ApplicationForAthlete
   athlete: AthleteDetail
   edition: EditionCosts
   t: (key: string, opts?: Record<string, unknown>) => string
+  style?: React.CSSProperties
 }) {
   const wp = app.waPerformance
   if (!wp || wp.personalBest == null || !edition) return null
@@ -33,8 +34,10 @@ export function ScoringPopup({ app, athlete, edition, t }: {
     eapMinima: app.event.eapMinima,
   }, edition)
 
+  const posStyle: React.CSSProperties = style ?? { position: 'absolute', zIndex: 20, left: 0, top: '1.5rem' }
+
   return (
-    <div className="absolute z-20 left-0 top-6 bg-white border rounded-lg shadow-lg p-3 text-xs w-52">
+    <div className="bg-white border rounded-lg shadow-lg p-3 text-xs w-52" style={posStyle}>
       <p className="font-semibold mb-2">{t('selection.scoringBreakdown')}</p>
       <div className="space-y-1 text-gray-600">
         <div className="flex justify-between">
@@ -282,12 +285,13 @@ export function BannerEventRow({ app, athlete, edition, isStaff, onParticipation
 
 // ── CostPopup ───────────────────────────────────────────────────────────────
 
-export function CostPopup({ athlete, latestAgreement, costMode, allRooms, t }: {
+export function CostPopup({ athlete, latestAgreement, costMode, allRooms, t, style }: {
   athlete: AthleteDetail
   latestAgreement: Agreement | undefined
   costMode: string
   allRooms: { id: string; costPerNight: number; dinnerCost: number }[]
   t: (key: string) => string
+  style?: React.CSSProperties
 }) {
   const room = latestAgreement ? allRooms.find(r => r.id === latestAgreement.hotelRoomId) : undefined
   const nightCount = latestAgreement
@@ -302,8 +306,10 @@ export function CostPopup({ athlete, latestAgreement, costMode, allRooms, t }: {
   const transportAHCost = latestAgreement?.transportAirportHotel ? (athlete.edition?.transportAirportHotelCost ?? 0) : 0
   const transportHSCost = latestAgreement?.transportHotelStadium ? (athlete.edition?.transportHotelStadiumCost ?? 0) : 0
 
+  const posStyle: React.CSSProperties = style ?? { position: 'absolute', zIndex: 20, right: 0, top: '1.5rem' }
+
   return (
-    <div className="absolute z-20 right-0 top-6 bg-white border rounded-lg shadow-lg p-3 text-xs w-64">
+    <div className="bg-white border rounded-lg shadow-lg p-3 text-xs w-64" style={posStyle}>
       {costMode === 'confirmed' && !latestAgreement ? (
         <p className="text-green-700 italic">{t('selection.acceptedAtMeeting')}</p>
       ) : costMode !== 'estimated' && latestAgreement ? (

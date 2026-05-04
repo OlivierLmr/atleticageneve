@@ -1,4 +1,5 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import { useTranslation } from 'react-i18next'
 import { Link, useSearchParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
@@ -268,8 +269,10 @@ function CandidateRow({
   userRole: string | undefined
 }) {
   const { t } = useTranslation()
-  const [showCostPopup, setShowCostPopup] = useState(false)
-  const [showScoringPopup, setShowScoringPopup] = useState(false)
+  const costBtnRef = useRef<HTMLButtonElement>(null)
+  const scoreBtnRef = useRef<HTMLButtonElement>(null)
+  const [costRect, setCostRect] = useState<DOMRect | null>(null)
+  const [scoreRect, setScoreRect] = useState<DOMRect | null>(null)
 
   const pb = app.waPerformance?.personalBest ?? app.personalBest
   const sb = app.waPerformance?.seasonBest ?? app.seasonBest
@@ -348,30 +351,31 @@ function CandidateRow({
 
       {/* Cost with hover popup */}
       <td className="px-3 py-2.5 font-mono text-xs">
-        <div className="relative inline-block">
-          <button
-            className="text-left hover:text-blue-700 cursor-default"
-            onMouseEnter={() => setShowCostPopup(true)}
-            onMouseLeave={() => setShowCostPopup(false)}
-          >
-            {hasOffer && latestOfferCost != null ? (
-              `CHF ${latestOfferCost.toLocaleString()}`
-            ) : app.athlete.estTotal > 0 ? (
-              <span className="text-gray-400">CHF {app.athlete.estTotal.toLocaleString()}</span>
-            ) : (
-              <span className="text-gray-400">—</span>
-            )}
-          </button>
-          {showCostPopup && (
-            <CostPopup
-              athlete={athleteDetail}
-              latestAgreement={app.latestAgreement ?? undefined}
-              costMode={costMode}
-              allRooms={allRooms}
-              t={t}
-            />
+        <button
+          ref={costBtnRef}
+          className="text-left hover:text-blue-700 cursor-default"
+          onMouseEnter={() => { if (costBtnRef.current) setCostRect(costBtnRef.current.getBoundingClientRect()) }}
+          onMouseLeave={() => setCostRect(null)}
+        >
+          {hasOffer && latestOfferCost != null ? (
+            `CHF ${latestOfferCost.toLocaleString()}`
+          ) : app.athlete.estTotal > 0 ? (
+            <span className="text-gray-400">CHF {app.athlete.estTotal.toLocaleString()}</span>
+          ) : (
+            <span className="text-gray-400">—</span>
           )}
-        </div>
+        </button>
+        {costRect && createPortal(
+          <CostPopup
+            athlete={athleteDetail}
+            latestAgreement={app.latestAgreement ?? undefined}
+            costMode={costMode}
+            allRooms={allRooms}
+            t={t}
+            style={{ position: 'fixed', top: costRect.bottom + 4, left: Math.max(0, costRect.right - 256), zIndex: 9999 }}
+          />,
+          document.body
+        )}
       </td>
 
       {/* Event */}
@@ -393,23 +397,26 @@ function CandidateRow({
       {/* Scoring with hover popup */}
       <td className="px-3 py-2.5">
         {app.score != null ? (
-          <div className="relative inline-block">
+          <>
             <button
+              ref={scoreBtnRef}
               className="font-mono text-xs font-medium hover:text-blue-700 cursor-default"
-              onMouseEnter={() => setShowScoringPopup(true)}
-              onMouseLeave={() => setShowScoringPopup(false)}
+              onMouseEnter={() => { if (scoreBtnRef.current) setScoreRect(scoreBtnRef.current.getBoundingClientRect()) }}
+              onMouseLeave={() => setScoreRect(null)}
             >
               {(app.score * 100).toFixed(0)}
             </button>
-            {showScoringPopup && edition && (
+            {scoreRect && edition && createPortal(
               <ScoringPopup
                 app={appForScoring}
                 athlete={athleteDetail}
                 edition={edition}
                 t={t}
-              />
+                style={{ position: 'fixed', top: scoreRect.bottom + 4, left: scoreRect.left, zIndex: 9999 }}
+              />,
+              document.body
             )}
-          </div>
+          </>
         ) : (
           '—'
         )}
