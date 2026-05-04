@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
@@ -44,6 +45,8 @@ export default function ManagerRegisterPage() {
   const [error, setError] = useState('')
   const [registeredCount, setRegisteredCount] = useState(0)
   const [expandedRow, setExpandedRow] = useState<string | null>(null)
+  const [dropdownPos, setDropdownPos] = useState<{ top: number; left: number; minWidth: number } | null>(null)
+  const dropdownRef = useRef<HTMLDivElement>(null)
 
   const { data: eapCities = [] } = useQuery<EapCity[]>({
     queryKey: ['eap-cities'],
@@ -85,8 +88,31 @@ export default function ManagerRegisterPage() {
   const removeRow = (key: string) => {
     if (rows.length <= 1) return
     setRows(prev => prev.filter(r => r.key !== key))
-    if (expandedRow === key) setExpandedRow(null)
+    if (expandedRow === key) {
+      setExpandedRow(null)
+      setDropdownPos(null)
+    }
   }
+
+  // Close dropdown when clicking outside or scrolling
+  useEffect(() => {
+    if (!expandedRow) return
+    const handleMouseDown = (e: MouseEvent) => {
+      if (dropdownRef.current?.contains(e.target as Node)) return
+      setExpandedRow(null)
+      setDropdownPos(null)
+    }
+    const handleScroll = () => {
+      setExpandedRow(null)
+      setDropdownPos(null)
+    }
+    document.addEventListener('mousedown', handleMouseDown)
+    window.addEventListener('scroll', handleScroll, true)
+    return () => {
+      document.removeEventListener('mousedown', handleMouseDown)
+      window.removeEventListener('scroll', handleScroll, true)
+    }
+  }, [expandedRow])
 
   const validRows = rows.filter(r => r.firstName && r.lastName && r.gender && r.eventIds.length > 0)
 
@@ -138,6 +164,11 @@ export default function ManagerRegisterPage() {
 
   const inputCls = 'w-full px-2 py-1.5 border border-gray-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-gray-900'
 
+  const expandedRowData = expandedRow ? rows.find(r => r.key === expandedRow) : null
+  const expandedRowEvents = expandedRowData
+    ? events.filter(e => e.id !== 'all' && e.gender === expandedRowData.gender)
+    : []
+
   return (
     <div className="min-h-screen bg-gray-50 px-4 py-8">
       <div className="max-w-5xl mx-auto">
@@ -166,7 +197,6 @@ export default function ManagerRegisterPage() {
             </thead>
             <tbody>
               {rows.map((row) => {
-                const filteredEvents = events.filter(e => e.id !== 'all' && (!row.gender || e.gender === row.gender))
                 return (
                   <tr key={row.key} className="border-b align-top">
                     <td className="px-1 py-1"><input className={inputCls} value={row.lastName} onChange={e => updateRow(row.key, 'lastName', e.target.value)} /></td>
@@ -192,37 +222,31 @@ export default function ManagerRegisterPage() {
                       )}
                     </td>
                     <td className="px-1 py-1"><input className={inputCls} value={row.waProfileUrl} onChange={e => updateRow(row.key, 'waProfileUrl', e.target.value)} placeholder="worldathletics.org/..." /></td>
-                    <td className="px-1 py-1 relative">
+                    <td className="px-1 py-1">
                       {!row.gender ? (
                         <span className="text-gray-400 text-xs">{t('athlete.gender')}...</span>
                       ) : (
                         <button
                           type="button"
-                          onClick={() => setExpandedRow(expandedRow === row.key ? null : row.key)}
+                          onMouseDown={(e) => {
+                            // stopPropagation so the document mousedown listener doesn't immediately close it
+                            e.stopPropagation()
+                            const btn = e.currentTarget
+                            const rect = btn.getBoundingClientRect()
+                            if (expandedRow === row.key) {
+                              setExpandedRow(null)
+                              setDropdownPos(null)
+                            } else {
+                              setDropdownPos({ top: rect.bottom + 4, left: rect.left, minWidth: Math.max(rect.width, 200) })
+                              setExpandedRow(row.key)
+                            }
+                          }}
                           className={`${inputCls} text-left ${row.eventIds.length > 0 ? 'text-gray-900' : 'text-gray-400'}`}
                         >
                           {row.eventIds.length > 0
                             ? `${row.eventIds.length} ${t('athlete.event')}(s)`
                             : `— ${t('athlete.event')}(s)`}
                         </button>
-                      )}
-                      {expandedRow === row.key && row.gender && (
-                        <div className="absolute z-10 mt-1 bg-white border rounded shadow-lg p-2 max-h-48 overflow-y-auto">
-                          {filteredEvents.map(e => (
-                            <label key={e.id} className="flex items-center gap-2 p-1 hover:bg-gray-50 cursor-pointer">
-                              <input
-                                type="checkbox"
-                                checked={row.eventIds.includes(e.id)}
-                                onChange={() => toggleEvent(row.key, e.id)}
-                                className="accent-gray-900"
-                              />
-                              <span className="text-xs">{e.name}</span>
-                            </label>
-                          ))}
-                          {filteredEvents.length === 0 && (
-                            <p className="text-xs text-gray-400 p-1">{t('athlete.noEvents')}</p>
-                          )}
-                        </div>
                       )}
                     </td>
                     <td className="px-1 py-1">
@@ -262,6 +286,37 @@ export default function ManagerRegisterPage() {
           </div>
         </div>
       </div>
+
+      {/* Event selection dropdown rendered via portal to escape overflow clipping */}
+      {expandedRow && dropdownPos && expandedRowData && createPortal(
+        <div
+          ref={dropdownRef}
+          style={{
+            position: 'fixed',
+            top: dropdownPos.top,
+            left: dropdownPos.left,
+            minWidth: dropdownPos.minWidth,
+            zIndex: 9999,
+          }}
+          className="bg-white border rounded shadow-lg p-2 max-h-48 overflow-y-auto"
+        >
+          {expandedRowEvents.map(e => (
+            <label key={e.id} className="flex items-center gap-2 p-1 hover:bg-gray-50 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={expandedRowData.eventIds.includes(e.id)}
+                onChange={() => toggleEvent(expandedRow, e.id)}
+                className="accent-gray-900"
+              />
+              <span className="text-xs">{e.name}</span>
+            </label>
+          ))}
+          {expandedRowEvents.length === 0 && (
+            <p className="text-xs text-gray-400 p-1">{t('athlete.noEvents')}</p>
+          )}
+        </div>,
+        document.body
+      )}
     </div>
   )
 }
