@@ -61,31 +61,22 @@ applications.get('/', async (c) => {
     waPerformance: waPerfMap.get(`${r.application.athleteId}-${r.application.eventId}`) ?? null,
   }))
 
-  // Fetch latest agreement totalCost per athlete
+  // Fetch latest agreement per athlete (full object for cost popup)
   const athleteIds = [...new Set(baseResults.map((r) => r.athlete.id))]
-  const latestOfferCostMap = new Map<string, number>()
-  if (athleteIds.length > 0) {
-    const agreements = await db
-      .select({
-        athleteId: schema.agreement.athleteId,
-        version: schema.agreement.version,
-        totalCost: schema.agreement.totalCost,
-      })
-      .from(schema.agreement)
-      .where(inArray(schema.agreement.athleteId, athleteIds))
-    const latestVersionMap = new Map<string, number>()
-    for (const agr of agreements) {
-      const existingVersion = latestVersionMap.get(agr.athleteId) ?? -1
-      if (agr.version > existingVersion) {
-        latestVersionMap.set(agr.athleteId, agr.version)
-        latestOfferCostMap.set(agr.athleteId, agr.totalCost)
-      }
+  const allAgreements = athleteIds.length > 0
+    ? await db.select().from(schema.agreement).where(inArray(schema.agreement.athleteId, athleteIds))
+    : []
+  const latestAgreementMap = new Map<string, (typeof allAgreements)[number]>()
+  for (const agr of allAgreements) {
+    const existing = latestAgreementMap.get(agr.athleteId)
+    if (!existing || agr.version > existing.version) {
+      latestAgreementMap.set(agr.athleteId, agr)
     }
   }
 
   let results = baseResults.map((r) => ({
     ...r,
-    latestOfferCost: latestOfferCostMap.get(r.athlete.id) ?? null,
+    latestAgreement: latestAgreementMap.get(r.athlete.id) ?? null,
   }))
 
   // Filter by managerId (athlete.managerId)

@@ -7,13 +7,14 @@ import { useAuth } from '@web/lib/auth'
 import { LanguageSwitcher } from '@web/App'
 import { STATUS_COLORS, PARTICIPATION_COLORS, formatPerf } from '@web/lib/ui-constants'
 import { PARTICIPATION_TRANSITIONS } from '@shared/constants'
-import type { Application, Athlete, Event, EventCatalog, NegotiationStatus, ParticipationStatus, WaPerformance } from '@shared/types'
+import { ScoringPopup, CostPopup } from './athlete/BannerEventRow'
+import type { Application, Athlete, Agreement, AthleteDetail, ApplicationForAthlete, Event, EventCatalog, NegotiationStatus, ParticipationStatus, WaPerformance, EditionCosts, Edition } from '@shared/types'
 
 interface ApplicationRow extends Application {
   athlete: Athlete
   event: Event & { catalog: EventCatalog }
   waPerformance: WaPerformance | null
-  latestOfferCost: number | null
+  latestAgreement: Agreement | null
 }
 
 interface EventListItem extends Event {
@@ -251,6 +252,205 @@ function EventInfoPanel({
   )
 }
 
+// ── CandidateRow ─────────────────────────────────────────────────────────────
+
+function CandidateRow({
+  app,
+  edition,
+  allRooms,
+  onStatusClick,
+  userRole,
+}: {
+  app: ApplicationRow
+  edition: EditionCosts | null
+  allRooms: { id: string; costPerNight: number; dinnerCost: number }[]
+  onStatusClick: (app: ApplicationRow) => void
+  userRole: string | undefined
+}) {
+  const { t } = useTranslation()
+  const [showCostPopup, setShowCostPopup] = useState(false)
+  const [showScoringPopup, setShowScoringPopup] = useState(false)
+
+  const pb = app.waPerformance?.personalBest ?? app.personalBest
+  const sb = app.waPerformance?.seasonBest ?? app.seasonBest
+  const wr = app.waPerformance?.worldRanking ?? app.worldRanking
+  const sbColor = seasonBestColor(app, sb)
+  const allowedTransitions = PARTICIPATION_TRANSITIONS[app.participationStatus] ?? []
+  const canChangeStatus = allowedTransitions.length > 0
+
+  const costMode =
+    app.athlete.negotiationStatus === 'confirmed' ? 'confirmed' :
+    ['agreement_sent', 'counter_offer_sent'].includes(app.athlete.negotiationStatus) ? 'negotiating' :
+    'estimated'
+
+  const latestOfferCost = app.latestAgreement?.totalCost ?? null
+  const hasOffer = ['agreement_sent', 'counter_offer_sent', 'confirmed'].includes(app.athlete.negotiationStatus)
+
+  // AthleteDetail-compatible object for the popups (edition is supplied externally)
+  const athleteDetail = {
+    ...app.athlete,
+    edition,
+    managerName: null,
+    applications: [] as ApplicationForAthlete[],
+    agreements: [] as Agreement[],
+    interactions: [],
+  } as AthleteDetail
+
+  const appForScoring = app as ApplicationForAthlete
+
+  return (
+    <tr className="border-b hover:bg-gray-50 transition-colors">
+      {/* Name */}
+      <td className="px-3 py-2.5">
+        <Link
+          to={
+            userRole === 'committee'
+              ? `/committee/athletes/${app.athleteId}`
+              : `/collaborator/athletes/${app.athleteId}`
+          }
+          className="font-medium text-gray-900 hover:underline"
+        >
+          {app.athlete.lastName}, {app.athlete.firstName}
+        </Link>
+        {app.athlete.managerId && (
+          <span className="ml-1 text-[10px] text-gray-400">MGR</span>
+        )}
+        {app.athlete.isEap && (
+          <span className="ml-1 text-[10px] text-gray-400">EAP</span>
+        )}
+      </td>
+
+      {/* Nationality */}
+      <td className="px-3 py-2.5">
+        <span
+          className={`text-xs ${
+            app.athlete.isSwiss
+              ? 'text-red-600 font-semibold'
+              : app.athlete.isEap
+              ? 'text-blue-600 font-semibold'
+              : 'text-gray-600'
+          }`}
+        >
+          {app.athlete.nationality}
+        </span>
+      </td>
+
+      {/* Negotiation status */}
+      <td className="px-3 py-2.5">
+        <span
+          className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${
+            STATUS_COLORS[app.athlete.negotiationStatus as NegotiationStatus] ?? ''
+          }`}
+        >
+          {t(`status.${app.athlete.negotiationStatus}`)}
+        </span>
+      </td>
+
+      {/* Cost with hover popup */}
+      <td className="px-3 py-2.5 font-mono text-xs">
+        <div className="relative inline-block">
+          <button
+            className="text-left hover:text-blue-700 cursor-default"
+            onMouseEnter={() => setShowCostPopup(true)}
+            onMouseLeave={() => setShowCostPopup(false)}
+          >
+            {hasOffer && latestOfferCost != null ? (
+              `CHF ${latestOfferCost.toLocaleString()}`
+            ) : app.athlete.estTotal > 0 ? (
+              <span className="text-gray-400">CHF {app.athlete.estTotal.toLocaleString()}</span>
+            ) : (
+              <span className="text-gray-400">—</span>
+            )}
+          </button>
+          {showCostPopup && (
+            <CostPopup
+              athlete={athleteDetail}
+              latestAgreement={app.latestAgreement ?? undefined}
+              costMode={costMode}
+              allRooms={allRooms}
+              t={t}
+            />
+          )}
+        </div>
+      </td>
+
+      {/* Event */}
+      <td className="px-3 py-2.5 text-gray-600">{app.event.catalog.name}</td>
+
+      {/* Personal best */}
+      <td className="px-3 py-2.5 font-mono text-xs text-gray-700">
+        {formatPerf(pb)}
+      </td>
+
+      {/* Season best */}
+      <td className={`px-3 py-2.5 font-mono text-xs ${sbColor}`}>
+        {formatPerf(sb)}
+      </td>
+
+      {/* World ranking */}
+      <td className="px-3 py-2.5 font-mono text-xs text-gray-700">{wr ?? '—'}</td>
+
+      {/* Scoring with hover popup */}
+      <td className="px-3 py-2.5">
+        {app.score != null ? (
+          <div className="relative inline-block">
+            <button
+              className="font-mono text-xs font-medium hover:text-blue-700 cursor-default"
+              onMouseEnter={() => setShowScoringPopup(true)}
+              onMouseLeave={() => setShowScoringPopup(false)}
+            >
+              {(app.score * 100).toFixed(0)}
+            </button>
+            {showScoringPopup && edition && (
+              <ScoringPopup
+                app={appForScoring}
+                athlete={athleteDetail}
+                edition={edition}
+                t={t}
+              />
+            )}
+          </div>
+        ) : (
+          '—'
+        )}
+      </td>
+
+      {/* Recommendation */}
+      <td className="px-3 py-2.5">
+        {app.recommendation ? (
+          <span
+            className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${
+              REC_COLORS[app.recommendation] ?? 'bg-gray-100 text-gray-600'
+            }`}
+          >
+            {app.recommendation}
+          </span>
+        ) : (
+          '—'
+        )}
+      </td>
+
+      {/* Selection status — clickable */}
+      <td className="px-3 py-2.5">
+        <button
+          className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${
+            PARTICIPATION_COLORS[app.participationStatus]
+          } ${canChangeStatus ? 'cursor-pointer hover:opacity-80' : 'cursor-default'}`}
+          disabled={!canChangeStatus}
+          onClick={() => {
+            if (!canChangeStatus) return
+            onStatusClick(app)
+          }}
+        >
+          {t(`participation.${app.participationStatus}`)}
+        </button>
+      </td>
+    </tr>
+  )
+}
+
+// ── CandidatesPage ────────────────────────────────────────────────────────────
+
 export default function CandidatesPage() {
   const { t } = useTranslation()
   const { user } = useAuth()
@@ -341,6 +541,18 @@ export default function CandidatesPage() {
     queryFn: () => api.get('/api/v1/users?role=manager'),
   })
 
+  const { data: editionRaw } = useQuery<Edition>({
+    queryKey: ['edition'],
+    queryFn: () => api.get('/api/v1/editions/current'),
+  })
+
+  const edition: EditionCosts | null = editionRaw ?? null
+
+  const { data: allRooms = [] } = useQuery<{ id: string; costPerNight: number; dinnerCost: number }[]>({
+    queryKey: ['hotel-rooms'],
+    queryFn: () => api.get('/api/v1/hotel-rooms'),
+  })
+
   const statusChangeMutation = useMutation({
     mutationFn: ({ appId, newStatus }: { appId: string; newStatus: ParticipationStatus }) =>
       api.patch(`/api/v1/applications/${appId}/participation-status`, {
@@ -365,7 +577,7 @@ export default function CandidatesPage() {
         return NEGOTIATION_ORDER[app.athlete.negotiationStatus] ?? 99
       case 'cost': {
         const hasOffer = ['agreement_sent', 'counter_offer_sent', 'confirmed'].includes(app.athlete.negotiationStatus)
-        return hasOffer && app.latestOfferCost != null ? app.latestOfferCost : app.athlete.estTotal
+        return hasOffer && app.latestAgreement?.totalCost != null ? app.latestAgreement.totalCost : app.athlete.estTotal
       }
       case 'event':
         return app.event.catalog.name.toLowerCase()
@@ -571,145 +783,24 @@ export default function CandidatesPage() {
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((app) => {
-                  const pb = app.waPerformance?.personalBest ?? app.personalBest
-                  const sb = app.waPerformance?.seasonBest ?? app.seasonBest
-                  const wr = app.waPerformance?.worldRanking ?? app.worldRanking
-                  const sbColor = seasonBestColor(app, sb)
-                  const allowedTransitions = PARTICIPATION_TRANSITIONS[app.participationStatus] ?? []
-                  const canChangeStatus = allowedTransitions.length > 0
-
-                  return (
-                    <tr key={app.id} className="border-b hover:bg-gray-50 transition-colors">
-                      {/* Name */}
-                      <td className="px-3 py-2.5">
-                        <Link
-                          to={
-                            user?.role === 'committee'
-                              ? `/committee/athletes/${app.athleteId}`
-                              : `/collaborator/athletes/${app.athleteId}`
-                          }
-                          className="font-medium text-gray-900 hover:underline"
-                        >
-                          {app.athlete.lastName}, {app.athlete.firstName}
-                        </Link>
-                        {app.athlete.managerId && (
-                          <span className="ml-1 text-[10px] text-gray-400">MGR</span>
-                        )}
-                        {app.athlete.isEap && (
-                          <span className="ml-1 text-[10px] text-gray-400">EAP</span>
-                        )}
-                      </td>
-
-                      {/* Nationality */}
-                      <td className="px-3 py-2.5">
-                        <span
-                          className={`text-xs ${
-                            app.athlete.isSwiss
-                              ? 'text-red-600 font-semibold'
-                              : app.athlete.isEap
-                              ? 'text-blue-600 font-semibold'
-                              : 'text-gray-600'
-                          }`}
-                        >
-                          {app.athlete.nationality}
-                        </span>
-                      </td>
-
-                      {/* Negotiation status */}
-                      <td className="px-3 py-2.5">
-                        <span
-                          className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${
-                            STATUS_COLORS[app.athlete.negotiationStatus as NegotiationStatus] ?? ''
-                          }`}
-                        >
-                          {t(`status.${app.athlete.negotiationStatus}`)}
-                        </span>
-                      </td>
-
-                      {/* Cost */}
-                      <td className="px-3 py-2.5 font-mono text-xs">
-                        {(() => {
-                          const hasOffer = ['agreement_sent', 'counter_offer_sent', 'confirmed'].includes(app.athlete.negotiationStatus)
-                          if (hasOffer && app.latestOfferCost != null) {
-                            return `CHF ${app.latestOfferCost.toLocaleString()}`
-                          }
-                          return app.athlete.estTotal > 0 ? (
-                            <span className="text-gray-400">
-                              CHF {app.athlete.estTotal.toLocaleString()}
-                            </span>
-                          ) : (
-                            <span className="text-gray-400">—</span>
-                          )
-                        })()}
-                      </td>
-
-                      {/* Event */}
-                      <td className="px-3 py-2.5 text-gray-600">{app.event.catalog.name}</td>
-
-                      {/* Personal best */}
-                      <td className="px-3 py-2.5 font-mono text-xs text-gray-700">
-                        {formatPerf(pb)}
-                      </td>
-
-                      {/* Season best */}
-                      <td className={`px-3 py-2.5 font-mono text-xs ${sbColor}`}>
-                        {formatPerf(sb)}
-                      </td>
-
-                      {/* World ranking */}
-                      <td className="px-3 py-2.5 font-mono text-xs text-gray-700">{wr ?? '—'}</td>
-
-                      {/* Scoring */}
-                      <td className="px-3 py-2.5">
-                        {app.score != null ? (
-                          <span className="font-mono text-xs font-medium">
-                            {(app.score * 100).toFixed(0)}
-                          </span>
-                        ) : (
-                          '—'
-                        )}
-                      </td>
-
-                      {/* Recommendation */}
-                      <td className="px-3 py-2.5">
-                        {app.recommendation ? (
-                          <span
-                            className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${
-                              REC_COLORS[app.recommendation] ?? 'bg-gray-100 text-gray-600'
-                            }`}
-                          >
-                            {app.recommendation}
-                          </span>
-                        ) : (
-                          '—'
-                        )}
-                      </td>
-
-                      {/* Selection status — clickable */}
-                      <td className="px-3 py-2.5">
-                        <button
-                          className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${
-                            PARTICIPATION_COLORS[app.participationStatus]
-                          } ${canChangeStatus ? 'cursor-pointer hover:opacity-80' : 'cursor-default'}`}
-                          disabled={!canChangeStatus}
-                          onClick={() => {
-                            if (!canChangeStatus) return
-                            setStatusModal({
-                              appId: app.id,
-                              athleteName: `${app.athlete.lastName}, ${app.athlete.firstName}`,
-                              eventName: app.event.catalog.name,
-                              currentStatus: app.participationStatus,
-                              pendingNew: null,
-                            })
-                          }}
-                        >
-                          {t(`participation.${app.participationStatus}`)}
-                        </button>
-                      </td>
-                    </tr>
-                  )
-                })}
+                {filtered.map((app) => (
+                  <CandidateRow
+                    key={app.id}
+                    app={app}
+                    edition={edition}
+                    allRooms={allRooms}
+                    onStatusClick={(a) =>
+                      setStatusModal({
+                        appId: a.id,
+                        athleteName: `${a.athlete.lastName}, ${a.athlete.firstName}`,
+                        eventName: a.event.catalog.name,
+                        currentStatus: a.participationStatus,
+                        pendingNew: null,
+                      })
+                    }
+                    userRole={user?.role}
+                  />
+                ))}
               </tbody>
             </table>
           </div>

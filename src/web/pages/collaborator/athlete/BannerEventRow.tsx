@@ -9,7 +9,7 @@ import type { ApplicationRow } from './types'
 
 // ── ScoringPopup ────────────────────────────────────────────────────────────
 
-function ScoringPopup({ app, athlete, edition, t }: {
+export function ScoringPopup({ app, athlete, edition, t }: {
   app: ApplicationForAthlete
   athlete: AthleteDetail
   edition: EditionCosts
