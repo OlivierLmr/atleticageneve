@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { api } from '@web/lib/api'
 import { computeScore } from '@shared/scoring'
 import { formatPerf } from '@web/lib/ui-constants'
+import { NIGHT_LABELS, DINNER_LABELS } from '@shared/constants'
 import type { AthleteDetail, ApplicationForAthlete, EditionCosts, Agreement } from '@shared/types'
 import type { ApplicationRow } from './types'
 
@@ -281,21 +282,40 @@ export function BannerEventRow({ app, athlete, edition, isStaff, onParticipation
 
 // ── CostPopup ───────────────────────────────────────────────────────────────
 
-export function CostPopup({ athlete, latestAgreement, costMode, t }: {
+export function CostPopup({ athlete, latestAgreement, costMode, allRooms, t }: {
   athlete: AthleteDetail
   latestAgreement: Agreement | undefined
   costMode: string
+  allRooms: { id: string; costPerNight: number; dinnerCost: number }[]
   t: (key: string) => string
 }) {
+  const room = latestAgreement ? allRooms.find(r => r.id === latestAgreement.hotelRoomId) : undefined
+  const nightCount = latestAgreement
+    ? NIGHT_LABELS.filter(n => latestAgreement[`hotelNight${n.charAt(0).toUpperCase() + n.slice(1)}` as keyof Agreement]).length
+    : 0
+  const dinnerCount = latestAgreement
+    ? DINNER_LABELS.filter(d => latestAgreement[`dinner${d.charAt(0).toUpperCase() + d.slice(1)}` as keyof Agreement]).length
+    : 0
+  const hotelCost = nightCount * (room?.costPerNight ?? 0)
+  const dinnerCost = dinnerCount * (room?.dinnerCost ?? 0)
+  const stadiumMealCost = latestAgreement?.stadiumMeals ? (athlete.edition?.stadiumMealCost ?? 0) : 0
+  const transportAHCost = latestAgreement?.transportAirportHotel ? (athlete.edition?.transportAirportHotelCost ?? 0) : 0
+  const transportHSCost = latestAgreement?.transportHotelStadium ? (athlete.edition?.transportHotelStadiumCost ?? 0) : 0
+
   return (
-    <div className="absolute z-20 right-0 top-6 bg-white border rounded-lg shadow-lg p-3 text-xs w-56">
+    <div className="absolute z-20 right-0 top-6 bg-white border rounded-lg shadow-lg p-3 text-xs w-64">
       {costMode === 'confirmed' && !latestAgreement ? (
         <p className="text-green-700 italic">{t('selection.acceptedAtMeeting')}</p>
       ) : costMode !== 'estimated' && latestAgreement ? (
         <div className="space-y-1 text-gray-600">
-          {latestAgreement.appearanceFee > 0 && <div className="flex justify-between"><span>{t('contract.bonus')}</span><span>CHF {latestAgreement.appearanceFee}</span></div>}
-          {latestAgreement.transport > 0 && <div className="flex justify-between"><span>{t('contract.transport')}</span><span>CHF {latestAgreement.transport}</span></div>}
-          {latestAgreement.otherCompensation > 0 && <div className="flex justify-between"><span>{t('contract.otherCompensation')}</span><span>CHF {latestAgreement.otherCompensation}</span></div>}
+          {latestAgreement.appearanceFee > 0 && <div className="flex justify-between"><span>{t('contract.bonus')}</span><span>CHF {latestAgreement.appearanceFee.toLocaleString()}</span></div>}
+          {latestAgreement.transport > 0 && <div className="flex justify-between"><span>{t('contract.transport')}</span><span>CHF {latestAgreement.transport.toLocaleString()}</span></div>}
+          {latestAgreement.otherCompensation > 0 && <div className="flex justify-between"><span>{t('contract.otherCompensation')}</span><span>CHF {latestAgreement.otherCompensation.toLocaleString()}</span></div>}
+          {hotelCost > 0 && <div className="flex justify-between"><span>{t('contract.hotelNights')} ({nightCount})</span><span>CHF {hotelCost.toLocaleString()}</span></div>}
+          {dinnerCost > 0 && <div className="flex justify-between"><span>{t('contract.dinners')} ({dinnerCount})</span><span>CHF {dinnerCost.toLocaleString()}</span></div>}
+          {stadiumMealCost > 0 && <div className="flex justify-between"><span>{t('contract.stadiumMeals')}</span><span>CHF {stadiumMealCost.toLocaleString()}</span></div>}
+          {transportAHCost > 0 && <div className="flex justify-between"><span>{t('contract.transportAirportHotel')}</span><span>CHF {transportAHCost.toLocaleString()}</span></div>}
+          {transportHSCost > 0 && <div className="flex justify-between"><span>{t('contract.transportHotelStadium')}</span><span>CHF {transportHSCost.toLocaleString()}</span></div>}
           <div className="border-t pt-1 mt-1 flex justify-between font-semibold text-gray-900">
             <span>{t('contract.totalCost')}</span>
             <span>CHF {(latestAgreement.totalCost ?? 0).toLocaleString()}</span>
