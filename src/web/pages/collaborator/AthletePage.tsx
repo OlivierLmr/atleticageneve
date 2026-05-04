@@ -24,7 +24,7 @@ import {
 export default function AthletePage() {
   const { t } = useTranslation()
   const { id } = useParams<{ id: string }>()
-  const { user } = useAuth()
+  const { user, logout } = useAuth()
   const navigate = useNavigate()
 
   // ── Data ───────────────────────────────���──────────────────────────────
@@ -136,13 +136,20 @@ export default function AthletePage() {
               >
                 ← {t('common.back')}
               </button>
-            ) : (
+            ) : user?.role === 'manager' ? (
               <Link
-                to={user?.role === 'manager' ? '/manager/portal' : '/athlete/portal'}
+                to="/manager/portal"
                 className="text-sm text-gray-400 hover:text-gray-600"
               >
                 ← {t('common.back')}
               </Link>
+            ) : (
+              <button
+                onClick={() => logout()}
+                className="text-sm text-gray-400 hover:text-gray-600"
+              >
+                {t('auth.logout')}
+              </button>
             )}
             <LanguageSwitcher />
           </div>
