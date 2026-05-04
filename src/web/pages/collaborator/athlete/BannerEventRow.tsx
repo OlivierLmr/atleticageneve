@@ -199,8 +199,8 @@ export function BannerEventRow({ app, athlete, edition, isStaff, onParticipation
           <span>SB: <span className={`font-mono font-medium ${sbColorClass(sb, app, athlete)}`}>{formatPerf(sb)}</span></span>
           <span>#{wr ?? '—'}</span>
 
-          {/* Score with popup */}
-          {app.score != null && (
+          {/* Score with popup — staff only */}
+          {isStaff && app.score != null && (
             <div className="relative">
               <button
                 onMouseEnter={() => setShowScorePopup(true)}
@@ -215,8 +215,8 @@ export function BannerEventRow({ app, athlete, edition, isStaff, onParticipation
             </div>
           )}
 
-          {/* Recommendation */}
-          {app.recommendation && (
+          {/* Recommendation — staff only */}
+          {isStaff && app.recommendation && (
             <span className={`text-[10px] px-1.5 py-0.5 rounded ${
               app.recommendation === 'Highly Recommended' ? 'bg-green-100 text-green-700' :
               app.recommendation === 'Recommended' ? 'bg-blue-100 text-blue-700' :
