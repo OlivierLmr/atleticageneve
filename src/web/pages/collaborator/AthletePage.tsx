@@ -221,7 +221,7 @@ export default function AthletePage() {
                       {costLabel}: {costSummary}
                     </button>
                     {showCostPopup && (
-                      <CostPopup athlete={athlete} latestAgreement={latestAgreement} costMode={costMode} t={t} />
+                      <CostPopup athlete={athlete} latestAgreement={latestAgreement} costMode={costMode} allRooms={allRooms} t={t} />
                     )}
                   </div>
                 )}
