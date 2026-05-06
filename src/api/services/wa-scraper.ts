@@ -2,7 +2,7 @@
 // Fetches an athlete's WA profile page, extracts __NEXT_DATA__ JSON,
 // and parses PB, SB, and world ranking per discipline.
 
-import { eq } from 'drizzle-orm'
+import { and, eq, isNotNull } from 'drizzle-orm'
 import * as schema from '../db/schema'
 import type { Db } from '../lib/helpers'
 
@@ -25,38 +25,18 @@ export interface DisciplineMapping {
   waName: string
   waRankingSlug: string | null
   catalogName: string
+  isField: boolean
 }
-
-// ── Default Seed Data ──────────────────────────────────────���─────────────────
-
-export const DEFAULT_DISCIPLINE_MAPPINGS: DisciplineMapping[] = [
-  { waName: '100 Metres', waRankingSlug: '100m', catalogName: '100m' },
-  { waName: '200 Metres', waRankingSlug: '200m', catalogName: '200m' },
-  { waName: '400 Metres', waRankingSlug: '400m', catalogName: '400m' },
-  { waName: '400 Metres Hurdles', waRankingSlug: '400mh', catalogName: '400mH' },
-  { waName: '800 Metres', waRankingSlug: '800m', catalogName: '800m' },
-  { waName: '1500 Metres', waRankingSlug: '1500m', catalogName: '1500m' },
-  { waName: '5000 Metres', waRankingSlug: '5000m', catalogName: '5000m' },
-  { waName: 'High Jump', waRankingSlug: 'high-jump', catalogName: 'High Jump' },
-  { waName: 'Long Jump', waRankingSlug: 'long-jump', catalogName: 'Long Jump' },
-  { waName: 'Pole Vault', waRankingSlug: 'pole-vault', catalogName: 'Pole Vault' },
-  { waName: 'Shot Put', waRankingSlug: 'shot-put', catalogName: 'Shot Put' },
-]
-
-// Track disciplines use 'Course' (lower is better), field uses 'Concours' (higher is better)
-const FIELD_EVENTS = new Set(['High Jump', 'Long Jump', 'Pole Vault', 'Shot Put'])
 
 // ── Mark Parsing ─────────────────────────────────────────────────────────────
 
 /**
  * Parse a WA mark string into a numeric value.
- * - Track events: stored as seconds (e.g. "9.80" → 9.80, "3:26.00" → 206.00)
- * - Field events: stored as centimeters (e.g. "2.35" → 235)
+ * - Track events (isField=false): stored as seconds (e.g. "9.80" → 9.80, "3:26.00" → 206.00)
+ * - Field events (isField=true): stored as centimeters (e.g. "2.35" → 235)
  */
-export function parseMark(mark: string, catalogName: string): number | null {
+export function parseMark(mark: string, isField: boolean): number | null {
   if (!mark || mark === '') return null
-
-  const isField = FIELD_EVENTS.has(catalogName)
 
   // Handle mm:ss.cc format (e.g. "3:26.00")
   const colonMatch = mark.match(/^(\d+):(\d+(?:\.\d+)?)$/)
@@ -93,18 +73,18 @@ interface WaRanking {
 
 /**
  * Fetch a WA profile page and extract structured performance data.
- * Discipline mapping is loaded from DB and passed in.
+ * Discipline mappings are built from the event catalog (gender-filtered).
  */
 export async function scrapeWaProfile(
   waProfileUrl: string,
   mappings: DisciplineMapping[],
 ): Promise<WaScrapeResult> {
-  // Build lookup maps from DB mappings
-  const nameMap = new Map<string, string>() // WA name → catalog name
-  const slugMap = new Map<string, string>() // WA ranking slug → catalog name
+  // Build lookup maps from mappings
+  const nameMap = new Map<string, { catalogName: string; isField: boolean }>()
+  const slugMap = new Map<string, { catalogName: string; isField: boolean }>()
   for (const m of mappings) {
-    nameMap.set(m.waName, m.catalogName)
-    if (m.waRankingSlug) slugMap.set(m.waRankingSlug, m.catalogName)
+    nameMap.set(m.waName, { catalogName: m.catalogName, isField: m.isField })
+    if (m.waRankingSlug) slugMap.set(m.waRankingSlug, { catalogName: m.catalogName, isField: m.isField })
   }
 
   const controller = new AbortController()
@@ -153,11 +133,11 @@ export async function scrapeWaProfile(
   const pbResults: WaResult[] = competitor.personalBests?.results ?? []
   for (const r of pbResults) {
     if (r.indoor || r.notLegal) continue
-    const catalogName = nameMap.get(r.discipline)
-    if (!catalogName) continue
-    const value = parseMark(r.mark, catalogName)
+    const info = nameMap.get(r.discipline)
+    if (!info) continue
+    const value = parseMark(r.mark, info.isField)
     if (value != null) {
-      ensureEntry(catalogName).personalBest = value
+      ensureEntry(info.catalogName).personalBest = value
     }
   }
 
@@ -165,26 +145,26 @@ export async function scrapeWaProfile(
   const sbResults: WaResult[] = competitor.seasonsBests?.results ?? []
   for (const r of sbResults) {
     if (r.indoor || r.notLegal) continue
-    const catalogName = nameMap.get(r.discipline)
-    if (!catalogName) continue
-    const value = parseMark(r.mark, catalogName)
+    const info = nameMap.get(r.discipline)
+    if (!info) continue
+    const value = parseMark(r.mark, info.isField)
     if (value != null) {
-      ensureEntry(catalogName).seasonBest = value
+      ensureEntry(info.catalogName).seasonBest = value
     }
   }
 
   // Parse world rankings
   const rankings: WaRanking[] = competitor.worldRankings?.current ?? []
   for (const r of rankings) {
-    const catalogName = slugMap.get(r.urlSlug)
-    if (!catalogName) continue
-    ensureEntry(catalogName).worldRanking = r.place
+    const info = slugMap.get(r.urlSlug)
+    if (!info) continue
+    ensureEntry(info.catalogName).worldRanking = r.place
   }
 
   // Convert map to array
   const performances: WaScrapedPerformance[] = []
   for (const [catalogName, perf] of perfMap) {
-    const waDiscipline = [...nameMap.entries()].find(([, v]) => v === catalogName)?.[0] ?? catalogName
+    const waDiscipline = [...nameMap.entries()].find(([, v]) => v.catalogName === catalogName)?.[0] ?? catalogName
     performances.push({
       waDiscipline,
       catalogName,
@@ -208,15 +188,20 @@ export async function fetchAndUpsertWaData(
 
   if (!athlete.waProfileUrl) throw new Error('No WA profile URL')
 
-  // Load discipline mappings from DB
-  const mappingRows = await db.select().from(schema.waDisciplineMap)
-  const mappings: DisciplineMapping[] = mappingRows.map(r => ({
-    waName: r.waName,
-    waRankingSlug: r.waRankingSlug,
-    catalogName: r.catalogName,
+  // Load discipline mappings from event catalog, filtered by athlete gender
+  const catalogRows = await db
+    .select()
+    .from(schema.eventCatalog)
+    .where(and(isNotNull(schema.eventCatalog.waName), eq(schema.eventCatalog.gender, athlete.gender)))
+
+  const mappings: DisciplineMapping[] = catalogRows.map(r => ({
+    waName: r.waName!,
+    waRankingSlug: r.waRankingSlug ?? null,
+    catalogName: r.name,
+    isField: r.discipline === 'Concours',
   }))
 
-  if (mappings.length === 0) throw new Error('No discipline mappings configured')
+  if (mappings.length === 0) throw new Error('No WA discipline mappings configured in event catalog')
 
   const result = await scrapeWaProfile(athlete.waProfileUrl, mappings)
   const fetched = result.performances.length
@@ -241,9 +226,8 @@ export async function fetchAndUpsertWaData(
       continue
     }
 
-    const eventMatch = events.find(
-      e => e.catalog.name === perf.catalogName && e.catalog.gender === athlete.gender
-    )
+    // Catalog names are already gender-specific (loaded per athlete gender above)
+    const eventMatch = events.find(e => e.catalog.name === perf.catalogName)
 
     if (!eventMatch) continue
 

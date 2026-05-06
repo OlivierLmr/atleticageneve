@@ -27,6 +27,8 @@ app.post('/', requireAuth('committee'), zValidator('json', eventCatalogSchema), 
     name: data.name,
     discipline: data.discipline,
     gender: data.gender,
+    waName: data.waName ?? null,
+    waRankingSlug: data.waRankingSlug ?? null,
   })
 
   const created = await db.select().from(schema.eventCatalog).where(eq(schema.eventCatalog.id, id)).limit(1)

@@ -121,9 +121,6 @@ export default function EditionConfigPage() {
 
       {/* Estimated cost configuration */}
       <CostConfigSection edition={edition} costConfigs={costConfigs ?? { tierConfigs: [], distanceConfigs: [] }} />
-
-      {/* WA Discipline Mapping */}
-      <WaDisciplineMapSection />
     </div>
   )
 }
@@ -386,127 +383,6 @@ function CostConfigSection({ edition, costConfigs }: { edition: Edition; costCon
           </button>
           {distSaved && <span className="text-sm text-green-600">{t('admin.saved')}</span>}
           {distMutation.isError && <span className="text-sm text-red-600">{(distMutation.error as Error)?.message || t('common.error')}</span>}
-        </div>
-      </div>
-    </div>
-  )
-}
-
-// ── WA Discipline Mapping Section ────────────────────────────────────────────
-
-interface WaMapping {
-  id: string
-  waName: string
-  waRankingSlug: string | null
-  catalogName: string
-}
-
-function WaDisciplineMapSection() {
-  const { t } = useTranslation()
-  const queryClient = useQueryClient()
-
-  const { data: mappings = [] } = useQuery<WaMapping[]>({
-    queryKey: ['wa-discipline-map'],
-    queryFn: () => api.get('/api/v1/editions/wa-discipline-map'),
-  })
-
-  const [newRow, setNewRow] = useState({ waName: '', waRankingSlug: '', catalogName: '' })
-
-  const addMutation = useMutation({
-    mutationFn: (data: { waName: string; waRankingSlug: string; catalogName: string }) =>
-      api.post('/api/v1/editions/wa-discipline-map', data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['wa-discipline-map'] })
-      setNewRow({ waName: '', waRankingSlug: '', catalogName: '' })
-    },
-  })
-
-  const deleteMutation = useMutation({
-    mutationFn: (id: string) => api.delete(`/api/v1/editions/wa-discipline-map/${id}`),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['wa-discipline-map'] }),
-  })
-
-  const handleAdd = () => {
-    if (!newRow.waName || !newRow.catalogName) return
-    addMutation.mutate(newRow)
-  }
-
-  return (
-    <div className="space-y-4">
-      <h2 className="text-base font-bold">{t('admin.waDisciplineMap')}</h2>
-      <p className="text-xs text-gray-500">{t('admin.waDisciplineMapHint')}</p>
-
-      <div className="bg-white rounded-lg border p-4">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b bg-gray-50 text-xs text-gray-500">
-                <th className="px-2 py-2 text-left font-medium">{t('admin.waName')}</th>
-                <th className="px-2 py-2 text-left font-medium">{t('admin.waRankingSlug')}</th>
-                <th className="px-2 py-2 text-left font-medium">{t('admin.catalogName')}</th>
-                <th className="px-2 py-2"></th>
-              </tr>
-            </thead>
-            <tbody>
-              {mappings.map((m) => (
-                <tr key={m.id} className="border-b">
-                  <td className="px-2 py-1.5 text-sm">{m.waName}</td>
-                  <td className="px-2 py-1.5 text-sm text-gray-500">{m.waRankingSlug ?? '—'}</td>
-                  <td className="px-2 py-1.5 text-sm">{m.catalogName}</td>
-                  <td className="px-2 py-1.5">
-                    <button
-                      type="button"
-                      onClick={() => { if (confirm(t('common.confirmDelete'))) deleteMutation.mutate(m.id) }}
-                      disabled={deleteMutation.isPending}
-                      className="text-xs text-red-600 hover:text-red-800"
-                    >
-                      ×
-                    </button>
-                  </td>
-                </tr>
-              ))}
-              {/* Add row */}
-              <tr className="border-b bg-gray-50/50">
-                <td className="px-2 py-1.5">
-                  <input
-                    type="text"
-                    value={newRow.waName}
-                    onChange={(e) => setNewRow(r => ({ ...r, waName: e.target.value }))}
-                    placeholder="e.g. 100 Metres"
-                    className="w-full px-1.5 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-gray-900"
-                  />
-                </td>
-                <td className="px-2 py-1.5">
-                  <input
-                    type="text"
-                    value={newRow.waRankingSlug}
-                    onChange={(e) => setNewRow(r => ({ ...r, waRankingSlug: e.target.value }))}
-                    placeholder="e.g. 100m"
-                    className="w-full px-1.5 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-gray-900"
-                  />
-                </td>
-                <td className="px-2 py-1.5">
-                  <input
-                    type="text"
-                    value={newRow.catalogName}
-                    onChange={(e) => setNewRow(r => ({ ...r, catalogName: e.target.value }))}
-                    placeholder="e.g. 100m"
-                    className="w-full px-1.5 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-gray-900"
-                  />
-                </td>
-                <td className="px-2 py-1.5">
-                  <button
-                    type="button"
-                    onClick={handleAdd}
-                    disabled={addMutation.isPending || !newRow.waName || !newRow.catalogName}
-                    className="text-xs text-blue-600 hover:text-blue-800 disabled:opacity-50"
-                  >
-                    + {t('common.add')}
-                  </button>
-                </td>
-              </tr>
-            </tbody>
-          </table>
         </div>
       </div>
     </div>

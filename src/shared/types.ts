@@ -80,6 +80,8 @@ export interface EventCatalog {
   name: string
   discipline: string
   gender: Gender
+  waName: string | null
+  waRankingSlug: string | null
 }
 
 export interface Event {

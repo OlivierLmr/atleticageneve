@@ -36,6 +36,8 @@ export const eventCatalog = sqliteTable('event_catalog', {
   name: text('name').notNull(),
   discipline: text('discipline').notNull(),
   gender: text('gender').notNull(),
+  waName: text('wa_name'),
+  waRankingSlug: text('wa_ranking_slug'),
 })
 
 // ── Event ─────────────────────────────────────────────────────────────────────
@@ -252,15 +254,6 @@ export const emailLog = sqliteTable('email_log', {
   lang: text('lang').notNull(),
   sentAt: text('sent_at').notNull().default(sql`(datetime('now'))`),
   relatedAthleteId: text('related_athlete_id').references(() => athlete.id),
-})
-
-// ── WA Discipline Mapping ────────────────────────────────────────────────────
-
-export const waDisciplineMap = sqliteTable('wa_discipline_map', {
-  id: id(),
-  waName: text('wa_name').notNull(),
-  waRankingSlug: text('wa_ranking_slug'),
-  catalogName: text('catalog_name').notNull(),
 })
 
 // ── WA Performance ────────────────────────────────────────────────────────────
