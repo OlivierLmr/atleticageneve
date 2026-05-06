@@ -1,50 +1,44 @@
 import { describe, test, expect } from 'vitest'
-import { parseMark, DEFAULT_DISCIPLINE_MAPPINGS, scrapeWaProfile } from '../../src/api/services/wa-scraper'
+import { parseMark, scrapeWaProfile } from '../../src/api/services/wa-scraper'
 import type { DisciplineMapping } from '../../src/api/services/wa-scraper'
 
-const MAPPINGS: DisciplineMapping[] = DEFAULT_DISCIPLINE_MAPPINGS
+const TEST_MAPPINGS: DisciplineMapping[] = [
+  { waName: '100 Metres', waRankingSlug: '100m', catalogName: '100m', isField: false },
+  { waName: '200 Metres', waRankingSlug: '200m', catalogName: '200m', isField: false },
+  { waName: '400 Metres', waRankingSlug: '400m', catalogName: '400m', isField: false },
+  { waName: '800 Metres', waRankingSlug: '800m', catalogName: '800m', isField: false },
+  { waName: '1500 Metres', waRankingSlug: '1500m', catalogName: '1500m', isField: false },
+  { waName: '5000 Metres', waRankingSlug: '5000m', catalogName: '5000m', isField: false },
+  { waName: 'High Jump', waRankingSlug: 'high-jump', catalogName: 'High Jump', isField: true },
+  { waName: 'Long Jump', waRankingSlug: 'long-jump', catalogName: 'Long Jump', isField: true },
+  { waName: 'Pole Vault', waRankingSlug: 'pole-vault', catalogName: 'Pole Vault', isField: true },
+  { waName: 'Shot Put', waRankingSlug: 'shot-put', catalogName: 'Shot Put', isField: true },
+]
 
 describe('WA Scraper', () => {
   describe('parseMark', () => {
     test('parses simple track time', () => {
-      expect(parseMark('9.80', '100m')).toBe(9.80)
-      expect(parseMark('19.67', '200m')).toBe(19.67)
-      expect(parseMark('43.03', '400m')).toBe(43.03)
+      expect(parseMark('9.80', false)).toBe(9.80)
+      expect(parseMark('19.67', false)).toBe(19.67)
+      expect(parseMark('43.03', false)).toBe(43.03)
     })
 
     test('parses mm:ss.cc track time', () => {
-      expect(parseMark('3:26.00', '1500m')).toBe(206.00)
-      expect(parseMark('1:43.50', '800m')).toBe(103.50)
-      expect(parseMark('12:35.36', '5000m')).toBe(755.36)
+      expect(parseMark('3:26.00', false)).toBe(206.00)
+      expect(parseMark('1:43.50', false)).toBe(103.50)
+      expect(parseMark('12:35.36', false)).toBe(755.36)
     })
 
     test('parses field event marks as centimeters', () => {
-      expect(parseMark('2.35', 'High Jump')).toBe(235)
-      expect(parseMark('8.50', 'Long Jump')).toBe(850)
-      expect(parseMark('6.15', 'Pole Vault')).toBe(615)
-      expect(parseMark('22.63', 'Shot Put')).toBe(2263)
+      expect(parseMark('2.35', true)).toBe(235)
+      expect(parseMark('8.50', true)).toBe(850)
+      expect(parseMark('6.15', true)).toBe(615)
+      expect(parseMark('22.63', true)).toBe(2263)
     })
 
     test('returns null for empty/invalid marks', () => {
-      expect(parseMark('', '100m')).toBeNull()
-      expect(parseMark('abc', '100m')).toBeNull()
-    })
-  })
-
-  describe('DEFAULT_DISCIPLINE_MAPPINGS', () => {
-    test('covers all catalog events', () => {
-      const catalogNames = new Set(DEFAULT_DISCIPLINE_MAPPINGS.map(m => m.catalogName))
-      for (const name of ['100m', '200m', '400m', '400mH', '800m', '1500m', '5000m', 'High Jump', 'Long Jump', 'Pole Vault', 'Shot Put']) {
-        expect(catalogNames.has(name)).toBe(true)
-      }
-    })
-
-    test('all entries have both waName and waRankingSlug', () => {
-      for (const m of DEFAULT_DISCIPLINE_MAPPINGS) {
-        expect(m.waName).toBeTruthy()
-        expect(m.waRankingSlug).toBeTruthy()
-        expect(m.catalogName).toBeTruthy()
-      }
+      expect(parseMark('', false)).toBeNull()
+      expect(parseMark('abc', false)).toBeNull()
     })
   })
 
@@ -90,7 +84,7 @@ describe('WA Scraper', () => {
       globalThis.fetch = async () => new Response(mockHtml, { status: 200 })
 
       try {
-        const result = await scrapeWaProfile('https://worldathletics.org/athletes/test/test-runner-12345', MAPPINGS)
+        const result = await scrapeWaProfile('https://worldathletics.org/athletes/test/test-runner-12345', TEST_MAPPINGS)
 
         expect(result.athleteName).toBe('Test RUNNER')
         expect(result.performances).toHaveLength(3) // 100m, 200m, High Jump

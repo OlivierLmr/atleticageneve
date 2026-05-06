@@ -3,7 +3,7 @@ import { zValidator } from '@hono/zod-validator'
 import { eq } from 'drizzle-orm'
 import * as schema from '../db/schema'
 import { requireAuth } from '../middleware/auth'
-import { editionConfigSchema, costTierConfigsSchema, costDistanceConfigsSchema, waDisciplineMapSchema } from '@shared/validation'
+import { editionConfigSchema, costTierConfigsSchema, costDistanceConfigsSchema } from '@shared/validation'
 import { recalculateAllAthletesForEdition } from '../services/costEstimation'
 import type { Env } from '../index'
 
@@ -168,38 +168,6 @@ app.put('/:id/cost-distance-configs', requireAuth('committee'), zValidator('json
     if (b.distanceMax == null) return -1
     return a.distanceMax - b.distanceMax
   }))
-})
-
-// ── WA Discipline Mapping CRUD (committee only) ─────────────────────────────
-
-app.get('/wa-discipline-map', requireAuth('committee'), async (c) => {
-  const db = c.get('db')
-  const rows = await db.select().from(schema.waDisciplineMap)
-  return c.json(rows)
-})
-
-app.post('/wa-discipline-map', requireAuth('committee'), zValidator('json', waDisciplineMapSchema), async (c) => {
-  const db = c.get('db')
-  const data = c.req.valid('json')
-
-  const id = crypto.randomUUID()
-  await db.insert(schema.waDisciplineMap).values({
-    id,
-    waName: data.waName,
-    waRankingSlug: data.waRankingSlug ?? null,
-    catalogName: data.catalogName,
-  })
-
-  const rows = await db.select().from(schema.waDisciplineMap).where(eq(schema.waDisciplineMap.id, id))
-  return c.json(rows[0], 201)
-})
-
-app.delete('/wa-discipline-map/:id', requireAuth('committee'), async (c) => {
-  const db = c.get('db')
-  const { id } = c.req.param()
-
-  await db.delete(schema.waDisciplineMap).where(eq(schema.waDisciplineMap.id, id))
-  return c.json({ success: true })
 })
 
 export default app

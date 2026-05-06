@@ -254,6 +254,8 @@ export const eventCatalogSchema = z.object({
   name: z.string().min(1),
   discipline: z.enum(['Course', 'Concours']),
   gender: z.enum(['M', 'F']),
+  waName: z.string().min(1).nullable().optional(),
+  waRankingSlug: z.string().nullable().optional(),
 })
 
 // ── Country ───────────────────────────────────────────────────────────────────
@@ -303,15 +305,7 @@ export const waPerformanceSchema = z.object({
   worldRanking: z.number().int().min(1).optional(),
 })
 
-// ── WA Discipline Map ────────────────────────────────────────────────────────
-
-export const waDisciplineMapSchema = z.object({
-  waName: z.string().min(1),
-  waRankingSlug: z.string().optional(),
-  catalogName: z.string().min(1),
-})
-
-// ���─ Interaction ──────────────────────────────────────────────────────────────
+// ── Interaction ──────────────────────────────────────────────────────────────
 
 export const interactionSchema = z.object({
   type: z.enum(['email', 'call', 'note', 'counter_offer', 'status_change', 'agreement']),
