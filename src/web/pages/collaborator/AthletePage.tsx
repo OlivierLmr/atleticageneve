@@ -50,6 +50,8 @@ export default function AthletePage() {
   const [messageText, setMessageText] = useState('')
   const [viewingEmailId, setViewingEmailId] = useState<string | null>(null)
   const [agreementInitialized, setAgreementInitialized] = useState(false)
+  const [editingWaUrl, setEditingWaUrl] = useState(false)
+  const [waUrlDraft, setWaUrlDraft] = useState('')
 
   const { data: viewingEmail } = useEmailQuery(viewingEmailId)
 
@@ -189,23 +191,85 @@ export default function AthletePage() {
                     Manager: {athlete.managerName}
                   </span>
                 )}
-                {athlete.waProfileUrl && (
-                  <>
+                {isStaff ? (
+                  <span className="flex items-center gap-1">
+                    <span className="text-xs text-gray-400 font-medium">WA:</span>
+                    {editingWaUrl ? (
+                      <>
+                        <input
+                          autoFocus
+                          type="text"
+                          value={waUrlDraft}
+                          onChange={e => setWaUrlDraft(e.target.value)}
+                          placeholder="https://worldathletics.org/athletes/..."
+                          className="text-xs border border-gray-300 rounded px-1.5 py-0.5 w-64 focus:outline-none focus:ring-1 focus:ring-blue-400"
+                          onKeyDown={e => {
+                            if (e.key === 'Enter') {
+                              mutations.athleteUpdateMutation.mutate(
+                                { waProfileUrl: waUrlDraft.trim() || null },
+                                { onSuccess: () => setEditingWaUrl(false) }
+                              )
+                            } else if (e.key === 'Escape') {
+                              setEditingWaUrl(false)
+                            }
+                          }}
+                        />
+                        {waUrlDraft && !waUrlDraft.startsWith('https://worldathletics.org') && !waUrlDraft.startsWith('https://www.worldathletics.org') && (
+                          <span className="text-xs text-amber-500" title="Domaine inattendu">⚠</span>
+                        )}
+                        <button
+                          onClick={() => mutations.athleteUpdateMutation.mutate(
+                            { waProfileUrl: waUrlDraft.trim() || null },
+                            { onSuccess: () => setEditingWaUrl(false) }
+                          )}
+                          disabled={mutations.athleteUpdateMutation.isPending}
+                          className="text-xs text-green-600 hover:text-green-800 disabled:opacity-50"
+                          title="Sauvegarder"
+                        >✓</button>
+                        <button
+                          onClick={() => setEditingWaUrl(false)}
+                          className="text-xs text-gray-400 hover:text-gray-600"
+                          title="Annuler"
+                        >✗</button>
+                      </>
+                    ) : (
+                      <>
+                        {athlete.waProfileUrl ? (
+                          <a
+                            href={athlete.waProfileUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-xs text-blue-600 hover:text-blue-800 max-w-[200px] truncate"
+                            title={athlete.waProfileUrl}
+                          >
+                            {athlete.waProfileUrl.replace(/^https?:\/\/(www\.)?/, '')} ↗
+                          </a>
+                        ) : (
+                          <span className="text-xs text-gray-400 italic">—</span>
+                        )}
+                        <button
+                          onClick={() => { setWaUrlDraft(athlete.waProfileUrl ?? ''); setEditingWaUrl(true) }}
+                          className="text-xs text-gray-400 hover:text-gray-600"
+                          title="Modifier l'URL World Athletics"
+                        >✎</button>
+                      </>
+                    )}
+                    <button
+                      onClick={() => mutations.waFetchMutation.mutate()}
+                      disabled={mutations.waFetchMutation.isPending || !athlete.waProfileUrl}
+                      className="text-xs text-blue-600 hover:text-blue-800 disabled:opacity-40 disabled:cursor-not-allowed ml-1"
+                      title={athlete.waProfileUrl ? t('wa.fetch') : "Ajoutez d'abord l'URL WA"}
+                    >
+                      {mutations.waFetchMutation.isPending ? t('wa.fetching') : '↻ WA'}
+                    </button>
+                  </span>
+                ) : (
+                  athlete.waProfileUrl && (
                     <a href={athlete.waProfileUrl} target="_blank" rel="noopener noreferrer"
                       className="text-xs text-blue-600 hover:text-blue-800" title="World Athletics">
                       WA ↗
                     </a>
-                    {isStaff && (
-                      <button
-                        onClick={() => mutations.waFetchMutation.mutate()}
-                        disabled={mutations.waFetchMutation.isPending}
-                        className="text-xs text-blue-600 hover:text-blue-800 disabled:opacity-50"
-                        title={t('wa.fetch')}
-                      >
-                        {mutations.waFetchMutation.isPending ? t('wa.fetching') : '↻ WA'}
-                      </button>
-                    )}
-                  </>
+                  )
                 )}
                 {isStaff && (
                   <div className="relative ml-auto">
