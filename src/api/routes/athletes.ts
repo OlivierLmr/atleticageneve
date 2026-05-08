@@ -538,13 +538,17 @@ athletes.patch('/:id/negotiation-status', requireAuth('athlete', 'manager', 'col
     }
   }
 
+  // Staff-initiated → email goes to athlete/manager: use their name
+  // Athlete/manager-initiated → email goes to organisation: use committee name
+  const emailRecipientName = staff ? recipientName : `${meetingName} Organisation Committee`
+
   const transitionEmail = buildTransitionEmail({
     from: currentStatus,
     to: newStatus,
     athleteName,
     meetingName,
     senderName,
-    recipientName,
+    recipientName: emailRecipientName,
     organizationName,
     counterOfferText,
   })

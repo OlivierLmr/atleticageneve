@@ -5,7 +5,7 @@ import * as schema from '../db/schema'
 import { agreementSchema } from '@shared/validation'
 import { requireAuth } from '../middleware/auth'
 import { sendEmail, buildTransitionEmail } from '../services/email'
-import { formatAgreementTerms } from '@shared/agreementFormatter'
+import { formatAgreementTerms, formatAgreementTermsHtml } from '@shared/agreementFormatter'
 import { calculateTotalCost } from '../lib/helpers'
 import type { Env } from '../index'
 import type { NegotiationStatus, ParticipationStatus } from '@shared/types'
@@ -199,6 +199,7 @@ agreements.post('/:athleteId/agreements', zValidator('json', agreementSchema), a
   }
 
   const agreementTerms = formatAgreementTerms(agreementForFormat, selectedEventNames, edition.name, 'en')
+  const agreementHtmlTerms = formatAgreementTermsHtml(agreementForFormat, selectedEventNames, edition.name, 'en')
 
   // Build transition email for agreement_sent
   const athleteName = `${ath.firstName} ${ath.lastName}`
@@ -225,6 +226,7 @@ agreements.post('/:athleteId/agreements', zValidator('json', agreementSchema), a
     recipientName,
     organizationName,
     agreementTerms,
+    agreementHtmlTerms,
   })
 
   if (transitionEmail) {
@@ -235,6 +237,7 @@ agreements.post('/:athleteId/agreements', zValidator('json', agreementSchema), a
         to: targetEmail,
         subject: transitionEmail.subject,
         body: transitionEmail.body,
+        htmlBody: transitionEmail.htmlBody,
         relatedAthleteId: athleteId,
       })
     }

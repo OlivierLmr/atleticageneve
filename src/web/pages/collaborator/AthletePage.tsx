@@ -38,7 +38,7 @@ export default function AthletePage() {
     toStatus: NegotiationStatus
     onConfirm: () => void
   } | null>(null)
-  const [emailPreview, setEmailPreview] = useState<{ subject: string; body: string } | null>(null)
+  const [emailPreview, setEmailPreview] = useState<{ subject: string; body: string; htmlBody?: string } | null>(null)
   const [showAgreementForm, setShowAgreementForm] = useState(false)
   const [noteType, setNoteType] = useState<'note' | 'call' | 'email'>('note')
   const [noteContent, setNoteContent] = useState('')
@@ -68,7 +68,7 @@ export default function AthletePage() {
   }
 
   // Propagate email preview from mutations
-  const handleStatusSuccess = (data: { emailPreview?: { subject: string; body: string } } | undefined) => {
+  const handleStatusSuccess = (data: { emailPreview?: { subject: string; body: string; htmlBody?: string } } | undefined) => {
     setConfirmDialog(null)
     if (data?.emailPreview) setEmailPreview(data.emailPreview)
   }
