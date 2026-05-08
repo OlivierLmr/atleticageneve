@@ -4,7 +4,7 @@ import { eq } from 'drizzle-orm'
 import * as schema from '../db/schema'
 import { managerRegistrationSchema } from '@shared/validation'
 import { generateToken, sessionExpiresAt, magicLinkExpiresAt } from '../services/auth'
-import { sendMagicLinkEmail } from '../services/email'
+import { sendLoginLinkEmail } from '../services/email'
 import type { Env } from '../index'
 
 const managers = new Hono<Env>()
@@ -27,7 +27,10 @@ managers.post('/register', zValidator('json', managerRegistrationSchema), async 
       expiresAt: magicLinkExpiresAt(),
     })
     const baseUrl = c.req.header('Origin') ?? 'http://localhost:5173'
-    await sendMagicLinkEmail(db, data.email, token, baseUrl, (user.preferredLang as 'en' | 'fr') ?? 'en')
+    const lang = (user.preferredLang as 'en' | 'fr') ?? 'en'
+    const editions = await db.select().from(schema.edition).limit(1)
+    const meetingName = editions[0]?.name ?? 'Atletica Geneve'
+    await sendLoginLinkEmail(db, data.email, token, baseUrl, lang, meetingName)
     return c.json({ message: 'Account exists — login link sent' })
   }
 

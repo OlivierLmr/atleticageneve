@@ -4,7 +4,7 @@ import { eq, or } from 'drizzle-orm'
 import * as schema from '../db/schema'
 import { loginSchema, magicLinkRequestSchema, magicLinkVerifySchema, identifySchema, loginWithPasswordSchema } from '@shared/validation'
 import { verifyPassword, generateToken, sessionExpiresAt, magicLinkExpiresAt } from '../services/auth'
-import { sendMagicLinkEmail } from '../services/email'
+import { sendLoginLinkEmail } from '../services/email'
 import { requireAuth } from '../middleware/auth'
 import type { Env } from '../index'
 
@@ -85,7 +85,9 @@ auth.post('/magic-link', zValidator('json', magicLinkRequestSchema), async (c) =
 
   const baseUrl = c.req.header('Origin') ?? 'http://localhost:5173'
   const lang = (user.preferredLang as 'en' | 'fr') ?? 'en'
-  await sendMagicLinkEmail(db, email, token, baseUrl, lang)
+  const editions = await db.select().from(schema.edition).limit(1)
+  const meetingName = editions[0]?.name ?? 'Atletica Geneve'
+  await sendLoginLinkEmail(db, email, token, baseUrl, lang, meetingName)
 
   return c.json({ message: 'If an account exists, a login link has been sent' })
 })
@@ -116,7 +118,7 @@ auth.post('/identify', zValidator('json', identifySchema), async (c) => {
   }
 
   // User is athlete/manager → send magic link
-  let emailPreview: { subject: string; body: string } | undefined
+  let emailPreview: { subject: string; body: string; htmlBody?: string } | undefined
   if (user.email) {
     const token = generateToken()
     await db.insert(schema.magicLink).values({
@@ -126,8 +128,10 @@ auth.post('/identify', zValidator('json', identifySchema), async (c) => {
     })
     const baseUrl = c.req.header('Origin') ?? 'http://localhost:5173'
     const lang = (user.preferredLang as 'en' | 'fr') ?? 'en'
-    const result = await sendMagicLinkEmail(db, user.email, token, baseUrl, lang)
-    emailPreview = { subject: result.subject, body: result.body }
+    const editions = await db.select().from(schema.edition).limit(1)
+    const meetingName = editions[0]?.name ?? 'Atletica Geneve'
+    const result = await sendLoginLinkEmail(db, user.email, token, baseUrl, lang, meetingName)
+    emailPreview = { subject: result.subject, body: result.body, htmlBody: result.htmlBody }
   }
 
   return c.json({ method: 'magic_link', message: 'If this email is registered, a login link has been sent.', emailPreview })

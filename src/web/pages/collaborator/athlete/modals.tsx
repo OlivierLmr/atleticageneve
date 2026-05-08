@@ -57,7 +57,7 @@ export function ConfirmTransitionDialog({ fromStatus, toStatus, athlete, onConfi
 // ── Email preview modal ─────────────────────────────────────────────────────
 
 export function EmailPreviewModal({ emailPreview, onClose }: {
-  emailPreview: { subject: string; body: string }
+  emailPreview: { subject: string; body: string; htmlBody?: string }
   onClose: () => void
 }) {
   const { t } = useTranslation()
@@ -73,7 +73,11 @@ export function EmailPreviewModal({ emailPreview, onClose }: {
           <div className="text-xs text-gray-700">
             <span className="font-medium">{t('emailPreview.subject')}:</span> {emailPreview.subject}
           </div>
-          <pre className="text-xs text-gray-700 whitespace-pre-wrap bg-gray-50 p-3 rounded border">{emailPreview.body}</pre>
+          {emailPreview.htmlBody ? (
+            <div className="text-sm prose prose-sm max-w-none bg-gray-50 p-3 rounded border" dangerouslySetInnerHTML={{ __html: emailPreview.htmlBody }} />
+          ) : (
+            <pre className="text-xs text-gray-700 whitespace-pre-wrap bg-gray-50 p-3 rounded border">{emailPreview.body}</pre>
+          )}
           <div className="flex justify-end">
             <button
               onClick={onClose}

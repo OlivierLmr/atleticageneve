@@ -5,7 +5,7 @@ import * as schema from '../db/schema'
 import { portalRespondSchema } from '@shared/validation'
 import { requireAuth } from '../middleware/auth'
 import { calculateTotalCost } from '../lib/helpers'
-import { sendEmail } from '../services/email'
+import { sendEmail, buildPortalResponseEmail } from '../services/email'
 import type { Env } from '../index'
 import type { NegotiationStatus } from '@shared/types'
 
@@ -310,11 +310,20 @@ portal.post('/athlete/:athleteId/respond', requireAuth('athlete', 'manager'), zV
   const editions = await db.select().from(schema.edition).limit(1)
   const notificationEmail = editions[0]?.notificationEmail
   if (notificationEmail) {
+    const emailContent = buildPortalResponseEmail({
+      athleteFirstName: ath.firstName,
+      athleteLastName: ath.lastName,
+      gender: ath.gender ?? '',
+      action,
+      newStatus,
+      meetingName: editions[0]?.name ?? 'Atletica Geneve',
+    })
     await sendEmail({
       db,
       to: notificationEmail,
-      subject: `Application update — ${ath.firstName} ${ath.lastName}`,
-      body: `${ath.firstName} ${ath.lastName} has ${action}ed the offer.\nNew status: ${newStatus}`,
+      subject: emailContent.subject,
+      body: emailContent.body,
+      htmlBody: emailContent.htmlBody,
       relatedAthleteId: athleteId,
     })
   }

@@ -6,6 +6,7 @@ import { useQuery } from '@tanstack/react-query'
 import { api, ApiError } from '@web/lib/api'
 import { useAuth } from '@web/lib/auth'
 import { LanguageSwitcher } from '@web/App'
+import { EmailPreviewModal } from '@web/pages/collaborator/athlete/modals'
 import type { Event, EapCity, Country } from '@shared/types'
 
 // Events API returns Event joined with catalog data
@@ -44,6 +45,7 @@ export default function ManagerRegisterPage() {
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
   const [registeredCount, setRegisteredCount] = useState(0)
+  const [emailPreview, setEmailPreview] = useState<{ subject: string; body: string; htmlBody?: string } | null>(null)
   const [expandedRow, setExpandedRow] = useState<string | null>(null)
   const [dropdownPos, setDropdownPos] = useState<{ top: number; left: number; minWidth: number } | null>(null)
   const dropdownRef = useRef<HTMLDivElement>(null)
@@ -133,9 +135,13 @@ export default function ManagerRegisterPage() {
         waProfileUrl: r.waProfileUrl || undefined,
         dateOfBirth: r.dateOfBirth || undefined,
       }))
-      const res = await api.post<{ registered: unknown[] }>('/api/v1/athletes/batch', { athletes })
+      const res = await api.post<{ registered: unknown[]; emailPreview?: { subject: string; body: string; htmlBody?: string } }>('/api/v1/athletes/batch', { athletes })
       setRegisteredCount(res.registered.length)
-      setSubmitted(true)
+      if (res.emailPreview) {
+        setEmailPreview(res.emailPreview)
+      } else {
+        setSubmitted(true)
+      }
     } catch (err) {
       setError(err instanceof ApiError ? err.message : t('common.error'))
     } finally {
@@ -286,6 +292,13 @@ export default function ManagerRegisterPage() {
           </div>
         </div>
       </div>
+
+      {emailPreview && (
+        <EmailPreviewModal
+          emailPreview={emailPreview}
+          onClose={() => { setEmailPreview(null); setSubmitted(true) }}
+        />
+      )}
 
       {/* Event selection dropdown rendered via portal to escape overflow clipping */}
       {expandedRow && dropdownPos && expandedRowData && createPortal(
