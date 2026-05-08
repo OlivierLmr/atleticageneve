@@ -35,6 +35,7 @@ export type InteractionType =
   | 'status_change'
   | 'agreement'
   | 'counter_offer'
+  | 'manager_notification'
 
 // ── Domain entities ───────────────────────────────────────────────────────────
 
@@ -253,6 +254,7 @@ export interface Interaction {
   content: string
   authorId: string | null
   authorName: string
+  authorRole: UserRole
   emailLogId: string | null
   createdAt: string
 }

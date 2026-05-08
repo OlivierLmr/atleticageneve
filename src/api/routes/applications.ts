@@ -186,10 +186,16 @@ applications.patch('/:id/participation-status', zValidator('json', participation
   const id = c.req.param('id')
   const newStatus = c.req.valid('json').participationStatus as ParticipationStatus
 
-  // Get application
+  // Get application with event name for the log
   const apps = await db
-    .select()
+    .select({
+      application: schema.application,
+      catalogName: schema.eventCatalog.name,
+      catalogGender: schema.eventCatalog.gender,
+    })
     .from(schema.application)
+    .innerJoin(schema.event, eq(schema.application.eventId, schema.event.id))
+    .innerJoin(schema.eventCatalog, eq(schema.event.catalogId, schema.eventCatalog.id))
     .where(eq(schema.application.id, id))
     .limit(1)
 
@@ -197,7 +203,8 @@ applications.patch('/:id/participation-status', zValidator('json', participation
     return c.json({ error: 'Application not found' }, 404)
   }
 
-  const app = apps[0]
+  const app = apps[0].application
+  const eventName = `${apps[0].catalogName} ${apps[0].catalogGender === 'M' ? 'Men' : 'Women'}`
   const currentStatus = app.participationStatus as ParticipationStatus
 
   // Block changes when athlete negotiation is confirmed
@@ -230,9 +237,11 @@ applications.patch('/:id/participation-status', zValidator('json', participation
     athleteId: app.athleteId,
     applicationId: id,
     type: 'status_change',
-    content: `Participation status changed to "${newStatus}"`,
+    content: `[${eventName}] Participation status changed from "${currentStatus}" to "${newStatus}"`,
     authorId: user.id,
     authorName: `${user.firstName} ${user.lastName}`,
+    authorRole: user.role,
+    createdAt: new Date().toISOString(),
   })
 
   return c.json({ id, participationStatus: newStatus, previousStatus: currentStatus })

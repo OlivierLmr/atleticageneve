@@ -161,6 +161,8 @@ agreements.post('/:athleteId/agreements', zValidator('json', agreementSchema), a
     content: `Agreement offer v${nextVersion} sent — CHF ${totalCost.toLocaleString()}`,
     authorId: user.id,
     authorName: `${user.firstName} ${user.lastName}`,
+    authorRole: user.role,
+    createdAt: new Date().toISOString(),
   })
 
   // Build the agreement object with hotel info for formatting
