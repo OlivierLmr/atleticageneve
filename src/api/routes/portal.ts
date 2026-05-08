@@ -290,7 +290,35 @@ portal.post('/athlete/:athleteId/respond', requireAuth('athlete', 'manager'), zV
       sentAt: now,
     })
 
-    // Log interaction
+    // Update negotiation status
+    await db
+      .update(schema.athlete)
+      .set({ negotiationStatus: 'counter_offer_sent', updatedAt: now })
+      .where(eq(schema.athlete.id, athleteId))
+
+    // Send notification email and capture emailLogId to link to the counter_offer interaction
+    let counterOfferEmailLogId: string | null = null
+    const notificationEmailForCounterOffer = editions[0]?.notificationEmail
+    if (notificationEmailForCounterOffer) {
+      const emailContent = buildPortalResponseEmail({
+        athleteFirstName: ath.firstName,
+        athleteLastName: ath.lastName,
+        gender: ath.gender ?? '',
+        action,
+        newStatus: 'counter_offer_sent',
+        meetingName: editions[0]?.name ?? 'Atletica Geneve',
+      })
+      counterOfferEmailLogId = await sendEmail({
+        db,
+        to: notificationEmailForCounterOffer,
+        subject: emailContent.subject,
+        body: emailContent.body,
+        htmlBody: emailContent.htmlBody,
+        relatedAthleteId: athleteId,
+      })
+    }
+
+    // Log interaction with emailLogId so the email is accessible and visible to athlete/manager
     await db.insert(schema.interaction).values({
       athleteId,
       type: 'counter_offer',
@@ -298,20 +326,17 @@ portal.post('/athlete/:athleteId/respond', requireAuth('athlete', 'manager'), zV
       authorId: user.id,
       authorName: `${user.firstName} ${user.lastName}`,
       authorRole: user.role,
+      emailLogId: counterOfferEmailLogId,
       createdAt: new Date().toISOString(),
     })
 
-    // Update negotiation status
-    await db
-      .update(schema.athlete)
-      .set({ negotiationStatus: 'counter_offer_sent', updatedAt: now })
-      .where(eq(schema.athlete.id, athleteId))
+    return c.json({ athleteId, status: 'counter_offer_sent', previousStatus: currentStatus })
 
   } else {
     return c.json({ error: `Invalid action: ${action}` }, 400)
   }
 
-  // Notify collaborators via email using edition's notification email
+  // Notify collaborators via email using edition's notification email (for accept/reject/withdraw)
   const updatedAth = await db.select().from(schema.athlete).where(eq(schema.athlete.id, athleteId)).limit(1)
   const newStatus = updatedAth[0]?.negotiationStatus ?? action
 
