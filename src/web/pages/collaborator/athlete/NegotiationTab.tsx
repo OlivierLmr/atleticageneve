@@ -135,7 +135,7 @@ export function NegotiationTab({ athlete, isStaff, isAthleteOrManager, canSendAg
           {athlete.interactions.length === 0 ? (
             <p className="text-xs text-gray-400">{t('collaborator.noInteractions')}</p>
           ) : (
-            <div className="space-y-3 max-h-96 overflow-y-auto">
+            <div className="max-h-96 overflow-y-auto divide-y divide-gray-100">
               {athlete.interactions.map(interaction => (
                 <InteractionCard key={interaction.id} interaction={interaction} onViewEmail={onViewEmail} />
               ))}

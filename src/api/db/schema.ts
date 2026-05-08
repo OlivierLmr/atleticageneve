@@ -239,6 +239,7 @@ export const interaction = sqliteTable('interaction', {
   content: text('content').notNull(),
   authorId: text('author_id').references(() => user.id),
   authorName: text('author_name').notNull(),
+  authorRole: text('author_role').notNull().default('collaborator'),
   emailLogId: text('email_log_id').references(() => emailLog.id),
   createdAt: createdAt(),
 })

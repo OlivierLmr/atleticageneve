@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
 import { zValidator } from '@hono/zod-validator'
-import { and, eq, sql } from 'drizzle-orm'
+import { and, eq, isNotNull, or, sql } from 'drizzle-orm'
 import * as schema from '../db/schema'
 import { athleteRegistrationSchema, batchAthleteRegistrationSchema, athleteUpdateSchema, negotiationStatusChangeSchema, interactionSchema } from '@shared/validation'
 import { NEGOTIATION_TRANSITIONS, COMMITTEE_EXTRA_TRANSITIONS, ATHLETE_TRANSITIONS } from '@shared/constants'
@@ -87,6 +87,7 @@ athletes.post('/', zValidator('json', athleteRegistrationSchema), async (c) => {
       type: 'status_change',
       content: 'Application submitted',
       authorName: `${data.firstName} ${data.lastName}`,
+      authorRole: 'athlete',
       createdAt: new Date().toISOString(),
     })
   }
@@ -176,6 +177,7 @@ athletes.post('/', zValidator('json', athleteRegistrationSchema), async (c) => {
         type: 'manager_notification',
         content: `Manager ${managerName} notified of new registration`,
         authorName: `${data.firstName} ${data.lastName}`,
+        authorRole: 'athlete',
         emailLogId: notifEmailId,
         createdAt: new Date().toISOString(),
       })
@@ -251,6 +253,7 @@ athletes.post('/batch', requireAuth('manager'), zValidator('json', batchAthleteR
         content: `Application submitted by manager ${user.firstName} ${user.lastName}`,
         authorId: user.id,
         authorName: `${user.firstName} ${user.lastName}`,
+        authorRole: user.role,
         createdAt: new Date().toISOString(),
       })
     }
@@ -291,6 +294,7 @@ athletes.post('/batch', requireAuth('manager'), zValidator('json', batchAthleteR
       content: `Batch registration confirmation sent to manager ${managerName}`,
       authorName: managerName,
       authorId: user.id,
+      authorRole: user.role,
       emailLogId: batchEmailId,
       createdAt: new Date().toISOString(),
     })
@@ -381,11 +385,21 @@ athletes.get('/:id', requireAuth('athlete', 'manager', 'collaborator', 'committe
     ? rawAgreements
     : rawAgreements.map(a => ({ ...a, totalCost: undefined }))
 
-  // Fetch interactions (ordered most recent first)
+  // Fetch interactions (ordered most recent first); athlete/manager only see status changes and emailed entries
+  const interactionWhere = staff
+    ? eq(schema.interaction.athleteId, id)
+    : and(
+        eq(schema.interaction.athleteId, id),
+        or(
+          isNotNull(schema.interaction.emailLogId),
+          eq(schema.interaction.type, 'status_change'),
+          eq(schema.interaction.type, 'email'),
+        ),
+      )
   const interactions = await db
     .select()
     .from(schema.interaction)
-    .where(eq(schema.interaction.athleteId, id))
+    .where(interactionWhere)
     .orderBy(sql`${schema.interaction.createdAt} DESC`)
 
   // Fetch current edition
@@ -589,6 +603,7 @@ athletes.patch('/:id/negotiation-status', requireAuth('athlete', 'manager', 'col
     content: `Negotiation status changed from "${currentStatus}" to "${newStatus}"`,
     authorId: user.id,
     authorName: senderName,
+    authorRole: user.role,
     emailLogId,
     createdAt: new Date().toISOString(),
   })
@@ -683,6 +698,7 @@ athletes.post('/:id/interactions', requireAuth('athlete', 'manager', 'collaborat
     content,
     authorId: user.id,
     authorName: `${user.firstName} ${user.lastName}`,
+    authorRole: user.role,
     createdAt: new Date().toISOString(),
   })
 

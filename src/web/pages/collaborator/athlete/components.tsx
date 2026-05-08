@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { ArrowRightLeft, FileText, CornerUpLeft, PenLine, Phone, Mail, Bell } from 'lucide-react'
 import { formatAgreementTerms } from '@shared/agreementFormatter'
 import { inputCls } from '@web/lib/ui-constants'
 import type { Athlete, Agreement, Interaction } from '@shared/types'
@@ -198,12 +199,15 @@ export function AgreementCard({
 
 // ── CounterOfferCard ────────────────────────────────────────────────────────
 
+const parseDate = (d: string) =>
+  new Date(d.includes('T') ? d : d.replace(' ', 'T') + 'Z')
+
 export function CounterOfferCard({ interaction }: { interaction: Interaction }) {
   return (
     <div className="p-3 rounded border border-rose-200 bg-rose-50 text-xs">
       <div className="flex justify-between mb-1">
         <span className="font-semibold text-rose-700">{interaction.authorName}</span>
-        <span className="text-gray-500">{new Date(interaction.createdAt).toLocaleDateString()}</span>
+        <span className="text-gray-500">{parseDate(interaction.createdAt).toLocaleDateString()}</span>
       </div>
       <p className="text-gray-700 whitespace-pre-wrap">{interaction.content}</p>
     </div>
@@ -212,45 +216,56 @@ export function CounterOfferCard({ interaction }: { interaction: Interaction }) 
 
 // ── InteractionCard ─────────────────────────────────────────────────────────
 
+const isAthleteManagerRole = (role: string) => role === 'athlete' || role === 'manager'
+
+function InteractionIcon({ type, authorRole }: { type: string; authorRole: string }) {
+  const byAthlete = isAthleteManagerRole(authorRole)
+  const cls = 'w-4 h-4 shrink-0'
+
+  switch (type) {
+    case 'status_change':
+      return <ArrowRightLeft className={`${cls} ${byAthlete ? 'text-orange-500' : 'text-blue-500'}`} />
+    case 'agreement':
+      return <FileText className={`${cls} text-green-500`} />
+    case 'counter_offer':
+      return <CornerUpLeft className={`${cls} text-purple-500`} />
+    case 'note':
+      return <PenLine className={`${cls} text-gray-500`} />
+    case 'call':
+      return <Phone className={`${cls} text-orange-500`} />
+    case 'email':
+      return <Mail className={`${cls} text-indigo-500`} />
+    case 'manager_notification':
+      return <Bell className={`${cls} text-yellow-500`} />
+    default:
+      return <ArrowRightLeft className={`${cls} text-gray-400`} />
+  }
+}
+
 export function InteractionCard({ interaction, onViewEmail }: { interaction: Interaction; onViewEmail?: (emailLogId: string) => void }) {
   const { t } = useTranslation()
-  const typeIcons: Record<string, string> = {
-    status_change: '●',
-    agreement: '■',
-    counter_offer: '◆',
-    note: '✎',
-    call: '☎',
-    email: '✉',
-  }
-
-  const typeColors: Record<string, string> = {
-    status_change: 'text-blue-500',
-    agreement: 'text-green-500',
-    counter_offer: 'text-purple-500',
-    note: 'text-gray-500',
-    call: 'text-orange-500',
-    email: 'text-indigo-500',
-  }
-
   const hasEmail = !!interaction.emailLogId
   const clickable = hasEmail && onViewEmail
 
   return (
-    <div
-      className={`flex gap-2 ${clickable ? 'cursor-pointer hover:bg-gray-50 rounded p-1 -m-1' : ''}`}
-      onClick={clickable ? () => onViewEmail(interaction.emailLogId!) : undefined}
-    >
-      <span className={`${typeColors[interaction.type] ?? 'text-gray-400'} mt-0.5 shrink-0`}>
-        {typeIcons[interaction.type] ?? '●'}
-      </span>
+    <div className={`flex gap-2 py-2 ${hasEmail ? 'border-l-2 border-indigo-400 pl-2' : 'pl-0'}`}>
+      <div className="mt-0.5">
+        <InteractionIcon type={interaction.type} authorRole={interaction.authorRole} />
+      </div>
       <div className="flex-1 min-w-0">
-        <p className="text-xs text-gray-900">
-          {interaction.content}
-          {hasEmail && <span className="ml-1 text-indigo-500" title={t('common.viewEmail')}>✉</span>}
+        <p className="text-xs text-gray-500 font-medium mb-0.5">
+          {parseDate(interaction.createdAt).toLocaleString()} — {interaction.authorName}
         </p>
-        <p className="text-[10px] text-gray-400 mt-0.5">
-          {interaction.authorName} — {new Date(interaction.createdAt).toLocaleString()}
-        </p>
+        <p className="text-xs text-gray-900">{interaction.content}</p>
+        {clickable && (
+          <button
+            onClick={() => onViewEmail(interaction.emailLogId!)}
+            className="mt-1 flex items-center gap-1 text-xs text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 px-2 py-0.5 rounded"
+          >
+            <Mail className="w-3 h-3" />
+            {t('common.viewEmail')}
+          </button>
+        )}
       </div>
     </div>
   )

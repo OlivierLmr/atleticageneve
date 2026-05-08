@@ -132,6 +132,8 @@ portal.post('/athlete/:athleteId/respond', requireAuth('athlete', 'manager'), zV
       content: `Agreement accepted by ${user.firstName} ${user.lastName}`,
       authorId: user.id,
       authorName: `${user.firstName} ${user.lastName}`,
+      authorRole: user.role,
+      createdAt: new Date().toISOString(),
     })
 
   } else if (action === 'reject') {
@@ -149,6 +151,8 @@ portal.post('/athlete/:athleteId/respond', requireAuth('athlete', 'manager'), zV
       content: `Agreement rejected by ${user.firstName} ${user.lastName}`,
       authorId: user.id,
       authorName: `${user.firstName} ${user.lastName}`,
+      authorRole: user.role,
+      createdAt: new Date().toISOString(),
     })
 
   } else if (action === 'withdraw') {
@@ -166,6 +170,8 @@ portal.post('/athlete/:athleteId/respond', requireAuth('athlete', 'manager'), zV
       content: `Withdrawn by ${user.firstName} ${user.lastName}`,
       authorId: user.id,
       authorName: `${user.firstName} ${user.lastName}`,
+      authorRole: user.role,
+      createdAt: new Date().toISOString(),
     })
 
   } else if (action === 'counter_offer') {
@@ -291,6 +297,8 @@ portal.post('/athlete/:athleteId/respond', requireAuth('athlete', 'manager'), zV
       content: `Counter-offer v${nextVersion} submitted by ${user.firstName} ${user.lastName}`,
       authorId: user.id,
       authorName: `${user.firstName} ${user.lastName}`,
+      authorRole: user.role,
+      createdAt: new Date().toISOString(),
     })
 
     // Update negotiation status
