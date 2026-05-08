@@ -154,7 +154,7 @@ function HomePage() {
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
-  const [emailPreview, setEmailPreview] = useState<{ subject: string; body: string } | null>(null)
+  const [emailPreview, setEmailPreview] = useState<{ subject: string; body: string; htmlBody?: string } | null>(null)
 
   // If already logged in, redirect to the right portal
   if (user && !loading) {
@@ -192,7 +192,7 @@ function HomePage() {
     setError('')
     setLoading(true)
     try {
-      const res = await api.post<{ method: string; emailPreview?: { subject: string; body: string } }>(
+      const res = await api.post<{ method: string; emailPreview?: { subject: string; body: string; htmlBody?: string } }>(
         '/api/v1/auth/identify',
         { identifier: email.trim() },
       )
@@ -342,7 +342,11 @@ function HomePage() {
                 <span>{emailPreview.subject}</span>
               </div>
               <hr />
-              <pre className="whitespace-pre-wrap font-sans leading-relaxed">{emailPreview.body}</pre>
+              {emailPreview.htmlBody ? (
+                <div className="text-sm prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: emailPreview.htmlBody }} />
+              ) : (
+                <pre className="whitespace-pre-wrap font-sans leading-relaxed">{emailPreview.body}</pre>
+              )}
             </div>
             <button
               onClick={() => setEmailPreview(null)}
