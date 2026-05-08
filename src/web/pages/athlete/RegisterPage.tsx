@@ -23,7 +23,7 @@ export default function AthleteRegisterPage() {
   const [submitted, setSubmitted] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
-  const [emailPreview, setEmailPreview] = useState<{ subject: string; body: string } | null>(null)
+  const [emailPreview, setEmailPreview] = useState<{ subject: string; body: string; htmlBody?: string } | null>(null)
 
   // Form state
   const [form, setForm] = useState({
@@ -101,7 +101,7 @@ export default function AthleteRegisterPage() {
         dopingFree: form.dopingFree,
         participantNotes: form.participantNotes || undefined,
         additionalNotes: form.additionalNotes || undefined,
-      }) as { emailPreview?: { subject: string; body: string } | null }
+      }) as { emailPreview?: { subject: string; body: string; htmlBody?: string } | null }
       setSubmitted(true)
       if (result.emailPreview) {
         setEmailPreview(result.emailPreview)
@@ -139,7 +139,11 @@ export default function AthleteRegisterPage() {
                   <span>{emailPreview.subject}</span>
                 </div>
                 <hr />
-                <pre className="whitespace-pre-wrap font-sans leading-relaxed">{emailPreview.body}</pre>
+                {emailPreview.htmlBody ? (
+                  <div className="text-sm prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: emailPreview.htmlBody }} />
+                ) : (
+                  <pre className="whitespace-pre-wrap font-sans leading-relaxed">{emailPreview.body}</pre>
+                )}
               </div>
               <button
                 onClick={() => setEmailPreview(null)}
