@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
 import { zValidator } from '@hono/zod-validator'
-import { and, eq, isNotNull, or, sql } from 'drizzle-orm'
+import { and, eq, isNotNull, isNull, or, sql } from 'drizzle-orm'
 import * as schema from '../db/schema'
 import { athleteRegistrationSchema, batchAthleteRegistrationSchema, athleteUpdateSchema, negotiationStatusChangeSchema, interactionSchema } from '@shared/validation'
 import { NEGOTIATION_TRANSITIONS, COMMITTEE_EXTRA_TRANSITIONS, ATHLETE_TRANSITIONS } from '@shared/constants'
@@ -392,7 +392,10 @@ athletes.get('/:id', requireAuth('athlete', 'manager', 'collaborator', 'committe
         eq(schema.interaction.athleteId, id),
         or(
           isNotNull(schema.interaction.emailLogId),
-          eq(schema.interaction.type, 'status_change'),
+          and(
+            eq(schema.interaction.type, 'status_change'),
+            isNull(schema.interaction.applicationId),
+          ),
           eq(schema.interaction.type, 'email'),
         ),
       )

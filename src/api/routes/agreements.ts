@@ -154,17 +154,6 @@ agreements.post('/:athleteId/agreements', zValidator('json', agreementSchema), a
     .set({ negotiationStatus: 'agreement_sent', updatedAt: now })
     .where(eq(schema.athlete.id, athleteId))
 
-  // Log interaction
-  await db.insert(schema.interaction).values({
-    athleteId,
-    type: 'agreement',
-    content: `Agreement offer v${nextVersion} sent — CHF ${totalCost.toLocaleString()}`,
-    authorId: user.id,
-    authorName: `${user.firstName} ${user.lastName}`,
-    authorRole: user.role,
-    createdAt: new Date().toISOString(),
-  })
-
   // Build the agreement object with hotel info for formatting
   const agreementForFormat = {
     id: agreementId,
@@ -231,10 +220,11 @@ agreements.post('/:athleteId/agreements', zValidator('json', agreementSchema), a
     agreementHtmlTerms,
   })
 
+  let emailLogId: string | null = null
   if (transitionEmail) {
     const targetEmail = ath.athleteEmail ?? managerEmail
     if (targetEmail) {
-      await sendEmail({
+      emailLogId = await sendEmail({
         db,
         to: targetEmail,
         subject: transitionEmail.subject,
@@ -244,6 +234,18 @@ agreements.post('/:athleteId/agreements', zValidator('json', agreementSchema), a
       })
     }
   }
+
+  // Log interaction after email so we can link the emailLogId
+  await db.insert(schema.interaction).values({
+    athleteId,
+    type: 'agreement',
+    content: `Agreement offer v${nextVersion} sent — CHF ${totalCost.toLocaleString()}`,
+    authorId: user.id,
+    authorName: `${user.firstName} ${user.lastName}`,
+    authorRole: user.role,
+    emailLogId,
+    createdAt: new Date().toISOString(),
+  })
 
   return c.json({
     id: agreementId,
