@@ -76,8 +76,9 @@ export function ScoringPopup({ app, athlete, edition, t, style }: {
 
 // ── ConfirmedAthletesPopup ──────────────────────────────────────────────────
 
-function ConfirmedAthletesPopup({ eventId, t }: {
+function ConfirmedAthletesPopup({ eventId, discipline, t }: {
   eventId: string
+  discipline: string
   t: (key: string) => string
 }) {
   const { data: confirmed = [], isLoading } = useQuery<ApplicationRow[]>({
@@ -108,7 +109,7 @@ function ConfirmedAthletesPopup({ eventId, t }: {
               <div key={a.id} className="flex justify-between text-gray-700">
                 <span>{a.athlete.lastName}, {a.athlete.firstName}</span>
                 <span className="font-mono text-gray-500">
-                  {formatPerf(a.waPerformance?.seasonBest ?? a.seasonBest ?? null)}
+                  {formatPerf(a.waPerformance?.seasonBest ?? a.seasonBest ?? null, discipline)}
                 </span>
               </div>
             ))}
@@ -144,12 +145,17 @@ export function BannerEventRow({ app, athlete, edition, isStaff, onParticipation
   isPendingParticipation: boolean
   t: (key: string) => string
 }) {
+  const isField = app.event.catalog.discipline === 'Concours'
   const [showEventPopup, setShowEventPopup] = useState(false)
   const [showScorePopup, setShowScorePopup] = useState(false)
   const [editingPerf, setEditingPerf] = useState(false)
   const [perfForm, setPerfForm] = useState({
-    personalBest: app.waPerformance?.personalBest != null ? String(app.waPerformance.personalBest) : '',
-    seasonBest: app.waPerformance?.seasonBest != null ? String(app.waPerformance.seasonBest) : '',
+    personalBest: app.waPerformance?.personalBest != null
+      ? String(isField ? app.waPerformance.personalBest / 100 : app.waPerformance.personalBest)
+      : '',
+    seasonBest: app.waPerformance?.seasonBest != null
+      ? String(isField ? app.waPerformance.seasonBest / 100 : app.waPerformance.seasonBest)
+      : '',
     worldRanking: app.waPerformance?.worldRanking != null ? String(app.waPerformance.worldRanking) : '',
   })
 
@@ -175,7 +181,7 @@ export function BannerEventRow({ app, athlete, edition, isStaff, onParticipation
         >
           {app.event.catalog.name}
         </button>
-        {showEventPopup && <ConfirmedAthletesPopup eventId={app.eventId} t={t} />}
+        {showEventPopup && <ConfirmedAthletesPopup eventId={app.eventId} discipline={app.event.catalog.discipline} t={t} />}
       </div>
 
       {/* PB / SB (colored) / Ranking */}
@@ -189,8 +195,8 @@ export function BannerEventRow({ app, athlete, edition, isStaff, onParticipation
             onChange={e => setPerfForm(p => ({ ...p, worldRanking: e.target.value }))} />
           <button onClick={() => {
             onWaPerfSave(athlete.id, app.eventId, {
-              ...(perfForm.personalBest ? { personalBest: parseFloat(perfForm.personalBest) } : {}),
-              ...(perfForm.seasonBest ? { seasonBest: parseFloat(perfForm.seasonBest) } : {}),
+              ...(perfForm.personalBest ? { personalBest: isField ? Math.round(parseFloat(perfForm.personalBest) * 100) : parseFloat(perfForm.personalBest) } : {}),
+              ...(perfForm.seasonBest ? { seasonBest: isField ? Math.round(parseFloat(perfForm.seasonBest) * 100) : parseFloat(perfForm.seasonBest) } : {}),
               ...(perfForm.worldRanking ? { worldRanking: parseInt(perfForm.worldRanking) } : {}),
             })
             setEditingPerf(false)
@@ -199,8 +205,8 @@ export function BannerEventRow({ app, athlete, edition, isStaff, onParticipation
         </div>
       ) : (
         <div className="flex items-center gap-3 text-xs text-gray-600 flex-1">
-          <span>PB: <span className="font-mono font-medium">{formatPerf(pb)}</span></span>
-          <span>SB: <span className={`font-mono font-medium ${sbColorClass(sb, app, athlete)}`}>{formatPerf(sb)}</span></span>
+          <span>PB: <span className="font-mono font-medium">{formatPerf(pb, app.event.catalog.discipline)}</span></span>
+          <span>SB: <span className={`font-mono font-medium ${sbColorClass(sb, app, athlete)}`}>{formatPerf(sb, app.event.catalog.discipline)}</span></span>
           <span>#{wr ?? '—'}</span>
 
           {/* Score with popup — staff only */}
