@@ -236,9 +236,6 @@ export function formatAgreementTermsHtml(
     rows.push(`<tr><td style="padding:5px 12px;font-weight:600;color:#555">${label}</td><td style="padding:5px 12px">${lang === 'fr' ? 'inclus' : 'included'}</td></tr>`)
   }
 
-  const totalLabel = lang === 'fr' ? 'Total' : 'Total cost'
-  rows.push(`<tr style="border-top:2px solid #ddd;background:#f9f9f9"><td style="padding:8px 12px;font-weight:700">${totalLabel}</td><td style="padding:8px 12px;font-weight:700">${formatAmount(agreement.totalCost, lang)}</td></tr>`)
-
   if (agreement.notes) {
     const noteLabel = 'Note'
     rows.push(`<tr><td style="padding:5px 12px;font-weight:600;color:#555">${noteLabel}</td><td style="padding:5px 12px;font-style:italic">${agreement.notes}</td></tr>`)
