@@ -5,7 +5,7 @@ import * as schema from '../db/schema'
 import { athleteRegistrationSchema, batchAthleteRegistrationSchema, athleteUpdateSchema, negotiationStatusChangeSchema, interactionSchema } from '@shared/validation'
 import { NEGOTIATION_TRANSITIONS, COMMITTEE_EXTRA_TRANSITIONS, ATHLETE_TRANSITIONS } from '@shared/constants'
 import { requireAuth } from '../middleware/auth'
-import { sendEmail, sendMagicLinkEmail, buildTransitionEmail } from '../services/email'
+import { sendEmail, sendApplicationEmail, buildTransitionEmail, buildManagerAthleteNotificationEmail, buildBatchNotificationEmail } from '../services/email'
 import type { EmailContent } from '../services/email'
 import { generateToken, magicLinkExpiresAt } from '../services/auth'
 import { recalculateAthleteEstimatedCost } from '../services/costEstimation'
@@ -142,7 +142,7 @@ athletes.post('/', zValidator('json', athleteRegistrationSchema), async (c) => {
     })
 
     const baseUrl = c.req.header('Origin') ?? 'http://localhost:5173'
-    emailPreview = await sendMagicLinkEmail(db, data.athleteEmail, token, baseUrl)
+    emailPreview = await sendApplicationEmail(db, data.athleteEmail, token, baseUrl, 'en', edition.name)
     magicLinkSent = true
   }
 
@@ -155,11 +155,29 @@ athletes.post('/', zValidator('json', athleteRegistrationSchema), async (c) => {
       .limit(1)
 
     if (managers.length > 0 && managers[0].email) {
-      await sendEmail({
+      const managerName = `${managers[0].firstName} ${managers[0].lastName}`
+      const notifEmail = buildManagerAthleteNotificationEmail({
+        managerName,
+        athleteFirstName: data.firstName,
+        athleteLastName: data.lastName,
+        meetingName: edition.name,
+        eventIds: data.eventIds,
+      })
+      const notifEmailId = await sendEmail({
         db,
         to: managers[0].email,
-        subject: `New athlete registered under your management: ${data.firstName} ${data.lastName}`,
-        body: `${data.firstName} ${data.lastName} has registered and listed you as their manager.\n\nEvents: ${data.eventIds.join(', ')}`,
+        subject: notifEmail.subject,
+        body: notifEmail.body,
+        htmlBody: notifEmail.htmlBody,
+        relatedAthleteId: athleteId,
+      })
+      await db.insert(schema.interaction).values({
+        athleteId,
+        type: 'manager_notification',
+        content: `Manager ${managerName} notified of new registration`,
+        authorName: `${data.firstName} ${data.lastName}`,
+        emailLogId: notifEmailId,
+        createdAt: new Date().toISOString(),
       })
     }
   }
@@ -250,15 +268,35 @@ athletes.post('/batch', requireAuth('manager'), zValidator('json', batchAthleteR
     results.push({ athleteId, applicationIds, firstName: data.firstName, lastName: data.lastName, eventIds: validEventIds })
   }
 
-  // Email stub to manager
-  await sendEmail({
+  // Email confirmation to manager
+  const managerName = `${user.firstName} ${user.lastName}`
+  const batchEmail = buildBatchNotificationEmail({
+    managerName,
+    meetingName: edition.name,
+    athletes: results.map(r => ({ firstName: r.firstName, lastName: r.lastName, eventIds: r.eventIds })),
+  })
+  const batchEmailId = await sendEmail({
     db,
     to: user.email ?? 'manager@unknown',
-    subject: `Batch registration complete — ${results.length} athletes`,
-    body: `You have registered ${results.length} athletes:\n${results.map(r => `- ${r.firstName} ${r.lastName} (${r.eventIds.join(', ')})`).join('\n')}`,
+    subject: batchEmail.subject,
+    body: batchEmail.body,
+    htmlBody: batchEmail.htmlBody,
   })
 
-  return c.json({ registered: results }, 201)
+  // Create interaction per athlete linking to the batch email
+  for (const r of results) {
+    await db.insert(schema.interaction).values({
+      athleteId: r.athleteId,
+      type: 'manager_notification',
+      content: `Batch registration confirmation sent to manager ${managerName}`,
+      authorName: managerName,
+      authorId: user.id,
+      emailLogId: batchEmailId,
+      createdAt: new Date().toISOString(),
+    })
+  }
+
+  return c.json({ registered: results, emailPreview: batchEmail }, 201)
 })
 
 // ── GET /athletes/:id — full athlete profile with applications, agreements, interactions ─
@@ -522,6 +560,7 @@ athletes.patch('/:id/negotiation-status', requireAuth('athlete', 'manager', 'col
         to: emailTo,
         subject: transitionEmail.subject,
         body: transitionEmail.body,
+        htmlBody: transitionEmail.htmlBody,
         relatedAthleteId: id,
       })
     }
@@ -534,6 +573,7 @@ athletes.patch('/:id/negotiation-status', requireAuth('athlete', 'manager', 'col
       to: edition.notificationEmail,
       subject: transitionEmail.subject,
       body: transitionEmail.body,
+      htmlBody: transitionEmail.htmlBody,
       relatedAthleteId: id,
     })
   }
