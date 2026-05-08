@@ -35,13 +35,13 @@ export function useAthleteMutations(id: string | undefined) {
 
   const statusMutation = useMutation({
     mutationFn: (status: NegotiationStatus) =>
-      api.patch<{ emailPreview?: { subject: string; body: string } }>(`/api/v1/athletes/${id}/negotiation-status`, { status }),
+      api.patch<{ emailPreview?: { subject: string; body: string; htmlBody?: string } }>(`/api/v1/athletes/${id}/negotiation-status`, { status }),
     onSuccess: invalidate,
   })
 
   const agreementMutation = useMutation({
     mutationFn: (data: AgreementFormDraft) =>
-      api.post<{ emailPreview?: { subject: string; body: string } }>(`/api/v1/athletes/${id}/agreements`, {
+      api.post<{ emailPreview?: { subject: string; body: string; htmlBody?: string } }>(`/api/v1/athletes/${id}/agreements`, {
         ...data,
         appearanceFee: data.appearanceFee === '' ? 0 : data.appearanceFee,
         otherCompensation: data.otherCompensation === '' ? 0 : data.otherCompensation,
@@ -94,7 +94,7 @@ export function useAthleteMutations(id: string | undefined) {
   const counterOfferMutation = useMutation({
     mutationFn: async (text: string) => {
       await api.post(`/api/v1/athletes/${id}/interactions`, { type: 'counter_offer', content: text })
-      return api.patch<{ emailPreview?: { subject: string; body: string } }>(`/api/v1/athletes/${id}/negotiation-status`, { status: 'counter_offer_sent' })
+      return api.patch<{ emailPreview?: { subject: string; body: string; htmlBody?: string } }>(`/api/v1/athletes/${id}/negotiation-status`, { status: 'counter_offer_sent' })
     },
     onSuccess: invalidate,
   })

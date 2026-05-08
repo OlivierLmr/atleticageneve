@@ -132,9 +132,10 @@ export function buildTransitionEmail(params: {
   recipientName: string
   organizationName: string
   agreementTerms?: string
+  agreementHtmlTerms?: string
   counterOfferText?: string
 }): TransitionEmail | null {
-  const { from, to, athleteName, meetingName, senderName, recipientName, organizationName, agreementTerms, counterOfferText } = params
+  const { from, to, athleteName, meetingName, senderName, recipientName, organizationName, agreementTerms, agreementHtmlTerms, counterOfferText } = params
   const key = `${from}__${to}`
 
   const make = (subject: string, body: string): TransitionEmail => ({
@@ -143,15 +144,20 @@ export function buildTransitionEmail(params: {
     htmlBody: textToHtml(body),
   })
 
+  const makeHtml = (subject: string, body: string, htmlBody: string): TransitionEmail => ({ subject, body, htmlBody })
+
   switch (key) {
     case 'to_review__agreement_sent': {
       const termsSection = agreementTerms
         ? `\n\nHere are the terms of our offer:\n\n${agreementTerms}`
         : ''
-      return make(
-        `${meetingName} — Participation Agreement`,
-        `Dear ${recipientName},\n\nWe are pleased to inform you that we have reviewed ${athleteName}'s application for ${meetingName} and are ready to move forward with a participation offer.${termsSection}\n\nPlease let us know your decision at your earliest convenience. Should you have any questions or wish to discuss any aspect of the offer, please do not hesitate to reach out.\n\nKind regards,\n${senderName} — ${organizationName}`,
-      )
+      const subject = `${meetingName} — Participation Agreement`
+      const body = `Dear ${recipientName},\n\nWe are pleased to inform you that we have reviewed ${athleteName}'s application for ${meetingName} and are ready to move forward with a participation offer.${termsSection}\n\nPlease let us know your decision at your earliest convenience. Should you have any questions or wish to discuss any aspect of the offer, please do not hesitate to reach out.\n\nKind regards,\n${senderName} — ${organizationName}`
+      if (agreementHtmlTerms) {
+        const htmlBody = `<div style="font-family:sans-serif;font-size:14px;line-height:1.6;color:#333"><p>Dear ${recipientName},</p><p>We are pleased to inform you that we have reviewed <strong>${athleteName}</strong>'s application for <strong>${meetingName}</strong> and are ready to move forward with a participation offer.</p>${agreementHtmlTerms}<p>Please let us know your decision at your earliest convenience. Should you have any questions or wish to discuss any aspect of the offer, please do not hesitate to reach out.</p><p>Kind regards,<br/>${senderName} — ${organizationName}</p></div>`
+        return makeHtml(subject, body, htmlBody)
+      }
+      return make(subject, body)
     }
     case 'to_review__rejected':
       return make(
@@ -186,10 +192,13 @@ export function buildTransitionEmail(params: {
       const termsSection = agreementTerms
         ? `\n\nHere are the revised terms:\n\n${agreementTerms}`
         : ''
-      return make(
-        `${meetingName} — Updated Participation Agreement`,
-        `Dear ${recipientName},\n\nThank you for your counter-offer regarding ${athleteName}'s participation in ${meetingName}. We have taken your points into consideration and are pleased to send you an updated participation offer.${termsSection}\n\nWe hope this revised proposal meets your expectations. Please do not hesitate to contact us if you have any further questions.\n\nKind regards,\n${senderName} — ${organizationName}`,
-      )
+      const subject = `${meetingName} — Updated Participation Agreement`
+      const body = `Dear ${recipientName},\n\nThank you for your counter-offer regarding ${athleteName}'s participation in ${meetingName}. We have taken your points into consideration and are pleased to send you an updated participation offer.${termsSection}\n\nWe hope this revised proposal meets your expectations. Please do not hesitate to contact us if you have any further questions.\n\nKind regards,\n${senderName} — ${organizationName}`
+      if (agreementHtmlTerms) {
+        const htmlBody = `<div style="font-family:sans-serif;font-size:14px;line-height:1.6;color:#333"><p>Dear ${recipientName},</p><p>Thank you for your counter-offer regarding <strong>${athleteName}</strong>'s participation in <strong>${meetingName}</strong>. We have taken your points into consideration and are pleased to send you an updated participation offer.</p>${agreementHtmlTerms}<p>We hope this revised proposal meets your expectations. Please do not hesitate to contact us if you have any further questions.</p><p>Kind regards,<br/>${senderName} — ${organizationName}</p></div>`
+        return makeHtml(subject, body, htmlBody)
+      }
+      return make(subject, body)
     }
     case 'counter_offer_sent__rejected':
       return make(
