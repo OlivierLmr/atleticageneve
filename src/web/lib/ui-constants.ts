@@ -21,9 +21,11 @@ export const inputCls =
 export const labelCls =
   'block text-xs font-medium text-gray-500 mb-1'
 
-export function formatPerf(value: number | null | undefined): string {
+export function formatPerf(value: number | null | undefined, discipline?: string): string {
   if (value == null) return '—'
-  // Distances/heights stored in cm (≥1000 means ≥10m) — format as m.cm
+  // Field events (Concours) are stored in centimeters — convert to meters
+  if (discipline === 'Concours') return (value / 100).toFixed(2)
+  // Fallback for legacy callers without discipline: assume cm if value ≥ 1000
   if (value >= 1000) return (value / 100).toFixed(2)
   // Times in seconds — format as ss.cc or m:ss.cc
   if (value < 60) return value.toFixed(2)

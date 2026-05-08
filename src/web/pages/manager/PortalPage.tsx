@@ -155,7 +155,7 @@ export default function ManagerPortalPage() {
                     </td>
                     <td className="px-3 py-2.5 text-xs">{ath.nationality}</td>
                     <td className="px-3 py-2.5 text-xs font-mono">
-                      {ath.applications.map(a => formatPerf(a.waPerformance?.seasonBest)).join(' / ') || '—'}
+                      {ath.applications.map(a => formatPerf(a.waPerformance?.seasonBest, a.event?.discipline)).join(' / ') || '—'}
                     </td>
                     <td className="px-3 py-2.5">
                       <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${STATUS_COLORS[ath.negotiationStatus]}`}>

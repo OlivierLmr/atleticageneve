@@ -91,12 +91,12 @@ function seasonBestColor(app: ApplicationRow, sb: number | null): string {
   return eligible ? 'text-green-600 font-semibold' : 'text-red-600'
 }
 
-function MinimaRow({ label, value }: { label: string; value: number | null | undefined }) {
+function MinimaRow({ label, value, discipline }: { label: string; value: number | null | undefined; discipline: string }) {
   return (
     <div className="flex items-center justify-between gap-4">
       <span className="text-xs text-gray-500">{label}</span>
       <span className="text-xs font-mono font-semibold text-gray-900">
-        {value != null ? formatPerf(value) : 'N/A'}
+        {value != null ? formatPerf(value, discipline) : 'N/A'}
       </span>
     </div>
   )
@@ -195,9 +195,9 @@ function EventInfoPanel({
             {t('selection.minima')}
           </p>
           <div className="space-y-1.5">
-            <MinimaRow label={t('selection.international')} value={event.intMinima} />
-            <MinimaRow label={t('selection.swiss')} value={event.swissMinima} />
-            <MinimaRow label={t('selection.eap')} value={event.eapMinima} />
+            <MinimaRow label={t('selection.international')} value={event.intMinima} discipline={event.discipline} />
+            <MinimaRow label={t('selection.swiss')} value={event.swissMinima} discipline={event.discipline} />
+            <MinimaRow label={t('selection.eap')} value={event.eapMinima} discipline={event.discipline} />
           </div>
         </div>
 
@@ -383,12 +383,12 @@ function CandidateRow({
 
       {/* Personal best */}
       <td className="px-3 py-2.5 font-mono text-xs text-gray-700">
-        {formatPerf(pb)}
+        {formatPerf(pb, app.event.catalog.discipline)}
       </td>
 
       {/* Season best */}
       <td className={`px-3 py-2.5 font-mono text-xs ${sbColor}`}>
-        {formatPerf(sb)}
+        {formatPerf(sb, app.event.catalog.discipline)}
       </td>
 
       {/* World ranking */}
