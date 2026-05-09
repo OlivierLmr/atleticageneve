@@ -385,7 +385,7 @@ athletes.get('/:id', requireAuth('athlete', 'manager', 'collaborator', 'committe
     ? rawAgreements
     : rawAgreements.map(a => ({ ...a, totalCost: undefined }))
 
-  // Fetch interactions (ordered most recent first); athlete/manager only see status changes and emailed entries
+  // Fetch interactions (ordered most recent first); athlete/manager only see status changes, counter-offers, and emailed entries
   const interactionWhere = staff
     ? eq(schema.interaction.athleteId, id)
     : and(
@@ -397,6 +397,7 @@ athletes.get('/:id', requireAuth('athlete', 'manager', 'collaborator', 'committe
             isNull(schema.interaction.applicationId),
           ),
           eq(schema.interaction.type, 'email'),
+          eq(schema.interaction.type, 'counter_offer'),
         ),
       )
   const interactions = await db
