@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { api } from '@web/lib/api'
 import { useAuth } from '@web/lib/auth'
-import type { AthleteDetail, NegotiationStatus } from '@shared/types'
+import type { AthleteDetail, NegotiationStatus, EapCity } from '@shared/types'
 import type { HotelWithRooms, StaffUser, AgreementFormDraft } from './types'
 
 export function useAthleteData(id: string | undefined) {
@@ -22,9 +22,14 @@ export function useAthleteData(id: string | undefined) {
     queryFn: () => api.get('/api/v1/users?role=collaborator,committee'),
   })
 
+  const { data: eapCities = [] } = useQuery<EapCity[]>({
+    queryKey: ['eap-cities'],
+    queryFn: () => api.get('/api/v1/eap-cities'),
+  })
+
   const allRooms = hotels.flatMap(h => h.rooms.map(r => ({ ...r, hotelName: h.name })))
 
-  return { athlete, isLoading, hotels, staffUsers, allRooms }
+  return { athlete, isLoading, hotels, staffUsers, allRooms, eapCities }
 }
 
 export function useAthleteMutations(id: string | undefined) {
