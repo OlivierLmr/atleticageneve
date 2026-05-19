@@ -1,15 +1,16 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { inputCls } from '@web/lib/ui-constants'
-import type { AthleteDetail } from '@shared/types'
+import type { AthleteDetail, EapCity } from '@shared/types'
 import type { FieldDef, StaffUser } from './types'
 import { CollapsibleSection, FieldReadOnly, AthleteFieldEditor, SelectorAssign } from './components'
 
-export function PersonalTab({ athlete, isStaff, isAthleteOrManager, staffUsers, mutations }: {
+export function PersonalTab({ athlete, isStaff, isAthleteOrManager, staffUsers, eapCities, mutations }: {
   athlete: AthleteDetail
   isStaff: boolean
   isAthleteOrManager: boolean
   staffUsers: StaffUser[]
+  eapCities: EapCity[]
   mutations: {
     athleteUpdate: { mutate: (data: Record<string, unknown>, options?: { onSuccess?: () => void }) => void; isPending: boolean; error: Error | null }
     internalNotes: { mutate: (notes: string) => void; isPending: boolean }
@@ -41,7 +42,10 @@ export function PersonalTab({ athlete, isStaff, isAthleteOrManager, staffUsers, 
     { key: 'distanceFromGva', label: t('athlete.distanceFromGva'), type: 'number' },
     { key: 'isEap', label: t('athlete.eapMember'), type: 'checkbox' },
     { key: 'isSwiss', label: t('athlete.swiss'), type: 'checkbox' },
-    { key: 'eapCity', label: t('athlete.eapCity'), type: 'text' },
+    { key: 'eapCity', label: t('athlete.eapCity'), type: 'select', options: [
+      { value: '', label: '—' },
+      ...eapCities.map(c => ({ value: c.id, label: c.name })),
+    ]},
   ]
 
   const athleteIdentityFields: FieldDef[] = identityFields.filter(f =>

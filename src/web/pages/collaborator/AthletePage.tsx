@@ -28,7 +28,7 @@ export default function AthletePage() {
   const navigate = useNavigate()
 
   // ── Data ───────────────────────────────���──────────────────────────────
-  const { athlete, isLoading, staffUsers, allRooms } = useAthleteData(id)
+  const { athlete, isLoading, staffUsers, allRooms, eapCities } = useAthleteData(id)
   const mutations = useAthleteMutations(id)
 
   // ── UI state ───────────────��──────────────────────────────────────────
@@ -470,6 +470,7 @@ export default function AthletePage() {
             isStaff={!!isStaff}
             isAthleteOrManager={isAthleteOrManager}
             staffUsers={staffUsers}
+            eapCities={eapCities}
             mutations={{
               athleteUpdate: mutations.athleteUpdateMutation,
               internalNotes: mutations.internalNotesMutation,
