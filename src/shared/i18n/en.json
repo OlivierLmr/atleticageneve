@@ -206,7 +206,7 @@
     "validate": "Validate",
     "roomType": "Room type",
     "selectHotelFirst": "Select a hotel first",
-    "roomAvailability": "{{negotiating}} in negotiation · {{confirmed}} confirmed",
+    "roomAvailability": "{{negotiating}} in negotiation · {{confirmed}} confirmed ({{total}} reserved in total)",
     "nightsDinnersRequireRoom": "Select a room to enable hotel nights and dinners"
   },
   "compliance": {
