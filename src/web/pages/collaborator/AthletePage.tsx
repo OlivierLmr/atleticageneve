@@ -63,6 +63,8 @@ export default function AthletePage() {
   if (athlete && !agreementInitialized) {
     if (latestAgreement) {
       setAgreementForm(defaultAgreement(latestAgreement))
+    } else {
+      setAgreementForm(defaultAgreement(undefined, athlete))
     }
     setAgreementInitialized(true)
   }

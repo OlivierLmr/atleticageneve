@@ -203,7 +203,11 @@
     "noHotelRoom": "Pas de chambre",
     "dinnersLockedHint": "Les dîners grisés n'étaient pas inclus dans l'offre",
     "description": "Description",
-    "validate": "Valider"
+    "validate": "Valider",
+    "roomType": "Type de chambre",
+    "selectHotelFirst": "Choisissez d'abord un hôtel",
+    "roomAvailability": "{{negotiating}} en négociation · {{confirmed}} confirmés",
+    "nightsDinnersRequireRoom": "Sélectionnez une chambre pour activer les nuitées et dîners"
   },
   "compliance": {
     "title": "Intégrité sportive",

@@ -203,7 +203,11 @@
     "noHotelRoom": "No hotel room",
     "dinnersLockedHint": "Greyed-out dinners were not included in the offer",
     "description": "Description",
-    "validate": "Validate"
+    "validate": "Validate",
+    "roomType": "Room type",
+    "selectHotelFirst": "Select a hotel first",
+    "roomAvailability": "{{negotiating}} in negotiation · {{confirmed}} confirmed",
+    "nightsDinnersRequireRoom": "Select a room to enable hotel nights and dinners"
   },
   "compliance": {
     "title": "Clean & Fair",
