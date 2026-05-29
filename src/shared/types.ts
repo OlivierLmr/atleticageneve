@@ -235,6 +235,8 @@ export interface HotelRoom {
   costPerNight: number
   dinnerCost: number
   reservedRooms: number
+  negotiatingCount: number
+  confirmedCount: number
 }
 
 export interface HotelNightDays {

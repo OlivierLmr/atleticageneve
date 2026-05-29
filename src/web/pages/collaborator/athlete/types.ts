@@ -48,7 +48,7 @@ export interface FieldDef {
   options?: { value: string; label: string }[]
 }
 
-export function defaultAgreement(existing?: Agreement): AgreementFormDraft {
+export function defaultAgreement(existing?: Agreement, athlete?: Athlete): AgreementFormDraft {
   if (existing) {
     return {
       appearanceFee: existing.appearanceFee,
@@ -75,10 +75,10 @@ export function defaultAgreement(existing?: Agreement): AgreementFormDraft {
     }
   }
   return {
-    appearanceFee: '',
+    appearanceFee: athlete?.estAppearance || '',
     otherCompensation: '',
     otherCompensationDesc: '',
-    transport: '',
+    transport: athlete?.estTravel || '',
     transportAirportHotel: true,
     transportHotelStadium: true,
     hotelRoomId: '',

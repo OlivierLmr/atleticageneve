@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { NIGHT_LABELS, DINNER_LABELS } from '@shared/constants'
 import { inputCls, labelCls } from '@web/lib/ui-constants'
@@ -224,7 +225,7 @@ export function MessageModal({ text, onTextChange, onSubmit, onCancel, isPending
 export function AgreementFormModal({ form, onChange, allRooms, athlete, onSubmit, onClose, isPending, error }: {
   form: AgreementFormDraft
   onChange: (updater: (prev: AgreementFormDraft) => AgreementFormDraft) => void
-  allRooms: { id: string; hotelName: string; roomType: string; costPerNight: number; dinnerCost: number }[]
+  allRooms: { id: string; hotelId: string; hotelName: string; roomType: string; costPerNight: number; dinnerCost: number; negotiatingCount: number; confirmedCount: number }[]
   athlete: AthleteDetail
   onSubmit: () => void
   onClose: () => void
@@ -233,7 +234,28 @@ export function AgreementFormModal({ form, onChange, allRooms, athlete, onSubmit
 }) {
   const { t } = useTranslation()
 
-  const room = allRooms.find(r => r.id === form.hotelRoomId)
+  const [selectedHotelId, setSelectedHotelId] = useState<string>(() =>
+    allRooms.find(r => r.id === form.hotelRoomId)?.hotelId ?? ''
+  )
+
+  // Derive unique hotel list from allRooms
+  const hotels = Array.from(
+    new Map(allRooms.map(r => [r.hotelId, { id: r.hotelId, name: r.hotelName }])).values()
+  )
+  const roomsForHotel = allRooms.filter(r => r.hotelId === selectedHotelId)
+  const selectedRoom = allRooms.find(r => r.id === form.hotelRoomId)
+
+  const handleHotelChange = (hotelId: string) => {
+    setSelectedHotelId(hotelId)
+    // Clear room selection if it belongs to a different hotel
+    if (form.hotelRoomId && allRooms.find(r => r.id === form.hotelRoomId)?.hotelId !== hotelId) {
+      onChange(p => ({ ...p, hotelRoomId: '' }))
+    }
+  }
+
+  const hasRoom = !!form.hotelRoomId
+
+  const room = selectedRoom
   const nights = NIGHT_LABELS.filter(n => form[`hotelNight${n.charAt(0).toUpperCase() + n.slice(1)}` as keyof AgreementFormDraft]).length
   const dinners = DINNER_LABELS.filter(d => form[`dinner${d.charAt(0).toUpperCase() + d.slice(1)}` as keyof AgreementFormDraft]).length
   let total = (form.appearanceFee || 0) + (form.otherCompensation || 0) + (form.transport || 0)
@@ -306,43 +328,90 @@ export function AgreementFormModal({ form, onChange, allRooms, athlete, onSubmit
               {t('contract.transportHotelStadium')}
             </label>
           </div>
+
+          {/* Hotel selection — step 1 */}
           <div>
             <label className={labelCls}>{t('logistics.hotel')}</label>
-            <select className={inputCls} value={form.hotelRoomId}
-              onChange={e => onChange(p => ({ ...p, hotelRoomId: e.target.value }))}>
+            <select className={inputCls} value={selectedHotelId}
+              onChange={e => handleHotelChange(e.target.value)}>
               <option value="">— {t('contract.noHotelRoom')} —</option>
-              {allRooms.map(r => (
-                <option key={r.id} value={r.id}>{r.hotelName} — {r.roomType} (CHF {r.costPerNight}/night)</option>
+              {hotels.map(h => (
+                <option key={h.id} value={h.id}>{h.name}</option>
               ))}
             </select>
           </div>
+
+          {/* Room type selection — step 2, requires hotel */}
           <div>
-            <label className={labelCls}>{t('contract.hotelNights')}</label>
+            <label className={labelCls}>{t('contract.roomType')}</label>
+            <select
+              className={`${inputCls} ${!selectedHotelId ? 'opacity-50 cursor-not-allowed' : ''}`}
+              value={form.hotelRoomId}
+              disabled={!selectedHotelId}
+              onChange={e => onChange(p => ({ ...p, hotelRoomId: e.target.value }))}
+            >
+              <option value="">
+                {selectedHotelId ? `— ${t('contract.noHotelRoom')} —` : t('contract.selectHotelFirst')}
+              </option>
+              {roomsForHotel.map(r => (
+                <option key={r.id} value={r.id}>
+                  {r.roomType} (CHF {r.costPerNight}/nuit)
+                </option>
+              ))}
+            </select>
+            {selectedRoom && (
+              <p className="text-xs text-gray-500 mt-1">
+                {t('contract.roomAvailability', {
+                  negotiating: selectedRoom.negotiatingCount,
+                  confirmed: selectedRoom.confirmedCount,
+                })}
+              </p>
+            )}
+          </div>
+
+          {/* Hotel nights — requires room selection */}
+          <div>
+            <label className={`${labelCls} ${!hasRoom ? 'text-gray-400' : ''}`}>{t('contract.hotelNights')}</label>
             <div className="flex gap-2">
               {NIGHT_LABELS.map(night => {
                 const key = `hotelNight${night.charAt(0).toUpperCase() + night.slice(1)}` as keyof AgreementFormDraft
                 return (
-                  <label key={night} className={`flex flex-col items-center text-xs cursor-pointer px-2 py-1 rounded border ${
-                    form[key] ? 'bg-gray-900 text-white border-gray-900' : 'border-gray-300'
+                  <label key={night} className={`flex flex-col items-center text-xs px-2 py-1 rounded border ${
+                    !hasRoom
+                      ? 'border-gray-200 text-gray-300 cursor-not-allowed'
+                      : form[key]
+                        ? 'bg-gray-900 text-white border-gray-900 cursor-pointer'
+                        : 'border-gray-300 cursor-pointer'
                   }`}>
                     <input type="checkbox" className="sr-only" checked={form[key] as boolean}
+                      disabled={!hasRoom}
                       onChange={e => onChange(p => ({ ...p, [key]: e.target.checked }))} />
                     {t(`night.${night}`)}
                   </label>
                 )
               })}
             </div>
+            {!hasRoom && (
+              <p className="text-xs text-gray-400 mt-1">{t('contract.nightsDinnersRequireRoom')}</p>
+            )}
           </div>
+
+          {/* Dinners — requires room selection */}
           <div>
-            <label className={labelCls}>{t('contract.dinners')}</label>
+            <label className={`${labelCls} ${!hasRoom ? 'text-gray-400' : ''}`}>{t('contract.dinners')}</label>
             <div className="flex gap-2">
               {DINNER_LABELS.map(day => {
                 const key = `dinner${day.charAt(0).toUpperCase() + day.slice(1)}` as keyof AgreementFormDraft
                 return (
-                  <label key={day} className={`flex flex-col items-center text-xs cursor-pointer px-2 py-1 rounded border ${
-                    form[key] ? 'bg-gray-900 text-white border-gray-900' : 'border-gray-300'
+                  <label key={day} className={`flex flex-col items-center text-xs px-2 py-1 rounded border ${
+                    !hasRoom
+                      ? 'border-gray-200 text-gray-300 cursor-not-allowed'
+                      : form[key]
+                        ? 'bg-gray-900 text-white border-gray-900 cursor-pointer'
+                        : 'border-gray-300 cursor-pointer'
                   }`}>
                     <input type="checkbox" className="sr-only" checked={form[key] as boolean}
+                      disabled={!hasRoom}
                       onChange={e => onChange(p => ({ ...p, [key]: e.target.checked }))} />
                     {t(`night.${day}`)}
                   </label>
@@ -350,6 +419,7 @@ export function AgreementFormModal({ form, onChange, allRooms, athlete, onSubmit
               })}
             </div>
           </div>
+
           <label className="flex items-center gap-2 text-sm cursor-pointer">
             <input type="checkbox" checked={form.stadiumMeals}
               onChange={e => onChange(p => ({ ...p, stadiumMeals: e.target.checked }))} />
