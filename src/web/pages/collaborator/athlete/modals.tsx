@@ -225,7 +225,7 @@ export function MessageModal({ text, onTextChange, onSubmit, onCancel, isPending
 export function AgreementFormModal({ form, onChange, allRooms, athlete, onSubmit, onClose, isPending, error }: {
   form: AgreementFormDraft
   onChange: (updater: (prev: AgreementFormDraft) => AgreementFormDraft) => void
-  allRooms: { id: string; hotelId: string; hotelName: string; roomType: string; costPerNight: number; dinnerCost: number; negotiatingCount: number; confirmedCount: number }[]
+  allRooms: { id: string; hotelId: string; hotelName: string; roomType: string; costPerNight: number; dinnerCost: number; negotiatingCount: number; confirmedCount: number; reservedRooms: number }[]
   athlete: AthleteDetail
   onSubmit: () => void
   onClose: () => void
@@ -364,6 +364,7 @@ export function AgreementFormModal({ form, onChange, allRooms, athlete, onSubmit
                 {t('contract.roomAvailability', {
                   negotiating: selectedRoom.negotiatingCount,
                   confirmed: selectedRoom.confirmedCount,
+                  total: selectedRoom.reservedRooms,
                 })}
               </p>
             )}

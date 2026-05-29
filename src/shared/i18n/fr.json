@@ -206,7 +206,7 @@
     "validate": "Valider",
     "roomType": "Type de chambre",
     "selectHotelFirst": "Choisissez d'abord un hôtel",
-    "roomAvailability": "{{negotiating}} en négociation · {{confirmed}} confirmés",
+    "roomAvailability": "{{negotiating}} en négociation · {{confirmed}} confirmés ({{total}} réservées au total)",
     "nightsDinnersRequireRoom": "Sélectionnez une chambre pour activer les nuitées et dîners"
   },
   "compliance": {
