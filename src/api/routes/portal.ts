@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
 import { zValidator } from '@hono/zod-validator'
-import { eq, or, and, desc, max } from 'drizzle-orm'
+import { eq, or, and, desc, max, isNull, inArray } from 'drizzle-orm'
 import * as schema from '../db/schema'
 import { portalRespondSchema } from '@shared/validation'
 import { requireAuth } from '../middleware/auth'
@@ -10,6 +10,51 @@ import type { Env } from '../index'
 import type { NegotiationStatus } from '@shared/types'
 
 const portal = new Hono<Env>()
+
+// ── Confirmed athletes for an event (all authenticated roles) ─────────────────
+
+// GET /portal/events/:eventId/confirmed-athletes — list confirmed athletes for an event
+// Used by the hover popup on the athlete page, accessible to all roles
+portal.get('/events/:eventId/confirmed-athletes', requireAuth('athlete', 'manager', 'collaborator', 'committee'), async (c) => {
+  const db = c.get('db')
+  const eventId = c.req.param('eventId')
+
+  const rows = await db
+    .select({
+      applicationId: schema.application.id,
+      athleteId: schema.athlete.id,
+      firstName: schema.athlete.firstName,
+      lastName: schema.athlete.lastName,
+    })
+    .from(schema.application)
+    .innerJoin(schema.athlete, eq(schema.application.athleteId, schema.athlete.id))
+    .where(and(
+      eq(schema.application.eventId, eventId),
+      eq(schema.athlete.negotiationStatus, 'confirmed'),
+      isNull(schema.athlete.archivedAt),
+    ))
+
+  const athleteIds = rows.map(r => r.athleteId)
+  const waPerfs = athleteIds.length > 0
+    ? await db
+        .select({ athleteId: schema.waPerformance.athleteId, seasonBest: schema.waPerformance.seasonBest })
+        .from(schema.waPerformance)
+        .where(and(
+          inArray(schema.waPerformance.athleteId, athleteIds),
+          eq(schema.waPerformance.eventId, eventId),
+        ))
+    : []
+  const waPerfMap = new Map(waPerfs.map(wp => [wp.athleteId, wp.seasonBest]))
+
+  const result = rows.map(r => ({
+    id: r.applicationId,
+    firstName: r.firstName,
+    lastName: r.lastName,
+    seasonBest: waPerfMap.get(r.athleteId) ?? null,
+  }))
+
+  return c.json(result)
+})
 
 // ── Athlete portal ───────────────────────────────────────────────────────────
 
