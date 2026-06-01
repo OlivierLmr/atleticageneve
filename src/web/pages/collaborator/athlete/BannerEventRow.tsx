@@ -5,7 +5,6 @@ import { computeScore } from '@shared/scoring'
 import { formatPerf } from '@web/lib/ui-constants'
 import { NIGHT_LABELS, DINNER_LABELS } from '@shared/constants'
 import type { AthleteDetail, ApplicationForAthlete, EditionCosts, Agreement } from '@shared/types'
-import type { ApplicationRow } from './types'
 
 // ── ScoringPopup ────────────────────────────────────────────────────────────
 
@@ -76,14 +75,21 @@ export function ScoringPopup({ app, athlete, edition, t, style }: {
 
 // ── ConfirmedAthletesPopup ──────────────────────────────────────────────────
 
+type ConfirmedAthleteEntry = {
+  id: string
+  firstName: string
+  lastName: string
+  seasonBest: number | null
+}
+
 function ConfirmedAthletesPopup({ eventId, discipline, t }: {
   eventId: string
   discipline: string
   t: (key: string) => string
 }) {
-  const { data: confirmed = [], isLoading } = useQuery<ApplicationRow[]>({
+  const { data: confirmed = [], isLoading } = useQuery<ConfirmedAthleteEntry[]>({
     queryKey: ['confirmed-athletes', eventId],
-    queryFn: () => api.get(`/api/v1/applications?eventId=${eventId}&negotiationStatus=confirmed`),
+    queryFn: () => api.get(`/api/v1/portal/events/${eventId}/confirmed-athletes`),
     staleTime: 60_000,
   })
 
@@ -98,8 +104,8 @@ function ConfirmedAthletesPopup({ eventId, discipline, t }: {
         <div className="space-y-1">
           {[...confirmed]
             .sort((a, b) => {
-              const sb1 = a.waPerformance?.seasonBest ?? a.seasonBest ?? null
-              const sb2 = b.waPerformance?.seasonBest ?? b.seasonBest ?? null
+              const sb1 = a.seasonBest
+              const sb2 = b.seasonBest
               if (sb1 == null && sb2 == null) return 0
               if (sb1 == null) return 1
               if (sb2 == null) return -1
@@ -107,9 +113,9 @@ function ConfirmedAthletesPopup({ eventId, discipline, t }: {
             })
             .map(a => (
               <div key={a.id} className="flex justify-between text-gray-700">
-                <span>{a.athlete.lastName}, {a.athlete.firstName}</span>
+                <span>{a.lastName}, {a.firstName}</span>
                 <span className="font-mono text-gray-500">
-                  {formatPerf(a.waPerformance?.seasonBest ?? a.seasonBest ?? null, discipline)}
+                  {formatPerf(a.seasonBest, discipline)}
                 </span>
               </div>
             ))}
