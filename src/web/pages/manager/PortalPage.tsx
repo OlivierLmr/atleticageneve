@@ -1,12 +1,12 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from '@web/lib/api'
 import { useAuth } from '@web/lib/auth'
 import { LanguageSwitcher } from '@web/App'
 import { STATUS_COLORS, formatPerf } from '@web/lib/ui-constants'
-import type { Application, Athlete, Event, NegotiationStatus, WaPerformance } from '@shared/types'
+import type { Application, Athlete, Event, NegotiationStatus, WaPerformance, User } from '@shared/types'
 
 interface PortalEvent extends Event {
   name: string
@@ -38,11 +38,30 @@ interface ManagerPortalData {
 export default function ManagerPortalPage() {
   const { t } = useTranslation()
   const { user, logout } = useAuth()
+  const queryClient = useQueryClient()
   const [statusFilter, setStatusFilter] = useState('')
+  const [editingIban, setEditingIban] = useState(false)
+  const [ibanDraft, setIbanDraft] = useState('')
+  const [ibanSaved, setIbanSaved] = useState(false)
 
   const { data, isLoading } = useQuery<ManagerPortalData>({
     queryKey: ['manager-portal'],
     queryFn: () => api.get('/api/v1/portal/manager'),
+  })
+
+  const { data: profile } = useQuery<User>({
+    queryKey: ['user-profile'],
+    queryFn: () => api.get('/api/v1/users/me'),
+  })
+
+  const ibanMutation = useMutation({
+    mutationFn: (bankIban: string | null) => api.patch('/api/v1/users/me', { bankIban }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['user-profile'] })
+      setEditingIban(false)
+      setIbanSaved(true)
+      setTimeout(() => setIbanSaved(false), 3000)
+    },
   })
 
   const athletes = data?.athletes ?? []
@@ -105,6 +124,60 @@ export default function ManagerPortalPage() {
               <p className={`text-2xl font-bold ${color}`}>{value}</p>
             </div>
           ))}
+        </div>
+
+        {/* IBAN section */}
+        <div className="bg-white rounded-lg border p-4 mb-6">
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex-1">
+              <h2 className="text-sm font-semibold mb-0.5">{t('payments.ibanSection')}</h2>
+              <p className="text-xs text-gray-400 mb-3">{t('payments.ibanHint')}</p>
+              {editingIban ? (
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    value={ibanDraft}
+                    onChange={e => setIbanDraft(e.target.value)}
+                    placeholder={t('payments.ibanPlaceholder')}
+                    className="flex-1 max-w-xs px-3 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
+                    autoFocus
+                  />
+                  <button
+                    onClick={() => ibanMutation.mutate(ibanDraft.trim() || null)}
+                    disabled={ibanMutation.isPending}
+                    className="text-xs px-3 py-1.5 bg-gray-900 text-white rounded hover:bg-gray-800 disabled:opacity-50"
+                  >
+                    {t('common.save')}
+                  </button>
+                  <button
+                    onClick={() => setEditingIban(false)}
+                    className="text-xs text-gray-400 hover:text-gray-600"
+                  >
+                    {t('common.cancel')}
+                  </button>
+                </div>
+              ) : (
+                <div className="flex items-center gap-3">
+                  {profile?.bankIban ? (
+                    <span className="font-mono text-sm text-green-700 bg-green-50 px-2 py-1 rounded border border-green-200">
+                      {profile.bankIban}
+                    </span>
+                  ) : (
+                    <span className="text-sm text-amber-600 font-medium">{t('payments.ibanMissing')}</span>
+                  )}
+                  <button
+                    onClick={() => { setIbanDraft(profile?.bankIban ?? ''); setEditingIban(true) }}
+                    className="text-xs text-blue-600 hover:text-blue-800 border border-blue-200 rounded px-2 py-1"
+                  >
+                    {t('common.edit')}
+                  </button>
+                  {ibanSaved && (
+                    <span className="text-xs text-green-600">{t('payments.ibanSaved')}</span>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
         </div>
 
         {/* Filters */}

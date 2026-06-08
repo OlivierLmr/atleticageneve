@@ -48,6 +48,7 @@ export interface User {
   firstName: string
   lastName: string
   organization: string | null
+  bankIban: string | null
   preferredLang: string
   isActive: boolean
   createdAt: string
@@ -184,6 +185,7 @@ export interface Application {
   worldRanking: number | null
   score: number | null
   recommendation: Recommendation | null
+  finalPlacement: number | null
   appliedAt: string
 }
 
@@ -354,4 +356,33 @@ export interface CostDistanceConfig {
   distanceMax: number | null
   travelCost: number
   nights: number
+}
+
+// ── Payments ──────────────────────────────────────────────────────────────────
+
+export interface PaymentEventLine {
+  applicationId: string
+  eventName: string
+  finalPlacement: number | null
+  prizeMoney: number
+}
+
+export interface PaymentEntry {
+  athleteId: string
+  athleteFirstName: string
+  athleteLastName: string
+  managerId: string | null
+  managerName: string | null
+  recipientName: string
+  recipientEmail: string | null
+  recipientIban: string | null
+  appearanceFee: number
+  otherCompensation: number
+  otherCompensationDesc: string | null
+  events: PaymentEventLine[]
+  totalPrizeMoney: number
+  totalDue: number
+  paymentStatus: PaymentStatus
+  paymentDate: string | null
+  currency: string
 }

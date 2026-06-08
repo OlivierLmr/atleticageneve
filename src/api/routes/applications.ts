@@ -2,7 +2,7 @@ import { Hono } from 'hono'
 import { zValidator } from '@hono/zod-validator'
 import { eq, and, sql, isNull, desc, inArray } from 'drizzle-orm'
 import * as schema from '../db/schema'
-import { participationStatusChangeSchema, interactionSchema } from '@shared/validation'
+import { participationStatusChangeSchema, interactionSchema, finalPlacementSchema } from '@shared/validation'
 import { PARTICIPATION_TRANSITIONS } from '@shared/constants'
 import { computeScore } from '@shared/scoring'
 import { requireAuth } from '../middleware/auth'
@@ -336,6 +336,50 @@ applications.post('/:id/score', async (c) => {
     recommendation: scoreResult.recommendation,
     breakdown: scoreResult,
   })
+})
+
+// ── PATCH /applications/:id/final-placement — set race result ────────────────
+
+applications.patch('/:id/final-placement', zValidator('json', finalPlacementSchema), async (c) => {
+  const db = c.get('db')
+  const user = c.get('user')!
+  const id = c.req.param('id')
+  const { finalPlacement } = c.req.valid('json')
+
+  const apps = await db
+    .select({
+      application: schema.application,
+      catalogName: schema.eventCatalog.name,
+      catalogGender: schema.eventCatalog.gender,
+    })
+    .from(schema.application)
+    .innerJoin(schema.event, eq(schema.application.eventId, schema.event.id))
+    .innerJoin(schema.eventCatalog, eq(schema.event.catalogId, schema.eventCatalog.id))
+    .where(eq(schema.application.id, id))
+    .limit(1)
+
+  if (apps.length === 0) return c.json({ error: 'Application not found' }, 404)
+
+  await db
+    .update(schema.application)
+    .set({ finalPlacement })
+    .where(eq(schema.application.id, id))
+
+  const eventName = `${apps[0].catalogName} ${apps[0].catalogGender === 'M' ? 'Men' : 'Women'}`
+  const placementText = finalPlacement != null ? `${finalPlacement}` : 'cleared'
+
+  await db.insert(schema.interaction).values({
+    athleteId: apps[0].application.athleteId,
+    applicationId: id,
+    type: 'note',
+    content: `[${eventName}] Final placement set to: ${placementText}`,
+    authorId: user.id,
+    authorName: `${user.firstName} ${user.lastName}`,
+    authorRole: user.role,
+    createdAt: new Date().toISOString(),
+  })
+
+  return c.json({ id, finalPlacement })
 })
 
 // ── POST /applications/:id/interactions — add an interaction ─────────────────

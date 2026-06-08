@@ -70,7 +70,8 @@
     "eapCities": "Villes EAP",
     "hotelRooms": "Chambres d'hôtel",
     "emailLog": "Journal des emails",
-    "candidates": "Candidats"
+    "candidates": "Candidats",
+    "payments": "Paiements"
   },
   "status": {
     "to_review": "À examiner",
@@ -439,5 +440,32 @@
     "overrideReject": "Annuler : Rejeter",
     "reopen": "Rouvrir",
     "awaitingResponse": "En attente de réponse de l'athlète / manager"
+  },
+  "payments": {
+    "title": "Paiements",
+    "subtitle": "Paiements à effectuer aux athlètes confirmés après le meeting",
+    "athlete": "Athlète",
+    "recipient": "Destinataire",
+    "appearanceFee": "Cachet d'apparition",
+    "prizeMoney": "Prize money",
+    "otherCompensation": "Autre compensation",
+    "totalDue": "Total dû",
+    "iban": "IBAN",
+    "ibanMissing": "IBAN manquant",
+    "status": "Statut",
+    "sendProforma": "Envoyer proforma",
+    "sending": "Envoi…",
+    "markPaid": "Marquer payé",
+    "markPending": "Marquer en attente",
+    "noPayments": "Aucun athlète confirmé avec des paiements en attente.",
+    "placement": "Place",
+    "noPlacement": "—",
+    "events": "Épreuves",
+    "proformaSent": "Proforma envoyé",
+    "ibanSection": "Coordonnées bancaires",
+    "myIban": "Mon IBAN / coordonnées bancaires",
+    "ibanPlaceholder": "ex. CH56 0483 5012 3456 7800 9",
+    "ibanSaved": "IBAN enregistré",
+    "ibanHint": "Votre IBAN est nécessaire pour effectuer le paiement. Il sera inclus dans la proforma envoyée par l'organisation."
   }
 }

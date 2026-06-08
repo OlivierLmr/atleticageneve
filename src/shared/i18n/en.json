@@ -70,7 +70,8 @@
     "eapCities": "EAP Cities",
     "hotelRooms": "Hotel Rooms",
     "emailLog": "Email Log",
-    "candidates": "Candidates"
+    "candidates": "Candidates",
+    "payments": "Payments"
   },
   "status": {
     "to_review": "Under review",
@@ -439,5 +440,32 @@
     "overrideReject": "Override: Reject",
     "reopen": "Reopen",
     "awaitingResponse": "Awaiting athlete / manager response"
+  },
+  "payments": {
+    "title": "Payments",
+    "subtitle": "Payments to be made to confirmed athletes after the meeting",
+    "athlete": "Athlete",
+    "recipient": "Recipient",
+    "appearanceFee": "Appearance fee",
+    "prizeMoney": "Prize money",
+    "otherCompensation": "Other compensation",
+    "totalDue": "Total due",
+    "iban": "IBAN",
+    "ibanMissing": "IBAN missing",
+    "status": "Status",
+    "sendProforma": "Send proforma",
+    "sending": "Sending…",
+    "markPaid": "Mark as paid",
+    "markPending": "Mark as pending",
+    "noPayments": "No confirmed athletes with pending payments.",
+    "placement": "Place",
+    "noPlacement": "—",
+    "events": "Events",
+    "proformaSent": "Proforma sent",
+    "ibanSection": "Banking details",
+    "myIban": "My IBAN / banking details",
+    "ibanPlaceholder": "e.g. CH56 0483 5012 3456 7800 9",
+    "ibanSaved": "IBAN saved",
+    "ibanHint": "Your IBAN is needed to process your payment. It will be included in the payment proforma sent by the organisation."
   }
 }

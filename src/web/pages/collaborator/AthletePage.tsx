@@ -431,12 +431,16 @@ export default function AthletePage() {
                   athlete={athlete}
                   edition={athlete.edition}
                   isStaff={!!isStaff}
+                  isCommittee={!!isCommittee}
                   onParticipationChange={(appId, status) =>
                     mutations.participationMutation.mutate({ appId, status })
                   }
                   onRescore={(appId) => mutations.scoreMutation.mutate(appId)}
                   onWaPerfSave={(athleteId, eventId, data) =>
                     mutations.waPerfMutation.mutate({ athleteId, eventId, ...data })
+                  }
+                  onPlacementSave={(appId, placement) =>
+                    mutations.placementMutation.mutate({ appId, placement })
                   }
                   isPendingParticipation={mutations.participationMutation.isPending}
                   t={t}

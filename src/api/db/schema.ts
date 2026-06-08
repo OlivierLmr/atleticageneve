@@ -93,6 +93,7 @@ export const user = sqliteTable('user', {
   firstName: text('first_name').notNull(),
   lastName: text('last_name').notNull(),
   organization: text('organization'),
+  bankIban: text('bank_iban'),
   preferredLang: text('preferred_lang').notNull().default('en'),
   isActive: integer('is_active', { mode: 'boolean' }).notNull().default(true),
   createdAt: createdAt(),
@@ -170,6 +171,7 @@ export const application = sqliteTable('application', {
   worldRanking: integer('world_ranking'),
   score: real('score'),
   recommendation: text('recommendation'),
+  finalPlacement: integer('final_placement'),
   appliedAt: text('applied_at').notNull().default(sql`(datetime('now'))`),
 }, (table) => [
   uniqueIndex('idx_application_athlete_event_edition').on(table.athleteId, table.eventId, table.editionId),

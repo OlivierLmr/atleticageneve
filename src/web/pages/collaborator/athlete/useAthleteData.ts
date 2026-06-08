@@ -120,6 +120,12 @@ export function useAthleteMutations(id: string | undefined) {
     ),
   })
 
+  const placementMutation = useMutation({
+    mutationFn: ({ appId, placement }: { appId: string; placement: number | null }) =>
+      api.patch(`/api/v1/applications/${appId}/final-placement`, { finalPlacement: placement }),
+    onSuccess: invalidate,
+  })
+
   return {
     statusMutation,
     agreementMutation,
@@ -133,6 +139,7 @@ export function useAthleteMutations(id: string | undefined) {
     counterOfferMutation,
     freeMessageMutation,
     archiveMutation,
+    placementMutation,
   }
 }
 

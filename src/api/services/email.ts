@@ -262,6 +262,113 @@ export function buildBatchNotificationEmail(params: {
   return { subject, body, htmlBody }
 }
 
+// ── Payment proforma (to manager or athlete) ──────────────────────────────────
+
+export function buildPaymentProformaEmail(params: {
+  recipientName: string
+  athleteFirstName: string
+  athleteLastName: string
+  meetingName: string
+  currency: string
+  appearanceFee: number
+  otherCompensation: number
+  otherCompensationDesc: string | null
+  events: Array<{ eventName: string; finalPlacement: number | null; prizeMoney: number }>
+  totalDue: number
+  recipientIban: string | null
+  portalLink: string
+}): EmailContent {
+  const {
+    recipientName,
+    athleteFirstName,
+    athleteLastName,
+    meetingName,
+    currency,
+    appearanceFee,
+    otherCompensation,
+    otherCompensationDesc,
+    events,
+    totalDue,
+    recipientIban,
+    portalLink,
+  } = params
+  const athleteName = `${athleteFirstName} ${athleteLastName}`
+
+  const subject = `${meetingName} — Payment summary for ${athleteName}`
+
+  const ibanSection = recipientIban
+    ? `Your IBAN on file: ${recipientIban}`
+    : `IMPORTANT: We do not have your IBAN on file. Please log in to your portal and update your banking details so we can process the payment: ${portalLink}`
+
+  const eventLines = events
+    .map(e => `  - ${e.eventName}${e.finalPlacement != null ? ` (place: ${e.finalPlacement})` : ''}: ${e.prizeMoney > 0 ? `${currency} ${e.prizeMoney.toLocaleString()} prize money` : 'no prize money'}`)
+    .join('\n')
+
+  const body = `Dear ${recipientName},
+
+Following ${meetingName}, please find below a summary of the amounts owed to ${athleteName}. We kindly ask you to issue an invoice to Atletica Genève for the total amount indicated.
+
+PAYMENT SUMMARY
+───────────────
+Athlete: ${athleteName}
+Meeting: ${meetingName}
+
+Line items:
+${appearanceFee > 0 ? `  - Appearance fee: ${currency} ${appearanceFee.toLocaleString()}\n` : ''}${eventLines}${otherCompensation > 0 ? `\n  - Other compensation${otherCompensationDesc ? ` (${otherCompensationDesc})` : ''}: ${currency} ${otherCompensation.toLocaleString()}` : ''}
+
+TOTAL DUE: ${currency} ${totalDue.toLocaleString()}
+
+${ibanSection}
+
+Please issue an invoice to:
+  Atletica Genève
+  For the attention of: Finance Department
+
+Thank you,
+The Atletica Genève Organisation Committee`
+
+  const eventHtmlRows = events
+    .map(e => `<tr><td style="padding:4px 8px">${e.eventName}${e.finalPlacement != null ? ` <span style="color:#666">(place: ${e.finalPlacement})</span>` : ''}</td><td style="padding:4px 8px;text-align:right">${e.prizeMoney > 0 ? `${currency} ${e.prizeMoney.toLocaleString()}` : '—'}</td></tr>`)
+    .join('')
+
+  const ibanHtml = recipientIban
+    ? `<p><strong>Your IBAN on file:</strong> <code>${recipientIban}</code></p>`
+    : `<p style="color:#b45309;background:#fef3c7;padding:10px;border-radius:6px">⚠️ <strong>We do not have your IBAN on file.</strong> Please log in to your portal and update your banking details so we can process the payment: <a href="${portalLink}">${portalLink}</a></p>`
+
+  const htmlBody = `<div style="font-family:sans-serif;font-size:14px;line-height:1.6;color:#333">
+<p>Dear ${recipientName},</p>
+<p>Following <strong>${meetingName}</strong>, please find below a summary of the amounts owed to <strong>${athleteName}</strong>. We kindly ask you to issue an invoice to Atletica Genève for the total amount indicated.</p>
+
+<table style="border-collapse:collapse;width:100%;margin:16px 0;font-size:13px">
+  <thead>
+    <tr style="background:#f5f5f5">
+      <th style="padding:6px 8px;text-align:left;border-bottom:2px solid #ddd">Line item</th>
+      <th style="padding:6px 8px;text-align:right;border-bottom:2px solid #ddd">Amount</th>
+    </tr>
+  </thead>
+  <tbody>
+    ${appearanceFee > 0 ? `<tr><td style="padding:4px 8px">Appearance fee</td><td style="padding:4px 8px;text-align:right">${currency} ${appearanceFee.toLocaleString()}</td></tr>` : ''}
+    ${eventHtmlRows}
+    ${otherCompensation > 0 ? `<tr><td style="padding:4px 8px">Other compensation${otherCompensationDesc ? ` (${otherCompensationDesc})` : ''}</td><td style="padding:4px 8px;text-align:right">${currency} ${otherCompensation.toLocaleString()}</td></tr>` : ''}
+    <tr style="border-top:2px solid #ddd;font-weight:600">
+      <td style="padding:8px">TOTAL DUE</td>
+      <td style="padding:8px;text-align:right">${currency} ${totalDue.toLocaleString()}</td>
+    </tr>
+  </tbody>
+</table>
+
+${ibanHtml}
+
+<p>Please issue an invoice to:<br/>
+<strong>Atletica Genève</strong><br/>
+For the attention of: Finance Department</p>
+
+<p>Thank you,<br/>The Atletica Genève Organisation Committee</p>
+</div>`
+
+  return { subject, body, htmlBody }
+}
+
 // ── Portal response notification (to organisation committee) ──────────────────
 export function buildPortalResponseEmail(params: {
   athleteFirstName: string
