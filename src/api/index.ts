@@ -20,6 +20,7 @@ import eapCityRoutes from './routes/eap-cities'
 import hotelRoomRoutes from './routes/hotel-rooms'
 import emailRoutes from './routes/emails'
 import userRoutes from './routes/users'
+import paymentRoutes from './routes/payments'
 
 export type Env = {
   Bindings: {
@@ -76,5 +77,6 @@ app.route('/api/v1/eap-cities', eapCityRoutes)
 app.route('/api/v1/hotel-rooms', hotelRoomRoutes)
 app.route('/api/v1/emails', emailRoutes)
 app.route('/api/v1/users', userRoutes)
+app.route('/api/v1/payments', paymentRoutes)
 
 export default app

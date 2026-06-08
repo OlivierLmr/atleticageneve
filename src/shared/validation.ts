@@ -334,3 +334,15 @@ export const portalRespondSchema = z.object({
 // ── Hotel room update ────────────────────────────────────────────────────────
 
 export const hotelRoomUpdateSchema = hotelRoomSchema.omit({ hotelId: true }).partial()
+
+// ── Final placement update ───────────────────────────────────────────────────
+
+export const finalPlacementSchema = z.object({
+  finalPlacement: z.number().int().positive().nullable(),
+})
+
+// ── User profile update ──────────────────────────────────────────────────────
+
+export const userProfileUpdateSchema = z.object({
+  bankIban: z.string().optional().nullable(),
+})

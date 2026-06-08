@@ -20,6 +20,7 @@ import EapCitiesPage from '@web/pages/committee/EapCitiesPage'
 import HotelRoomsPage from '@web/pages/committee/HotelRoomsPage'
 import EmailLogPage from '@web/pages/committee/EmailLogPage'
 import EventsPage from '@web/pages/committee/EventsPage'
+import PaymentsPage from '@web/pages/committee/PaymentsPage'
 import { api, ApiError } from '@web/lib/api'
 import type { ReactNode } from 'react'
 import type { UserRole } from '@shared/types'
@@ -88,6 +89,7 @@ const COMMITTEE_NAV: NavItem[] = [
   { to: '/committee/hotel-rooms', key: 'nav.hotelRooms' },
   { to: '/committee/emails', key: 'nav.emailLog' },
   { to: '/committee/candidates', key: 'nav.candidates', activePrefix: '/committee/athletes/' },
+  { to: '/committee/payments', key: 'nav.payments' },
 ]
 
 const COLLABORATOR_NAV: NavItem[] = [
@@ -430,6 +432,7 @@ export default function App() {
               <Route path="emails" element={<EmailLogPage />} />
               <Route path="candidates" element={<CandidatesPage />} />
               <Route path="athletes/:id" element={<CollaboratorAthletePage />} />
+              <Route path="payments" element={<PaymentsPage />} />
             </Route>
 
             {/* Redirects for committee users hitting collaborator paths */}
