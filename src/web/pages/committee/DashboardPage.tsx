@@ -22,6 +22,7 @@ interface EventStat {
 interface HotelRoomStat {
   roomId: string
   hotelId: string
+  hotelName: string
   roomType: string
   reservedRooms: number
   confirmedOccupancy: number
@@ -243,6 +244,7 @@ export default function DashboardPage() {
                 <div className="space-y-2">
                   {hotelRooms.map((room) => (
                     <div key={room.roomId} className="text-xs">
+                      <p className="text-gray-400 mb-0.5">{room.hotelName}</p>
                       <div className="flex justify-between mb-1">
                         <span className="font-medium">{room.roomType}</span>
                         <span className="font-mono">{room.confirmedCount}/{room.reservedRooms}</span>
