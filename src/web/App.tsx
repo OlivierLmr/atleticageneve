@@ -21,6 +21,7 @@ import HotelRoomsPage from '@web/pages/committee/HotelRoomsPage'
 import EmailLogPage from '@web/pages/committee/EmailLogPage'
 import EventsPage from '@web/pages/committee/EventsPage'
 import PaymentsPage from '@web/pages/committee/PaymentsPage'
+import ResultsPage from '@web/pages/committee/ResultsPage'
 import { api, ApiError } from '@web/lib/api'
 import type { ReactNode } from 'react'
 import type { UserRole } from '@shared/types'
@@ -89,6 +90,7 @@ const COMMITTEE_NAV: NavItem[] = [
   { to: '/committee/hotel-rooms', key: 'nav.hotelRooms' },
   { to: '/committee/emails', key: 'nav.emailLog' },
   { to: '/committee/candidates', key: 'nav.candidates', activePrefix: '/committee/athletes/' },
+  { to: '/committee/results', key: 'nav.results' },
   { to: '/committee/payments', key: 'nav.payments' },
 ]
 
@@ -432,6 +434,7 @@ export default function App() {
               <Route path="emails" element={<EmailLogPage />} />
               <Route path="candidates" element={<CandidatesPage />} />
               <Route path="athletes/:id" element={<CollaboratorAthletePage />} />
+              <Route path="results" element={<ResultsPage />} />
               <Route path="payments" element={<PaymentsPage />} />
             </Route>
 
