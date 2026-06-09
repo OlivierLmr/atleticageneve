@@ -71,6 +71,7 @@
     "hotelRooms": "Hotel Rooms",
     "emailLog": "Email Log",
     "candidates": "Candidates",
+    "results": "Results",
     "payments": "Payments"
   },
   "status": {
@@ -467,5 +468,16 @@
     "ibanPlaceholder": "e.g. CH56 0483 5012 3456 7800 9",
     "ibanSaved": "IBAN saved",
     "ibanHint": "Your IBAN is needed to process your payment. It will be included in the payment proforma sent by the organisation."
+  },
+  "results": {
+    "title": "Results",
+    "subtitle": "Enter final placements for confirmed athletes, grouped by event",
+    "athlete": "Athlete",
+    "placement": "Placement",
+    "prizeMoney": "Prize money",
+    "prizeMoneyLegend": "Prize money",
+    "place": "Place",
+    "noEvents": "No events found for the current edition.",
+    "noAthletes": "No confirmed athletes registered for this event."
   }
 }

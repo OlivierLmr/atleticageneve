@@ -386,3 +386,26 @@ export interface PaymentEntry {
   paymentDate: string | null
   currency: string
 }
+
+// ── Results ───────────────────────────────────────────────────────────────────
+
+export interface ResultAthleteEntry {
+  applicationId: string
+  athleteId: string
+  athleteFirstName: string
+  athleteLastName: string
+  finalPlacement: number | null
+  prizeMoney: number
+}
+
+export interface ResultEventEntry {
+  eventId: string
+  eventName: string
+  prizeSlots: { place: number; amount: number }[]
+  athletes: ResultAthleteEntry[]
+}
+
+export interface ResultsResponse {
+  currency: string
+  events: ResultEventEntry[]
+}

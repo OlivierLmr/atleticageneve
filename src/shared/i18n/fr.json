@@ -71,6 +71,7 @@
     "hotelRooms": "Chambres d'hôtel",
     "emailLog": "Journal des emails",
     "candidates": "Candidats",
+    "results": "Résultats",
     "payments": "Paiements"
   },
   "status": {
@@ -467,5 +468,16 @@
     "ibanPlaceholder": "ex. CH56 0483 5012 3456 7800 9",
     "ibanSaved": "IBAN enregistré",
     "ibanHint": "Votre IBAN est nécessaire pour effectuer le paiement. Il sera inclus dans la proforma envoyée par l'organisation."
+  },
+  "results": {
+    "title": "Résultats",
+    "subtitle": "Saisissez les classements finaux des athlètes confirmés, par épreuve",
+    "athlete": "Athlète",
+    "placement": "Classement",
+    "prizeMoney": "Prize money",
+    "prizeMoneyLegend": "Prize money",
+    "place": "Place",
+    "noEvents": "Aucune épreuve trouvée pour l'édition en cours.",
+    "noAthletes": "Aucun athlète confirmé inscrit à cette épreuve."
   }
 }

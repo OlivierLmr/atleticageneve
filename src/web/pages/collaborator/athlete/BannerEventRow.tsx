@@ -140,16 +140,14 @@ function sbColorClass(sb: number | null, app: ApplicationForAthlete, athlete: At
 
 // ── BannerEventRow ──────────────────────────────────────────────────────────
 
-export function BannerEventRow({ app, athlete, edition, isStaff, isCommittee, onParticipationChange, onRescore, onWaPerfSave, onPlacementSave, isPendingParticipation, t }: {
+export function BannerEventRow({ app, athlete, edition, isStaff, onParticipationChange, onRescore, onWaPerfSave, isPendingParticipation, t }: {
   app: ApplicationForAthlete
   athlete: AthleteDetail
   edition: EditionCosts | null
   isStaff: boolean
-  isCommittee?: boolean
   onParticipationChange: (appId: string, status: string) => void
   onRescore: (appId: string) => void
   onWaPerfSave: (athleteId: string, eventId: string, data: { personalBest?: number; seasonBest?: number; worldRanking?: number }) => void
-  onPlacementSave?: (appId: string, placement: number | null) => void
   isPendingParticipation: boolean
   t: (key: string) => string
 }) {
@@ -157,8 +155,6 @@ export function BannerEventRow({ app, athlete, edition, isStaff, isCommittee, on
   const [showEventPopup, setShowEventPopup] = useState(false)
   const [showScorePopup, setShowScorePopup] = useState(false)
   const [editingPerf, setEditingPerf] = useState(false)
-  const [editingPlacement, setEditingPlacement] = useState(false)
-  const [placementDraft, setPlacementDraft] = useState(app.finalPlacement != null ? String(app.finalPlacement) : '')
   const [perfForm, setPerfForm] = useState({
     personalBest: app.waPerformance?.personalBest != null
       ? String(isField ? app.waPerformance.personalBest / 100 : app.waPerformance.personalBest)
@@ -283,47 +279,6 @@ export function BannerEventRow({ app, athlete, edition, isStaff, isCommittee, on
           </>
         )}
       </div>
-
-      {/* Final placement — committee only, shown for confirmed athletes */}
-      {isCommittee && athlete.negotiationStatus === 'confirmed' && (
-        <div className="flex items-center gap-1 shrink-0">
-          {editingPlacement ? (
-            <>
-              <input
-                type="number"
-                min="1"
-                placeholder="#"
-                className="w-12 px-1 py-0.5 border border-gray-300 rounded text-xs"
-                value={placementDraft}
-                onChange={e => setPlacementDraft(e.target.value)}
-                autoFocus
-              />
-              <button
-                onClick={() => {
-                  const val = placementDraft.trim()
-                  const placement = val ? parseInt(val) : null
-                  onPlacementSave?.(app.id, placement)
-                  setEditingPlacement(false)
-                }}
-                className="text-[10px] text-green-600 hover:text-green-800"
-              >✓</button>
-              <button onClick={() => setEditingPlacement(false)} className="text-[10px] text-gray-400 hover:text-gray-600">✕</button>
-            </>
-          ) : (
-            <button
-              onClick={() => { setPlacementDraft(app.finalPlacement != null ? String(app.finalPlacement) : ''); setEditingPlacement(true) }}
-              className={`text-[10px] px-1.5 py-0.5 rounded border ${
-                app.finalPlacement != null
-                  ? 'bg-blue-50 border-blue-200 text-blue-700 font-medium'
-                  : 'border-dashed border-gray-300 text-gray-400 hover:border-gray-400'
-              }`}
-              title={t('payments.placement')}
-            >
-              {app.finalPlacement != null ? `#${app.finalPlacement}` : t('payments.noPlacement')}
-            </button>
-          )}
-        </div>
-      )}
 
       {/* Staff-only: edit perf + rescore */}
       {isStaff && !editingPerf && (
