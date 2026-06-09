@@ -467,7 +467,15 @@
     "myIban": "Mon IBAN / coordonnées bancaires",
     "ibanPlaceholder": "ex. CH56 0483 5012 3456 7800 9",
     "ibanSaved": "IBAN enregistré",
-    "ibanHint": "Votre IBAN est nécessaire pour effectuer le paiement. Il sera inclus dans la proforma envoyée par l'organisation."
+    "ibanHint": "Votre IBAN est nécessaire pour effectuer le paiement. Il sera inclus dans la proforma envoyée par l'organisation.",
+    "filterByAthlete": "Filtrer par athlète…",
+    "filterByRecipient": "Filtrer par destinataire…",
+    "allEvents": "Toutes les épreuves",
+    "allIban": "Tous IBAN",
+    "ibanPresent": "IBAN présent",
+    "allStatuses": "Tous les statuts",
+    "resetFilters": "Réinitialiser",
+    "noResults": "Aucun paiement ne correspond aux filtres actifs."
   },
   "results": {
     "title": "Résultats",
