@@ -28,6 +28,7 @@ dashboard.get('/', async (c) => {
   const agreements = await db.select().from(schema.agreement)
   const collaborators = await db.select().from(schema.user).where(eq(schema.user.role, 'collaborator'))
   const hotelRooms = await db.select().from(schema.hotelRoom)
+  const hotels = await db.select().from(schema.hotel)
 
   // Build catalog lookup
   const catalogMap = new Map(catalogRows.map(c => [c.id, c]))
@@ -138,12 +139,15 @@ dashboard.get('/', async (c) => {
     }
   }
 
+  const hotelMap = new Map(hotels.map(h => [h.id, h.name]))
+
   const hotelRoomStats = hotelRooms.map(room => {
     const confirmedCount = roomConfirmed.get(room.id) ?? 0
     const inNegCount = roomInNeg.get(room.id) ?? 0
     return {
       roomId: room.id,
       hotelId: room.hotelId,
+      hotelName: hotelMap.get(room.hotelId) ?? '',
       roomType: room.roomType,
       reservedRooms: room.reservedRooms,
       confirmedOccupancy: room.reservedRooms > 0 ? confirmedCount / room.reservedRooms : 0,
