@@ -90,6 +90,14 @@ export default function DashboardPage() {
   const cur = edition.currency || 'CHF'
   const budgetUsedPct = edition.totalBudget > 0 ? (kpi.budgetCommitted / edition.totalBudget) * 100 : 0
 
+  const hotelGroups = new Map<string, { hotelName: string; rooms: HotelRoomStat[] }>()
+  for (const room of hotelRooms) {
+    if (!hotelGroups.has(room.hotelId)) {
+      hotelGroups.set(room.hotelId, { hotelName: room.hotelName, rooms: [] })
+    }
+    hotelGroups.get(room.hotelId)!.rooms.push(room)
+  }
+
   return (
     <div>
       <div className="max-w-7xl mx-auto px-6 py-6 space-y-6">
@@ -241,26 +249,34 @@ export default function DashboardPage() {
             {hotelRooms.length > 0 && (
               <div className="bg-white rounded-lg border p-4">
                 <h3 className="font-semibold text-sm mb-3">{t('dashboard.hotelOccupancy')}</h3>
-                <div className="space-y-2">
-                  {hotelRooms.map((room) => (
-                    <div key={room.roomId} className="text-xs">
-                      <p className="text-gray-400 mb-0.5">{room.hotelName}</p>
-                      <div className="flex justify-between mb-1">
-                        <span className="font-medium">{room.roomType}</span>
-                        <span className="font-mono">{room.confirmedCount}/{room.reservedRooms}</span>
+                <div className="space-y-4">
+                  {Array.from(hotelGroups.values()).map(({ hotelName, rooms }) => (
+                    <div key={hotelName}>
+                      <p className="text-[10px] font-semibold tracking-widest text-gray-400 uppercase mb-2">
+                        {hotelName}
+                      </p>
+                      <div className="space-y-2">
+                        {rooms.map((room) => (
+                          <div key={room.roomId} className="text-xs">
+                            <div className="flex justify-between mb-1">
+                              <span className="font-medium">{room.roomType}</span>
+                              <span className="font-mono">{room.confirmedCount}/{room.reservedRooms}</span>
+                            </div>
+                            <div className="w-full h-1.5 bg-gray-200 rounded-full overflow-hidden">
+                              <div
+                                className={`h-full rounded-full ${
+                                  room.confirmedOccupancy >= 1 ? 'bg-red-500' :
+                                  room.confirmedOccupancy >= 0.7 ? 'bg-yellow-500' : 'bg-green-500'
+                                }`}
+                                style={{ width: `${Math.min(100, room.confirmedOccupancy * 100)}%` }}
+                              />
+                            </div>
+                            {room.inNegotiationCount > 0 && (
+                              <span className="text-gray-400">+{room.inNegotiationCount} in neg.</span>
+                            )}
+                          </div>
+                        ))}
                       </div>
-                      <div className="w-full h-1.5 bg-gray-200 rounded-full overflow-hidden">
-                        <div
-                          className={`h-full rounded-full ${
-                            room.confirmedOccupancy >= 1 ? 'bg-red-500' :
-                            room.confirmedOccupancy >= 0.7 ? 'bg-yellow-500' : 'bg-green-500'
-                          }`}
-                          style={{ width: `${Math.min(100, room.confirmedOccupancy * 100)}%` }}
-                        />
-                      </div>
-                      {room.inNegotiationCount > 0 && (
-                        <span className="text-gray-400">+{room.inNegotiationCount} in neg.</span>
-                      )}
                     </div>
                   ))}
                 </div>
