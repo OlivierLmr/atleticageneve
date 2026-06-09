@@ -5,6 +5,76 @@ import { Link } from 'react-router-dom'
 import { api } from '@web/lib/api'
 import type { ResultAthleteEntry, ResultEventEntry, ResultsResponse } from '@shared/types'
 
+const PRIZE_ORDINALS = ['1st', '2nd', '3rd', '4th', '5th', '6th', '7th', '8th']
+const PRIZE_FIELDS = [
+  'prizeMoney1st', 'prizeMoney2nd', 'prizeMoney3rd', 'prizeMoney4th',
+  'prizeMoney5th', 'prizeMoney6th', 'prizeMoney7th', 'prizeMoney8th',
+] as const
+type PrizeField = typeof PRIZE_FIELDS[number]
+
+function PrizeMoneyEditor({ event, currency, onSave }: {
+  event: ResultEventEntry
+  currency: string
+  onSave: (eventId: string, field: PrizeField, value: number) => Promise<void>
+}) {
+  const { t } = useTranslation()
+
+  const [drafts, setDrafts] = useState<string[]>(() =>
+    PRIZE_FIELDS.map((_, i) => {
+      const slot = event.prizeSlots.find(s => s.place === i + 1)
+      return slot && slot.amount > 0 ? String(slot.amount) : ''
+    })
+  )
+  const [saving, setSaving] = useState<boolean[]>(Array(8).fill(false))
+
+  const handleChange = (i: number, value: string) => {
+    setDrafts(prev => { const next = [...prev]; next[i] = value; return next })
+  }
+
+  const handleBlur = async (i: number) => {
+    const val = drafts[i].trim()
+    const newAmount = val ? Math.max(0, parseInt(val) || 0) : 0
+    const currentSlot = event.prizeSlots.find(s => s.place === i + 1)
+    const currentAmount = currentSlot?.amount ?? 0
+    if (newAmount === currentAmount) return
+
+    setSaving(prev => { const next = [...prev]; next[i] = true; return next })
+    try {
+      await onSave(event.eventId, PRIZE_FIELDS[i], newAmount)
+    } finally {
+      setSaving(prev => { const next = [...prev]; next[i] = false; return next })
+    }
+  }
+
+  return (
+    <div className="mb-5">
+      <p className="text-xs font-medium text-gray-700 mb-2">{t('results.prizeMoneyEdit')}</p>
+      <div className="flex flex-wrap gap-2">
+        {PRIZE_ORDINALS.map((label, i) => (
+          <div key={i} className="flex flex-col items-center gap-0.5">
+            <span className="text-[10px] text-gray-400 font-medium">{label}</span>
+            <div className={`flex items-center gap-1 border rounded px-2 py-1 ${
+              saving[i] ? 'opacity-50 bg-gray-50 border-gray-200' : 'bg-white border-gray-200 focus-within:border-blue-400 focus-within:ring-1 focus-within:ring-blue-400'
+            }`}>
+              <span className="text-xs text-gray-400">{currency}</span>
+              <input
+                type="number"
+                min="0"
+                placeholder="0"
+                value={drafts[i]}
+                onChange={e => handleChange(i, e.target.value)}
+                onBlur={() => handleBlur(i)}
+                disabled={saving[i]}
+                className="w-16 text-sm font-mono text-right focus:outline-none bg-transparent disabled:opacity-50"
+              />
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 function AthleteRow({ ath, event, currency, onSave }: {
   ath: ResultAthleteEntry
   event: ResultEventEntry
@@ -94,6 +164,14 @@ export default function ResultsPage() {
     },
   })
 
+  const prizeMutation = useMutation({
+    mutationFn: ({ eventId, field, value }: { eventId: string; field: PrizeField; value: number }) =>
+      api.patch(`/api/v1/events/${eventId}`, { [field]: value }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['results'] })
+    },
+  })
+
   if (isLoading) {
     return <div className="max-w-7xl mx-auto px-6 py-8 text-gray-400 text-sm">{t('common.loading')}</div>
   }
@@ -155,17 +233,15 @@ export default function ResultsPage() {
 
       {currentEvent && (
         <>
-          {/* Prize money legend */}
-          {currentEvent.prizeSlots.length > 0 && (
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mb-4 text-xs text-gray-500">
-              <span className="font-medium text-gray-700">{t('results.prizeMoneyLegend')}:</span>
-              {currentEvent.prizeSlots.map(slot => (
-                <span key={slot.place} className="text-gray-500">
-                  {t('results.place')} {slot.place} — {currency} {slot.amount.toLocaleString()}
-                </span>
-              ))}
-            </div>
-          )}
+          {/* Prize money editor — key forces remount when switching events */}
+          <PrizeMoneyEditor
+            key={currentEvent.eventId}
+            event={currentEvent}
+            currency={currency}
+            onSave={async (eventId, field, value) => {
+              await prizeMutation.mutateAsync({ eventId, field, value })
+            }}
+          />
 
           {/* Athletes table */}
           {currentEvent.athletes.length === 0 ? (

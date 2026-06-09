@@ -475,8 +475,7 @@
     "athlete": "Athlete",
     "placement": "Placement",
     "prizeMoney": "Prize money",
-    "prizeMoneyLegend": "Prize money",
-    "place": "Place",
+    "prizeMoneyEdit": "Prize money per rank",
     "noEvents": "No events found for the current edition.",
     "noAthletes": "No confirmed athletes registered for this event."
   }
