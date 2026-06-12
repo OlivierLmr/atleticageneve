@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from '@web/lib/api'
-import { inputCls, labelCls } from '@web/lib/ui-constants'
+import { inputCls, labelCls, formatPerf, parseHumanPerf } from '@web/lib/ui-constants'
 import type { EventCatalog } from '@shared/types'
 
 interface EditionEvent {
@@ -32,12 +32,16 @@ interface EditionEvent {
 
 const PRIZE_KEYS = ['prizeMoney1st', 'prizeMoney2nd', 'prizeMoney3rd', 'prizeMoney4th', 'prizeMoney5th', 'prizeMoney6th', 'prizeMoney7th', 'prizeMoney8th'] as const
 
+function perfHint(discipline: string): string {
+  return discipline === 'Concours' ? 'm.cm (ex: 21.50)' : 'ss.cc ou m:ss.cc (ex: 9.95 ou 1:45.30)'
+}
+
 function defaultForm() {
   return {
     catalogId: '',
     maxSlots: 8,
-    intMinima: 0,
-    swissMinima: 0,
+    intMinima: '',
+    swissMinima: '',
     eapMinima: '',
     meetRecord: '',
     targetPerf: '',
@@ -53,6 +57,11 @@ function defaultForm() {
     prizeMoney8th: 0,
   }
 }
+
+const ORDINAL_SUFFIX = ['er', 'e', 'e', 'e', 'e', 'e', 'e', 'e']
+
+const sectionCls = 'border rounded p-3 space-y-3'
+const sectionTitleCls = 'text-xs font-semibold text-gray-400 uppercase tracking-wide'
 
 export default function EventsPage() {
   const { t } = useTranslation()
@@ -70,9 +79,9 @@ export default function EventsPage() {
 
   const [form, setForm] = useState(defaultForm)
   const [editingId, setEditingId] = useState<string | null>(null)
+  const [editingDiscipline, setEditingDiscipline] = useState<string>('')
   const [showForm, setShowForm] = useState(false)
 
-  // Catalog items not yet added as events
   const usedCatalogIds = new Set(events.map(e => e.catalogId))
   const availableCatalog = catalog.filter(c => !usedCatalogIds.has(c.id))
 
@@ -96,19 +105,21 @@ export default function EventsPage() {
   const resetForm = () => {
     setForm(defaultForm())
     setEditingId(null)
+    setEditingDiscipline('')
     setShowForm(false)
   }
 
   const startEdit = (evt: EditionEvent) => {
     setEditingId(evt.id)
+    setEditingDiscipline(evt.discipline)
     setForm({
       catalogId: evt.catalogId,
       maxSlots: evt.maxSlots,
-      intMinima: evt.intMinima,
-      swissMinima: evt.swissMinima,
-      eapMinima: evt.eapMinima != null ? String(evt.eapMinima) : '',
-      meetRecord: evt.meetRecord != null ? String(evt.meetRecord) : '',
-      targetPerf: evt.targetPerf != null ? String(evt.targetPerf) : '',
+      intMinima: formatPerf(evt.intMinima, evt.discipline),
+      swissMinima: formatPerf(evt.swissMinima, evt.discipline),
+      eapMinima: evt.eapMinima != null ? formatPerf(evt.eapMinima, evt.discipline) : '',
+      meetRecord: evt.meetRecord != null ? formatPerf(evt.meetRecord, evt.discipline) : '',
+      targetPerf: evt.targetPerf != null ? formatPerf(evt.targetPerf, evt.discipline) : '',
       swissQuota: evt.swissQuota,
       eapQuota: evt.eapQuota,
       prizeMoney1st: evt.prizeMoney1st,
@@ -121,17 +132,28 @@ export default function EventsPage() {
       prizeMoney8th: evt.prizeMoney8th,
     })
     setShowForm(true)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  // Discipline for the form: from edited event or from selected catalog
+  const formDiscipline = editingId
+    ? editingDiscipline
+    : (catalog.find(c => c.id === form.catalogId)?.discipline ?? '')
+
+  const handleCatalogChange = (catalogId: string) => {
+    setForm(p => ({ ...p, catalogId, intMinima: '', swissMinima: '', eapMinima: '', meetRecord: '', targetPerf: '' }))
   }
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
+    const disc = formDiscipline
     const payload: Record<string, unknown> = {
       maxSlots: form.maxSlots,
-      intMinima: form.intMinima,
-      swissMinima: form.swissMinima,
-      eapMinima: form.eapMinima ? parseFloat(form.eapMinima) : undefined,
-      meetRecord: form.meetRecord ? parseFloat(form.meetRecord) : undefined,
-      targetPerf: form.targetPerf ? parseFloat(form.targetPerf) : undefined,
+      intMinima: parseHumanPerf(String(form.intMinima), disc) ?? 0,
+      swissMinima: parseHumanPerf(String(form.swissMinima), disc) ?? 0,
+      eapMinima: parseHumanPerf(form.eapMinima, disc),
+      meetRecord: parseHumanPerf(form.meetRecord, disc),
+      targetPerf: parseHumanPerf(form.targetPerf, disc),
       swissQuota: form.swissQuota,
       eapQuota: form.eapQuota,
       prizeMoney1st: form.prizeMoney1st,
@@ -165,8 +187,11 @@ export default function EventsPage() {
   const setNum = (key: string, val: string) =>
     setForm(p => ({ ...p, [key]: parseInt(val) || 0 }))
 
+  const setPerfStr = (key: string, val: string) =>
+    setForm(p => ({ ...p, [key]: val }))
+
   return (
-    <div className="max-w-5xl mx-auto py-8 px-6">
+    <div className="max-w-6xl mx-auto py-8 px-6">
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-lg font-bold">{t('selection.participation')}</h1>
         {!showForm && (
@@ -182,16 +207,18 @@ export default function EventsPage() {
 
       {/* Create / Edit form */}
       {showForm && (
-        <form onSubmit={handleSubmit} className="bg-white rounded-lg border p-4 mb-6 space-y-4">
+        <form onSubmit={handleSubmit} className="bg-white rounded-lg border p-5 mb-6 space-y-4">
           <h2 className="font-semibold text-sm">
-            {editingId ? t('common.edit') : t('common.add')}
+            {editingId
+              ? events.find(e => e.id === editingId)?.name
+              : t('common.add')}
           </h2>
 
           {!editingId && (
             <div>
               <label className={labelCls}>{t('admin.eventCatalog')}</label>
               <select className={inputCls} value={form.catalogId}
-                onChange={e => setForm(p => ({ ...p, catalogId: e.target.value }))}>
+                onChange={e => handleCatalogChange(e.target.value)}>
                 <option value="">—</option>
                 {availableCatalog.map(c => (
                   <option key={c.id} value={c.id}>{c.name} ({c.gender}) — {c.discipline}</option>
@@ -200,62 +227,93 @@ export default function EventsPage() {
             </div>
           )}
 
-          <div className="grid grid-cols-3 gap-3">
-            <div>
+          {/* Section: Général */}
+          <div className={sectionCls}>
+            <p className={sectionTitleCls}>{t('admin.general')}</p>
+            <div className="max-w-[120px]">
               <label className={labelCls}>{t('selection.maxSlots')}</label>
               <input type="number" className={inputCls} value={form.maxSlots}
                 onChange={e => setNum('maxSlots', e.target.value)} />
             </div>
-            <div>
-              <label className={labelCls}>{t('selection.minima')} ({t('selection.international')})</label>
-              <input type="number" step="0.01" className={inputCls} value={form.intMinima}
-                onChange={e => setForm(p => ({ ...p, intMinima: parseFloat(e.target.value) || 0 }))} />
+          </div>
+
+          {/* Section: Performances */}
+          <div className={sectionCls}>
+            <div className="flex items-baseline justify-between">
+              <p className={sectionTitleCls}>Performances</p>
+              {formDiscipline && (
+                <span className="text-xs text-gray-400 italic">{perfHint(formDiscipline)}</span>
+              )}
             </div>
-            <div>
-              <label className={labelCls}>{t('selection.minima')} ({t('selection.swiss')})</label>
-              <input type="number" step="0.01" className={inputCls} value={form.swissMinima}
-                onChange={e => setForm(p => ({ ...p, swissMinima: parseFloat(e.target.value) || 0 }))} />
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              <div>
+                <label className={labelCls}>{t('selection.minima')} ({t('selection.international')})</label>
+                <input type="text" inputMode="decimal" className={inputCls}
+                  value={form.intMinima}
+                  onChange={e => setPerfStr('intMinima', e.target.value)} />
+              </div>
+              <div>
+                <label className={labelCls}>{t('selection.minima')} ({t('selection.swiss')})</label>
+                <input type="text" inputMode="decimal" className={inputCls}
+                  value={form.swissMinima}
+                  onChange={e => setPerfStr('swissMinima', e.target.value)} />
+              </div>
+              <div>
+                <label className={labelCls}>{t('selection.minima')} ({t('selection.eap')}) <span className="font-normal text-gray-400">(opt.)</span></label>
+                <input type="text" inputMode="decimal" className={inputCls}
+                  value={form.eapMinima}
+                  onChange={e => setPerfStr('eapMinima', e.target.value)} />
+              </div>
+              <div>
+                <label className={labelCls}>{t('selection.meetRecord')} <span className="font-normal text-gray-400">(opt.)</span></label>
+                <input type="text" inputMode="decimal" className={inputCls}
+                  value={form.meetRecord}
+                  onChange={e => setPerfStr('meetRecord', e.target.value)} />
+              </div>
+              <div>
+                <label className={labelCls}>{t('selection.targetPerf')} <span className="font-normal text-gray-400">(opt.)</span></label>
+                <input type="text" inputMode="decimal" className={inputCls}
+                  value={form.targetPerf}
+                  onChange={e => setPerfStr('targetPerf', e.target.value)} />
+              </div>
             </div>
           </div>
 
-          <div className="grid grid-cols-4 gap-3">
-            <div>
-              <label className={labelCls}>{t('selection.minima')} ({t('selection.eap')})</label>
-              <input type="number" step="0.01" className={inputCls} value={form.eapMinima}
-                onChange={e => setForm(p => ({ ...p, eapMinima: e.target.value }))} />
-            </div>
-            <div>
-              <label className={labelCls}>{t('selection.meetRecord')}</label>
-              <input type="number" step="0.01" className={inputCls} value={form.meetRecord}
-                onChange={e => setForm(p => ({ ...p, meetRecord: e.target.value }))} />
-            </div>
-            <div>
-              <label className={labelCls}>{t('dashboard.swissQuota')}</label>
-              <input type="number" className={inputCls} value={form.swissQuota}
-                onChange={e => setNum('swissQuota', e.target.value)} />
-            </div>
-            <div>
-              <label className={labelCls}>{t('dashboard.eapQuota')}</label>
-              <input type="number" className={inputCls} value={form.eapQuota}
-                onChange={e => setNum('eapQuota', e.target.value)} />
+          {/* Section: Quotas */}
+          <div className={sectionCls}>
+            <p className={sectionTitleCls}>{t('dashboard.quotas')}</p>
+            <div className="grid grid-cols-2 gap-3 max-w-xs">
+              <div>
+                <label className={labelCls}>{t('dashboard.swissQuota')}</label>
+                <input type="number" className={inputCls} value={form.swissQuota}
+                  onChange={e => setNum('swissQuota', e.target.value)} />
+              </div>
+              <div>
+                <label className={labelCls}>{t('dashboard.eapQuota')}</label>
+                <input type="number" className={inputCls} value={form.eapQuota}
+                  onChange={e => setNum('eapQuota', e.target.value)} />
+              </div>
             </div>
           </div>
 
-          <div>
-            <label className={labelCls}>{t('dashboard.totalPrizeMoney')} (1st–8th, CHF)</label>
-            <div className="grid grid-cols-8 gap-2">
+          {/* Section: Prize Money */}
+          <div className={sectionCls}>
+            <p className={sectionTitleCls}>{t('results.prizeMoney')} (CHF)</p>
+            <div className="grid grid-cols-4 gap-2">
               {PRIZE_KEYS.map((key, i) => (
-                <input key={key} type="number" className={inputCls} value={form[key]}
-                  placeholder={`${i + 1}${['st','nd','rd'][i] ?? 'th'}`}
-                  onChange={e => setNum(key, e.target.value)} />
+                <div key={key}>
+                  <label className={labelCls}>{i + 1}{ORDINAL_SUFFIX[i]}</label>
+                  <input type="number" className={inputCls} value={form[key]}
+                    onChange={e => setNum(key, e.target.value)} />
+                </div>
               ))}
             </div>
           </div>
 
-          <div className="flex gap-2">
+          <div className="flex gap-2 pt-1">
             <button type="submit" disabled={isPending || (!editingId && !form.catalogId)}
               className="text-xs bg-gray-900 text-white px-4 py-1.5 rounded hover:bg-gray-800 disabled:opacity-50">
-              {isPending ? t('common.loading') : editingId ? t('common.save') : t('common.add')}
+              {isPending ? t('common.loading') : t('common.save')}
             </button>
             <button type="button" onClick={resetForm}
               className="text-xs px-4 py-1.5 rounded border hover:bg-gray-50">
@@ -278,36 +336,41 @@ export default function EventsPage() {
               <tr className="border-b bg-gray-50 text-xs text-gray-500">
                 <th className="px-3 py-2 text-left font-medium">{t('athlete.event')}</th>
                 <th className="px-3 py-2 text-center font-medium">{t('selection.maxSlots')}</th>
-                <th className="px-3 py-2 text-center font-medium">{t('selection.minima')} (Int)</th>
-                <th className="px-3 py-2 text-center font-medium">{t('selection.minima')} (SUI)</th>
-                <th className="px-3 py-2 text-center font-medium">{t('dashboard.swissQuota')}</th>
-                <th className="px-3 py-2 text-center font-medium">{t('dashboard.eapQuota')}</th>
+                <th className="px-3 py-2 text-center font-medium">Min. Int</th>
+                <th className="px-3 py-2 text-center font-medium">Min. SUI</th>
+                <th className="px-3 py-2 text-center font-medium">Min. EAP</th>
+                <th className="px-3 py-2 text-center font-medium">{t('selection.meetRecord')}</th>
+                <th className="px-3 py-2 text-center font-medium">{t('selection.targetPerf')}</th>
+                <th className="px-3 py-2 text-center font-medium">Q.SUI</th>
+                <th className="px-3 py-2 text-center font-medium">Q.EAP</th>
                 <th className="px-3 py-2 text-center font-medium">{t('dashboard.totalPrizeMoney')}</th>
-                <th className="px-3 py-2 text-right font-medium">{t('common.actions')}</th>
               </tr>
             </thead>
             <tbody>
               {events.map(evt => {
                 const totalPrize = PRIZE_KEYS.reduce((sum, k) => sum + evt[k], 0)
+                const disc = evt.discipline
                 return (
                   <tr key={evt.id} className="border-b hover:bg-gray-50">
                     <td className="px-3 py-2">
-                      <span className="font-medium">{evt.name}</span>
+                      <button
+                        onClick={() => startEdit(evt)}
+                        className="font-medium text-left hover:underline text-gray-900"
+                      >
+                        {evt.name}
+                      </button>
                       <span className="text-xs text-gray-400 ml-1">({evt.gender})</span>
                     </td>
                     <td className="px-3 py-2 text-center font-mono text-xs">{evt.maxSlots}</td>
-                    <td className="px-3 py-2 text-center font-mono text-xs">{evt.intMinima}</td>
-                    <td className="px-3 py-2 text-center font-mono text-xs">{evt.swissMinima}</td>
+                    <td className="px-3 py-2 text-center font-mono text-xs">{formatPerf(evt.intMinima, disc)}</td>
+                    <td className="px-3 py-2 text-center font-mono text-xs">{formatPerf(evt.swissMinima, disc)}</td>
+                    <td className="px-3 py-2 text-center font-mono text-xs">{formatPerf(evt.eapMinima, disc)}</td>
+                    <td className="px-3 py-2 text-center font-mono text-xs">{formatPerf(evt.meetRecord, disc)}</td>
+                    <td className="px-3 py-2 text-center font-mono text-xs">{formatPerf(evt.targetPerf, disc)}</td>
                     <td className="px-3 py-2 text-center font-mono text-xs">{evt.swissQuota}</td>
                     <td className="px-3 py-2 text-center font-mono text-xs">{evt.eapQuota}</td>
                     <td className="px-3 py-2 text-center font-mono text-xs">
                       {totalPrize > 0 ? `CHF ${totalPrize.toLocaleString()}` : '—'}
-                    </td>
-                    <td className="px-3 py-2 text-right">
-                      <button onClick={() => startEdit(evt)}
-                        className="text-xs text-blue-600 hover:text-blue-800">
-                        {t('common.edit')}
-                      </button>
                     </td>
                   </tr>
                 )
