@@ -2,7 +2,7 @@ import React, { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { api } from '@web/lib/api'
 import { computeScore } from '@shared/scoring'
-import { formatPerf } from '@web/lib/ui-constants'
+import { formatPerf, parseHumanPerf } from '@web/lib/ui-constants'
 import { NIGHT_LABELS, DINNER_LABELS } from '@shared/constants'
 import type { AthleteDetail, ApplicationForAthlete, EditionCosts, Agreement } from '@shared/types'
 
@@ -109,7 +109,8 @@ function ConfirmedAthletesPopup({ eventId, discipline, t }: {
               if (sb1 == null && sb2 == null) return 0
               if (sb1 == null) return 1
               if (sb2 == null) return -1
-              return sb2 - sb1
+              // Field events: higher is better (desc); track events: lower is better (asc)
+              return discipline === 'Concours' ? sb2 - sb1 : sb1 - sb2
             })
             .map(a => (
               <div key={a.id} className="flex justify-between text-gray-700">
@@ -151,16 +152,15 @@ export function BannerEventRow({ app, athlete, edition, isStaff, onParticipation
   isPendingParticipation: boolean
   t: (key: string) => string
 }) {
-  const isField = app.event.catalog.discipline === 'Concours'
   const [showEventPopup, setShowEventPopup] = useState(false)
   const [showScorePopup, setShowScorePopup] = useState(false)
   const [editingPerf, setEditingPerf] = useState(false)
   const [perfForm, setPerfForm] = useState({
     personalBest: app.waPerformance?.personalBest != null
-      ? String(isField ? app.waPerformance.personalBest / 100 : app.waPerformance.personalBest)
+      ? formatPerf(app.waPerformance.personalBest, app.event.catalog.discipline)
       : '',
     seasonBest: app.waPerformance?.seasonBest != null
-      ? String(isField ? app.waPerformance.seasonBest / 100 : app.waPerformance.seasonBest)
+      ? formatPerf(app.waPerformance.seasonBest, app.event.catalog.discipline)
       : '',
     worldRanking: app.waPerformance?.worldRanking != null ? String(app.waPerformance.worldRanking) : '',
   })
@@ -193,16 +193,19 @@ export function BannerEventRow({ app, athlete, edition, isStaff, onParticipation
       {/* PB / SB (colored) / Ranking */}
       {editingPerf ? (
         <div className="flex gap-1 items-center flex-1">
-          <input type="number" step="0.01" placeholder="PB" className="w-20 px-1 py-0.5 border border-gray-300 rounded text-xs" value={perfForm.personalBest}
+          <input type="text" placeholder="PB" className="w-20 px-1 py-0.5 border border-gray-300 rounded text-xs font-mono" value={perfForm.personalBest}
             onChange={e => setPerfForm(p => ({ ...p, personalBest: e.target.value }))} />
-          <input type="number" step="0.01" placeholder="SB" className="w-20 px-1 py-0.5 border border-gray-300 rounded text-xs" value={perfForm.seasonBest}
+          <input type="text" placeholder="SB" className="w-20 px-1 py-0.5 border border-gray-300 rounded text-xs font-mono" value={perfForm.seasonBest}
             onChange={e => setPerfForm(p => ({ ...p, seasonBest: e.target.value }))} />
           <input type="number" placeholder="#" className="w-16 px-1 py-0.5 border border-gray-300 rounded text-xs" value={perfForm.worldRanking}
             onChange={e => setPerfForm(p => ({ ...p, worldRanking: e.target.value }))} />
           <button onClick={() => {
+            const disc = app.event.catalog.discipline
+            const parsedPB = parseHumanPerf(perfForm.personalBest, disc)
+            const parsedSB = parseHumanPerf(perfForm.seasonBest, disc)
             onWaPerfSave(athlete.id, app.eventId, {
-              ...(perfForm.personalBest ? { personalBest: isField ? Math.round(parseFloat(perfForm.personalBest) * 100) : parseFloat(perfForm.personalBest) } : {}),
-              ...(perfForm.seasonBest ? { seasonBest: isField ? Math.round(parseFloat(perfForm.seasonBest) * 100) : parseFloat(perfForm.seasonBest) } : {}),
+              ...(parsedPB != null ? { personalBest: parsedPB } : {}),
+              ...(parsedSB != null ? { seasonBest: parsedSB } : {}),
               ...(perfForm.worldRanking ? { worldRanking: parseInt(perfForm.worldRanking) } : {}),
             })
             setEditingPerf(false)
