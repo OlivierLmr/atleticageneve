@@ -33,3 +33,20 @@ export function formatPerf(value: number | null | undefined, discipline?: string
   const sec = (value % 60).toFixed(2).padStart(5, '0')
   return `${min}:${sec}`
 }
+
+// Inverse of formatPerf — converts human-readable input to storage format.
+// Returns null for empty/blank input.
+export function parseHumanPerf(str: string, discipline?: string): number | null {
+  const s = str.trim()
+  if (!s) return null
+  if (discipline === 'Concours') {
+    // Stored in centimeters; user enters meters (e.g. "21.50" → 2150)
+    return Math.round(parseFloat(s) * 100)
+  }
+  // Time: "m:ss.cc" or "ss.cc"
+  if (s.includes(':')) {
+    const [minPart, secPart] = s.split(':')
+    return parseInt(minPart, 10) * 60 + parseFloat(secPart)
+  }
+  return parseFloat(s)
+}
