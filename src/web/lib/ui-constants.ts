@@ -25,8 +25,6 @@ export function formatPerf(value: number | null | undefined, discipline?: string
   if (value == null) return '—'
   // Field events (Concours) are stored in centimeters — convert to meters
   if (discipline === 'Concours') return (value / 100).toFixed(2)
-  // Fallback for legacy callers without discipline: assume cm if value ≥ 1000
-  if (value >= 1000) return (value / 100).toFixed(2)
   // Times in seconds — format as ss.cc or m:ss.cc
   if (value < 60) return value.toFixed(2)
   const min = Math.floor(value / 60)
