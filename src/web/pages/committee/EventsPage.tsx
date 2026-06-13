@@ -317,7 +317,7 @@ export default function EventsPage() {
                   {PRIZE_KEYS.map((key, i) => (
                     <div key={key}>
                       <label className={labelCls}>{i + 1}{ORDINAL_SUFFIX[i]}</label>
-                      <input type="number" className={inputCls} value={form[key]}
+                      <input type="text" inputMode="numeric" className={inputCls} value={form[key]}
                         onChange={e => setNum(key, e.target.value)} />
                     </div>
                   ))}
