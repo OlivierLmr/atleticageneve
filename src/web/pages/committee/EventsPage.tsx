@@ -132,7 +132,6 @@ export default function EventsPage() {
       prizeMoney8th: evt.prizeMoney8th,
     })
     setShowForm(true)
-    window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
   // Discipline for the form: from edited event or from selected catalog
@@ -194,134 +193,153 @@ export default function EventsPage() {
     <div className="max-w-6xl mx-auto py-8 px-6">
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-lg font-bold">{t('selection.participation')}</h1>
-        {!showForm && (
-          <button
-            onClick={() => { resetForm(); setShowForm(true) }}
-            disabled={availableCatalog.length === 0}
-            className="text-xs bg-gray-900 text-white px-3 py-1.5 rounded hover:bg-gray-800 disabled:opacity-50"
-          >
-            {t('common.add')}
-          </button>
-        )}
+        <button
+          onClick={() => { resetForm(); setShowForm(true) }}
+          disabled={availableCatalog.length === 0}
+          className="text-xs bg-gray-900 text-white px-3 py-1.5 rounded hover:bg-gray-800 disabled:opacity-50"
+        >
+          {t('common.add')}
+        </button>
       </div>
 
-      {/* Create / Edit form */}
+      {/* Modal */}
       {showForm && (
-        <form onSubmit={handleSubmit} className="bg-white rounded-lg border p-5 mb-6 space-y-4">
-          <h2 className="font-semibold text-sm">
-            {editingId
-              ? events.find(e => e.id === editingId)?.name
-              : t('common.add')}
-          </h2>
-
-          {!editingId && (
-            <div>
-              <label className={labelCls}>{t('admin.eventCatalog')}</label>
-              <select className={inputCls} value={form.catalogId}
-                onChange={e => handleCatalogChange(e.target.value)}>
-                <option value="">—</option>
-                {availableCatalog.map(c => (
-                  <option key={c.id} value={c.id}>{c.name} ({c.gender}) — {c.discipline}</option>
-                ))}
-              </select>
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+          onClick={e => { if (e.target === e.currentTarget) resetForm() }}
+        >
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-xl mx-4 max-h-[90vh] flex flex-col">
+            {/* Modal header */}
+            <div className="flex items-center justify-between px-5 py-4 border-b">
+              <h2 className="font-semibold text-sm">
+                {editingId
+                  ? events.find(e => e.id === editingId)?.name
+                  : t('common.add')}
+              </h2>
+              <button
+                type="button"
+                onClick={resetForm}
+                className="text-gray-400 hover:text-gray-700 text-lg leading-none"
+                aria-label="Fermer"
+              >
+                ✕
+              </button>
             </div>
-          )}
 
-          {/* Section: Général */}
-          <div className={sectionCls}>
-            <p className={sectionTitleCls}>{t('admin.general')}</p>
-            <div className="max-w-[120px]">
-              <label className={labelCls}>{t('selection.maxSlots')}</label>
-              <input type="number" className={inputCls} value={form.maxSlots}
-                onChange={e => setNum('maxSlots', e.target.value)} />
-            </div>
-          </div>
-
-          {/* Section: Performances */}
-          <div className={sectionCls}>
-            <div className="flex items-baseline justify-between">
-              <p className={sectionTitleCls}>Performances</p>
-              {formDiscipline && (
-                <span className="text-xs text-gray-400 italic">{perfHint(formDiscipline)}</span>
-              )}
-            </div>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-              <div>
-                <label className={labelCls}>{t('selection.minima')} ({t('selection.international')})</label>
-                <input type="text" inputMode="decimal" className={inputCls}
-                  value={form.intMinima}
-                  onChange={e => setPerfStr('intMinima', e.target.value)} />
-              </div>
-              <div>
-                <label className={labelCls}>{t('selection.minima')} ({t('selection.swiss')})</label>
-                <input type="text" inputMode="decimal" className={inputCls}
-                  value={form.swissMinima}
-                  onChange={e => setPerfStr('swissMinima', e.target.value)} />
-              </div>
-              <div>
-                <label className={labelCls}>{t('selection.minima')} ({t('selection.eap')}) <span className="font-normal text-gray-400">(opt.)</span></label>
-                <input type="text" inputMode="decimal" className={inputCls}
-                  value={form.eapMinima}
-                  onChange={e => setPerfStr('eapMinima', e.target.value)} />
-              </div>
-              <div>
-                <label className={labelCls}>{t('selection.meetRecord')} <span className="font-normal text-gray-400">(opt.)</span></label>
-                <input type="text" inputMode="decimal" className={inputCls}
-                  value={form.meetRecord}
-                  onChange={e => setPerfStr('meetRecord', e.target.value)} />
-              </div>
-              <div>
-                <label className={labelCls}>{t('selection.targetPerf')} <span className="font-normal text-gray-400">(opt.)</span></label>
-                <input type="text" inputMode="decimal" className={inputCls}
-                  value={form.targetPerf}
-                  onChange={e => setPerfStr('targetPerf', e.target.value)} />
-              </div>
-            </div>
-          </div>
-
-          {/* Section: Quotas */}
-          <div className={sectionCls}>
-            <p className={sectionTitleCls}>{t('dashboard.quotas')}</p>
-            <div className="grid grid-cols-2 gap-3 max-w-xs">
-              <div>
-                <label className={labelCls}>{t('dashboard.swissQuota')}</label>
-                <input type="number" className={inputCls} value={form.swissQuota}
-                  onChange={e => setNum('swissQuota', e.target.value)} />
-              </div>
-              <div>
-                <label className={labelCls}>{t('dashboard.eapQuota')}</label>
-                <input type="number" className={inputCls} value={form.eapQuota}
-                  onChange={e => setNum('eapQuota', e.target.value)} />
-              </div>
-            </div>
-          </div>
-
-          {/* Section: Prize Money */}
-          <div className={sectionCls}>
-            <p className={sectionTitleCls}>{t('results.prizeMoney')} (CHF)</p>
-            <div className="grid grid-cols-4 gap-2">
-              {PRIZE_KEYS.map((key, i) => (
-                <div key={key}>
-                  <label className={labelCls}>{i + 1}{ORDINAL_SUFFIX[i]}</label>
-                  <input type="number" className={inputCls} value={form[key]}
-                    onChange={e => setNum(key, e.target.value)} />
+            {/* Scrollable form body */}
+            <form onSubmit={handleSubmit} className="overflow-y-auto flex-1 p-5 space-y-4">
+              {!editingId && (
+                <div>
+                  <label className={labelCls}>{t('admin.eventCatalog')}</label>
+                  <select className={inputCls} value={form.catalogId}
+                    onChange={e => handleCatalogChange(e.target.value)}>
+                    <option value="">—</option>
+                    {availableCatalog.map(c => (
+                      <option key={c.id} value={c.id}>{c.name} ({c.gender}) — {c.discipline}</option>
+                    ))}
+                  </select>
                 </div>
-              ))}
-            </div>
-          </div>
+              )}
 
-          <div className="flex gap-2 pt-1">
-            <button type="submit" disabled={isPending || (!editingId && !form.catalogId)}
-              className="text-xs bg-gray-900 text-white px-4 py-1.5 rounded hover:bg-gray-800 disabled:opacity-50">
-              {isPending ? t('common.loading') : t('common.save')}
-            </button>
-            <button type="button" onClick={resetForm}
-              className="text-xs px-4 py-1.5 rounded border hover:bg-gray-50">
-              {t('common.cancel')}
-            </button>
+              {/* Section: Général */}
+              <div className={sectionCls}>
+                <p className={sectionTitleCls}>{t('admin.general')}</p>
+                <div className="max-w-[120px]">
+                  <label className={labelCls}>{t('selection.maxSlots')}</label>
+                  <input type="number" className={inputCls} value={form.maxSlots}
+                    onChange={e => setNum('maxSlots', e.target.value)} />
+                </div>
+              </div>
+
+              {/* Section: Performances */}
+              <div className={sectionCls}>
+                <div className="flex items-baseline justify-between">
+                  <p className={sectionTitleCls}>Performances</p>
+                  {formDiscipline && (
+                    <span className="text-xs text-gray-400 italic">{perfHint(formDiscipline)}</span>
+                  )}
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                  <div>
+                    <label className={labelCls}>{t('selection.minima')} ({t('selection.international')})</label>
+                    <input type="text" inputMode="decimal" className={inputCls}
+                      value={form.intMinima}
+                      onChange={e => setPerfStr('intMinima', e.target.value)} />
+                  </div>
+                  <div>
+                    <label className={labelCls}>{t('selection.minima')} ({t('selection.swiss')})</label>
+                    <input type="text" inputMode="decimal" className={inputCls}
+                      value={form.swissMinima}
+                      onChange={e => setPerfStr('swissMinima', e.target.value)} />
+                  </div>
+                  <div>
+                    <label className={labelCls}>{t('selection.minima')} ({t('selection.eap')}) <span className="font-normal text-gray-400">(opt.)</span></label>
+                    <input type="text" inputMode="decimal" className={inputCls}
+                      value={form.eapMinima}
+                      onChange={e => setPerfStr('eapMinima', e.target.value)} />
+                  </div>
+                  <div>
+                    <label className={labelCls}>{t('selection.meetRecord')} <span className="font-normal text-gray-400">(opt.)</span></label>
+                    <input type="text" inputMode="decimal" className={inputCls}
+                      value={form.meetRecord}
+                      onChange={e => setPerfStr('meetRecord', e.target.value)} />
+                  </div>
+                  <div>
+                    <label className={labelCls}>{t('selection.targetPerf')} <span className="font-normal text-gray-400">(opt.)</span></label>
+                    <input type="text" inputMode="decimal" className={inputCls}
+                      value={form.targetPerf}
+                      onChange={e => setPerfStr('targetPerf', e.target.value)} />
+                  </div>
+                </div>
+              </div>
+
+              {/* Section: Quotas */}
+              <div className={sectionCls}>
+                <p className={sectionTitleCls}>{t('dashboard.quotas')}</p>
+                <div className="grid grid-cols-2 gap-3 max-w-xs">
+                  <div>
+                    <label className={labelCls}>{t('dashboard.swissQuota')}</label>
+                    <input type="number" className={inputCls} value={form.swissQuota}
+                      onChange={e => setNum('swissQuota', e.target.value)} />
+                  </div>
+                  <div>
+                    <label className={labelCls}>{t('dashboard.eapQuota')}</label>
+                    <input type="number" className={inputCls} value={form.eapQuota}
+                      onChange={e => setNum('eapQuota', e.target.value)} />
+                  </div>
+                </div>
+              </div>
+
+              {/* Section: Prize Money */}
+              <div className={sectionCls}>
+                <p className={sectionTitleCls}>{t('results.prizeMoney')} (CHF)</p>
+                <div className="grid grid-cols-4 gap-2">
+                  {PRIZE_KEYS.map((key, i) => (
+                    <div key={key}>
+                      <label className={labelCls}>{i + 1}{ORDINAL_SUFFIX[i]}</label>
+                      <input type="number" className={inputCls} value={form[key]}
+                        onChange={e => setNum(key, e.target.value)} />
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {error && <p className="text-xs text-red-600">{(error as Error).message}</p>}
+
+              {/* Footer */}
+              <div className="flex gap-2 pt-1">
+                <button type="submit" disabled={isPending || (!editingId && !form.catalogId)}
+                  className="text-xs bg-gray-900 text-white px-4 py-1.5 rounded hover:bg-gray-800 disabled:opacity-50">
+                  {isPending ? t('common.loading') : t('common.save')}
+                </button>
+                <button type="button" onClick={resetForm}
+                  className="text-xs px-4 py-1.5 rounded border hover:bg-gray-50">
+                  {t('common.cancel')}
+                </button>
+              </div>
+            </form>
           </div>
-          {error && <p className="text-xs text-red-600">{(error as Error).message}</p>}
-        </form>
+        </div>
       )}
 
       {/* Events table */}
