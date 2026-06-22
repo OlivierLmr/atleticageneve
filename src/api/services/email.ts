@@ -134,8 +134,9 @@ export function buildTransitionEmail(params: {
   agreementTerms?: string
   agreementHtmlTerms?: string
   counterOfferText?: string
+  magicLinkUrl?: string
 }): TransitionEmail | null {
-  const { from, to, athleteName, meetingName, senderName, recipientName, organizationName, agreementTerms, agreementHtmlTerms, counterOfferText } = params
+  const { from, to, athleteName, meetingName, senderName, recipientName, organizationName, agreementTerms, agreementHtmlTerms, counterOfferText, magicLinkUrl } = params
   const key = `${from}__${to}`
 
   const make = (subject: string, body: string): TransitionEmail => ({
@@ -146,18 +147,27 @@ export function buildTransitionEmail(params: {
 
   const makeHtml = (subject: string, body: string, htmlBody: string): TransitionEmail => ({ subject, body, htmlBody })
 
+  const portalButton = magicLinkUrl
+    ? `${linkButton(magicLinkUrl, 'Access my portal')}<p style="font-size:12px;color:#666"><em>This link is valid for 48 hours and can only be used once.</em></p>`
+    : ''
+
+  const portalText = magicLinkUrl
+    ? `\n\nYou can access your portal directly using the link below:\n${magicLinkUrl}\n(This link is valid for 48 hours and can only be used once.)`
+    : ''
+
   switch (key) {
     case 'to_review__agreement_sent': {
       const termsSection = agreementTerms
         ? `\n\nHere are the terms of our offer:\n\n${agreementTerms}`
         : ''
       const subject = `${meetingName} — Participation Agreement`
-      const body = `Dear ${recipientName},\n\nWe are pleased to inform you that we have reviewed ${athleteName}'s application for ${meetingName} and are ready to move forward with a participation offer.${termsSection}\n\nPlease let us know your decision at your earliest convenience. Should you have any questions or wish to discuss any aspect of the offer, please do not hesitate to reach out.\n\nKind regards,\n${senderName} — ${organizationName}`
+      const body = `Dear ${recipientName},\n\nWe are pleased to inform you that we have reviewed ${athleteName}'s application for ${meetingName} and are ready to move forward with a participation offer.${termsSection}\n\nPlease let us know your decision at your earliest convenience. Should you have any questions or wish to discuss any aspect of the offer, please do not hesitate to reach out.${portalText}\n\nKind regards,\n${senderName} — ${organizationName}`
       if (agreementHtmlTerms) {
-        const htmlBody = `<div style="font-family:sans-serif;font-size:14px;line-height:1.6;color:#333"><p>Dear ${recipientName},</p><p>We are pleased to inform you that we have reviewed <strong>${athleteName}</strong>'s application for <strong>${meetingName}</strong> and are ready to move forward with a participation offer.</p>${agreementHtmlTerms}<p>Please let us know your decision at your earliest convenience. Should you have any questions or wish to discuss any aspect of the offer, please do not hesitate to reach out.</p><p>Kind regards,<br/>${senderName} — ${organizationName}</p></div>`
+        const htmlBody = `<div style="font-family:sans-serif;font-size:14px;line-height:1.6;color:#333"><p>Dear ${recipientName},</p><p>We are pleased to inform you that we have reviewed <strong>${athleteName}</strong>'s application for <strong>${meetingName}</strong> and are ready to move forward with a participation offer.</p>${agreementHtmlTerms}<p>Please let us know your decision at your earliest convenience. Should you have any questions or wish to discuss any aspect of the offer, please do not hesitate to reach out.</p>${portalButton}<p>Kind regards,<br/>${senderName} — ${organizationName}</p></div>`
         return makeHtml(subject, body, htmlBody)
       }
-      return make(subject, body)
+      const htmlBody = `<div style="font-family:sans-serif;font-size:14px;line-height:1.6;color:#333"><p>Dear ${recipientName},</p><p>We are pleased to inform you that we have reviewed <strong>${athleteName}</strong>'s application for <strong>${meetingName}</strong> and are ready to move forward with a participation offer.</p><p>Please let us know your decision at your earliest convenience. Should you have any questions or wish to discuss any aspect of the offer, please do not hesitate to reach out.</p>${portalButton}<p>Kind regards,<br/>${senderName} — ${organizationName}</p></div>`
+      return makeHtml(subject, body, htmlBody)
     }
     case 'to_review__rejected':
       return make(
@@ -193,12 +203,13 @@ export function buildTransitionEmail(params: {
         ? `\n\nHere are the revised terms:\n\n${agreementTerms}`
         : ''
       const subject = `${meetingName} — Updated Participation Agreement`
-      const body = `Dear ${recipientName},\n\nThank you for your counter-offer regarding ${athleteName}'s participation in ${meetingName}. We have taken your points into consideration and are pleased to send you an updated participation offer.${termsSection}\n\nWe hope this revised proposal meets your expectations. Please do not hesitate to contact us if you have any further questions.\n\nKind regards,\n${senderName} — ${organizationName}`
+      const body = `Dear ${recipientName},\n\nThank you for your counter-offer regarding ${athleteName}'s participation in ${meetingName}. We have taken your points into consideration and are pleased to send you an updated participation offer.${termsSection}\n\nWe hope this revised proposal meets your expectations. Please do not hesitate to contact us if you have any further questions.${portalText}\n\nKind regards,\n${senderName} — ${organizationName}`
       if (agreementHtmlTerms) {
-        const htmlBody = `<div style="font-family:sans-serif;font-size:14px;line-height:1.6;color:#333"><p>Dear ${recipientName},</p><p>Thank you for your counter-offer regarding <strong>${athleteName}</strong>'s participation in <strong>${meetingName}</strong>. We have taken your points into consideration and are pleased to send you an updated participation offer.</p>${agreementHtmlTerms}<p>We hope this revised proposal meets your expectations. Please do not hesitate to contact us if you have any further questions.</p><p>Kind regards,<br/>${senderName} — ${organizationName}</p></div>`
+        const htmlBody = `<div style="font-family:sans-serif;font-size:14px;line-height:1.6;color:#333"><p>Dear ${recipientName},</p><p>Thank you for your counter-offer regarding <strong>${athleteName}</strong>'s participation in <strong>${meetingName}</strong>. We have taken your points into consideration and are pleased to send you an updated participation offer.</p>${agreementHtmlTerms}<p>We hope this revised proposal meets your expectations. Please do not hesitate to contact us if you have any further questions.</p>${portalButton}<p>Kind regards,<br/>${senderName} — ${organizationName}</p></div>`
         return makeHtml(subject, body, htmlBody)
       }
-      return make(subject, body)
+      const htmlBody = `<div style="font-family:sans-serif;font-size:14px;line-height:1.6;color:#333"><p>Dear ${recipientName},</p><p>Thank you for your counter-offer regarding <strong>${athleteName}</strong>'s participation in <strong>${meetingName}</strong>. We have taken your points into consideration and are pleased to send you an updated participation offer.</p><p>We hope this revised proposal meets your expectations. Please do not hesitate to contact us if you have any further questions.</p>${portalButton}<p>Kind regards,<br/>${senderName} — ${organizationName}</p></div>`
+      return makeHtml(subject, body, htmlBody)
     }
     case 'counter_offer_sent__rejected':
       return make(
@@ -220,16 +231,18 @@ export function buildTransitionEmail(params: {
         `${meetingName} — Update Regarding ${athleteName}'s Participation`,
         `Dear ${recipientName},\n\nWe regret to inform you that, due to exceptional circumstances, ${athleteName}'s confirmed participation in ${meetingName} has had to be cancelled.\n\nWe are truly sorry for the inconvenience this causes and want to assure you that this decision was not taken lightly. We remain available to discuss this matter and hope to have the opportunity to welcome ${athleteName} at a future event.\n\nKind regards,\n${senderName} — ${organizationName}`,
       )
-    case 'rejected__to_review':
-      return make(
-        `${meetingName} — Application Reopened`,
-        `Dear ${recipientName},\n\nFollowing our previous communication, we are pleased to inform you that ${athleteName}'s application for ${meetingName} has been reopened.\n\nWe would like to invite you to resume discussions with us. Please feel free to contact us at your convenience.\n\nKind regards,\n${senderName} — ${organizationName}`,
-      )
-    case 'withdrawn__to_review':
-      return make(
-        `${meetingName} — Invitation to Reconsider`,
-        `Dear ${recipientName},\n\nFollowing ${athleteName}'s withdrawal from ${meetingName}, we would like to reach out and explore whether there might be an opportunity to resume the process.\n\nIf circumstances have changed and you would be open to reconsidering, we would be very pleased to discuss this with you. Please feel free to contact us.\n\nKind regards,\n${senderName} — ${organizationName}`,
-      )
+    case 'rejected__to_review': {
+      const subject = `${meetingName} — Application Reopened`
+      const body = `Dear ${recipientName},\n\nFollowing our previous communication, we are pleased to inform you that ${athleteName}'s application for ${meetingName} has been reopened.\n\nWe would like to invite you to resume discussions with us. Please feel free to contact us at your convenience.${portalText}\n\nKind regards,\n${senderName} — ${organizationName}`
+      const htmlBody = `<div style="font-family:sans-serif;font-size:14px;line-height:1.6;color:#333"><p>Dear ${recipientName},</p><p>Following our previous communication, we are pleased to inform you that <strong>${athleteName}</strong>'s application for <strong>${meetingName}</strong> has been reopened.</p><p>We would like to invite you to resume discussions with us. Please feel free to contact us at your convenience.</p>${portalButton}<p>Kind regards,<br/>${senderName} — ${organizationName}</p></div>`
+      return makeHtml(subject, body, htmlBody)
+    }
+    case 'withdrawn__to_review': {
+      const subject = `${meetingName} — Invitation to Reconsider`
+      const body = `Dear ${recipientName},\n\nFollowing ${athleteName}'s withdrawal from ${meetingName}, we would like to reach out and explore whether there might be an opportunity to resume the process.\n\nIf circumstances have changed and you would be open to reconsidering, we would be very pleased to discuss this with you. Please feel free to contact us.${portalText}\n\nKind regards,\n${senderName} — ${organizationName}`
+      const htmlBody = `<div style="font-family:sans-serif;font-size:14px;line-height:1.6;color:#333"><p>Dear ${recipientName},</p><p>Following <strong>${athleteName}</strong>'s withdrawal from <strong>${meetingName}</strong>, we would like to reach out and explore whether there might be an opportunity to resume the process.</p><p>If circumstances have changed and you would be open to reconsidering, we would be very pleased to discuss this with you. Please feel free to contact us.</p>${portalButton}<p>Kind regards,<br/>${senderName} — ${organizationName}</p></div>`
+      return makeHtml(subject, body, htmlBody)
+    }
     default:
       return null
   }

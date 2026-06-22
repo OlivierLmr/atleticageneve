@@ -560,6 +560,25 @@ athletes.patch('/:id/negotiation-status', requireAuth('athlete', 'manager', 'col
   // Athlete/manager-initiated → email goes to organisation: use committee name
   const emailRecipientName = staff ? recipientName : `${meetingName} Organisation Committee`
 
+  // Generate a 48h magic link for the recipient on specific staff-initiated transitions
+  const MAGIC_LINK_TRANSITIONS = new Set(['rejected__to_review', 'withdrawn__to_review'])
+  let magicLinkUrl: string | undefined
+  if (staff && MAGIC_LINK_TRANSITIONS.has(`${currentStatus}__${newStatus}`)) {
+    const recipientUserId = ath.managerId ?? ath.userId
+    if (recipientUserId) {
+      const baseUrl = c.req.header('Origin') ?? 'http://localhost:5173'
+      const token = generateToken()
+      const redirectUrl = ath.managerId ? '/manager/portal' : '/athlete/portal'
+      await db.insert(schema.magicLink).values({
+        userId: recipientUserId,
+        token,
+        expiresAt: magicLinkExpiresAt(48 * 60),
+        redirectUrl,
+      })
+      magicLinkUrl = `${baseUrl}/auth/verify?token=${token}`
+    }
+  }
+
   const transitionEmail = buildTransitionEmail({
     from: currentStatus,
     to: newStatus,
@@ -569,6 +588,7 @@ athletes.patch('/:id/negotiation-status', requireAuth('athlete', 'manager', 'col
     recipientName: emailRecipientName,
     organizationName,
     counterOfferText,
+    magicLinkUrl,
   })
 
   let emailLogId: string | null = null
