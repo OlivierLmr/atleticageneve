@@ -5,6 +5,7 @@ import * as schema from '../db/schema'
 import { agreementSchema } from '@shared/validation'
 import { requireAuth } from '../middleware/auth'
 import { sendEmail, buildTransitionEmail } from '../services/email'
+import { generateToken, magicLinkExpiresAt } from '../services/auth'
 import { formatAgreementTerms, formatAgreementTermsHtml } from '@shared/agreementFormatter'
 import { calculateTotalCost } from '../lib/helpers'
 import type { Env } from '../index'
@@ -208,6 +209,22 @@ agreements.post('/:athleteId/agreements', zValidator('json', agreementSchema), a
     }
   }
 
+  // Generate a 48h magic link for the recipient (manager takes priority over athlete)
+  const baseUrl = c.req.header('Origin') ?? 'http://localhost:5173'
+  let magicLinkUrl: string | undefined
+  const recipientUserId = ath.managerId ?? ath.userId
+  if (recipientUserId) {
+    const token = generateToken()
+    const redirectUrl = ath.managerId ? '/manager/portal' : '/athlete/portal'
+    await db.insert(schema.magicLink).values({
+      userId: recipientUserId,
+      token,
+      expiresAt: magicLinkExpiresAt(48 * 60),
+      redirectUrl,
+    })
+    magicLinkUrl = `${baseUrl}/auth/verify?token=${token}`
+  }
+
   const transitionEmail = buildTransitionEmail({
     from: currentStatus as NegotiationStatus,
     to: 'agreement_sent',
@@ -218,6 +235,7 @@ agreements.post('/:athleteId/agreements', zValidator('json', agreementSchema), a
     organizationName,
     agreementTerms,
     agreementHtmlTerms,
+    magicLinkUrl,
   })
 
   let emailLogId: string | null = null
