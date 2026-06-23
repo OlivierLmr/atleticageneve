@@ -275,26 +275,59 @@ export function AgreementFormModal({ form, onChange, allRooms, athlete, onSubmit
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600">✕</button>
         </div>
         <div className="p-4 space-y-3">
-          <div>
-            <label className={labelCls}>{t('contract.bonus')} (CHF)</label>
-            <input
-              type="number"
-              className={`${inputCls} text-right`}
-              value={form.appearanceFee}
-              placeholder="0"
-              onChange={e => onChange(p => ({ ...p, appearanceFee: e.target.value === '' ? '' : (parseInt(e.target.value) || 0) }))}
-            />
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className={labelCls}>{t('contract.bonus')}</label>
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs text-gray-400 shrink-0">CHF</span>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  className="w-28 px-2 py-1.5 border border-gray-300 rounded text-sm text-right focus:outline-none focus:ring-1 focus:ring-gray-900"
+                  value={form.appearanceFee}
+                  placeholder="0"
+                  onChange={e => {
+                    const digits = e.target.value.replace(/\D/g, '')
+                    onChange(p => ({ ...p, appearanceFee: digits === '' ? '' : parseInt(digits, 10) }))
+                  }}
+                />
+              </div>
+            </div>
+            <div>
+              <label className={labelCls}>{t('contract.transport')}</label>
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs text-gray-400 shrink-0">CHF</span>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  className="w-28 px-2 py-1.5 border border-gray-300 rounded text-sm text-right focus:outline-none focus:ring-1 focus:ring-gray-900"
+                  value={form.transport}
+                  placeholder="0"
+                  onChange={e => {
+                    const digits = e.target.value.replace(/\D/g, '')
+                    onChange(p => ({ ...p, transport: digits === '' ? '' : parseInt(digits, 10) }))
+                  }}
+                />
+              </div>
+            </div>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className={labelCls}>{t('contract.otherCompensation')} (CHF)</label>
-              <input
-                type="number"
-                className={`${inputCls} text-right`}
-                value={form.otherCompensation}
-                placeholder="0"
-                onChange={e => onChange(p => ({ ...p, otherCompensation: e.target.value === '' ? '' : (parseInt(e.target.value) || 0) }))}
-              />
+              <label className={labelCls}>{t('contract.otherCompensation')}</label>
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs text-gray-400 shrink-0">CHF</span>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  className="w-28 px-2 py-1.5 border border-gray-300 rounded text-sm text-right focus:outline-none focus:ring-1 focus:ring-gray-900"
+                  value={form.otherCompensation}
+                  placeholder="0"
+                  onChange={e => {
+                    const digits = e.target.value.replace(/\D/g, '')
+                    onChange(p => ({ ...p, otherCompensation: digits === '' ? '' : parseInt(digits, 10) }))
+                  }}
+                />
+              </div>
             </div>
             <div>
               <label className={labelCls}>{t('contract.description')}</label>
@@ -305,16 +338,6 @@ export function AgreementFormModal({ form, onChange, allRooms, athlete, onSubmit
                 placeholder={t('contract.otherCompensationDesc')}
               />
             </div>
-          </div>
-          <div>
-            <label className={labelCls}>{t('contract.transport')} (CHF)</label>
-            <input
-              type="number"
-              className={`${inputCls} text-right`}
-              value={form.transport}
-              placeholder="0"
-              onChange={e => onChange(p => ({ ...p, transport: e.target.value === '' ? '' : (parseInt(e.target.value) || 0) }))}
-            />
           </div>
           <div className="flex items-center gap-4">
             <label className="flex items-center gap-2 text-sm cursor-pointer">

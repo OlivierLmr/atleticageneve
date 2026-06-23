@@ -51,10 +51,10 @@ export interface FieldDef {
 export function defaultAgreement(existing?: Agreement, athlete?: Athlete): AgreementFormDraft {
   if (existing) {
     return {
-      appearanceFee: existing.appearanceFee,
-      otherCompensation: existing.otherCompensation,
+      appearanceFee: existing.appearanceFee || '',
+      otherCompensation: existing.otherCompensation || '',
       otherCompensationDesc: existing.otherCompensationDesc ?? '',
-      transport: existing.transport,
+      transport: existing.transport || '',
       transportAirportHotel: existing.transportAirportHotel,
       transportHotelStadium: existing.transportHotelStadium,
       hotelRoomId: existing.hotelRoomId ?? '',
