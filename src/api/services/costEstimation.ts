@@ -87,7 +87,8 @@ export async function recalculateAthleteEstimatedCost(db: Db, athleteId: string)
     }
   }
 
-  const estAppearance = matchedTier.appearanceFee
+  // No world ranking at all → no appearance fee, regardless of the default tier
+  const estAppearance = bestRanking != null ? matchedTier.appearanceFee : 0
   const estTravel = matchedDist.travelCost
   const estAccommodation = matchedDist.nights * matchedTier.nightlyRate
   const estTotal = estAppearance + estTravel + estAccommodation
