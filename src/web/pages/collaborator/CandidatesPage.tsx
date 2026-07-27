@@ -277,6 +277,8 @@ function CandidateRow({
   const pb = app.waPerformance?.personalBest ?? app.personalBest
   const sb = app.waPerformance?.seasonBest ?? app.seasonBest
   const wr = app.waPerformance?.worldRanking ?? app.worldRanking
+  const er = app.waPerformance?.eaRanking ?? null
+  const eaObligation = er != null && edition != null && er <= edition.eaRankingThreshold
   const sbColor = seasonBestColor(app, sb)
   const allowedTransitions = PARTICIPATION_TRANSITIONS[app.participationStatus] ?? []
   const canChangeStatus = allowedTransitions.length > 0
@@ -391,8 +393,18 @@ function CandidateRow({
         {formatPerf(sb, app.event.catalog.discipline)}
       </td>
 
-      {/* World ranking */}
-      <td className="px-3 py-2.5 font-mono text-xs text-gray-700">{wr ?? '—'}</td>
+      {/* World ranking + EA ranking (badged if it triggers performance obligations) */}
+      <td className="px-3 py-2.5 font-mono text-xs text-gray-700">
+        {wr ?? '—'}
+        {er != null && (
+          <span
+            title={t('athlete.eaRanking')}
+            className={`ml-1.5 ${eaObligation ? 'px-1 py-0.5 rounded bg-orange-100 text-orange-800 font-semibold' : 'text-gray-400'}`}
+          >
+            EA {er}
+          </span>
+        )}
+      </td>
 
       {/* Scoring with hover popup */}
       <td className="px-3 py-2.5">

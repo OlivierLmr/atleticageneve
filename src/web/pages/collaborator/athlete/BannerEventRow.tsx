@@ -148,7 +148,7 @@ export function BannerEventRow({ app, athlete, edition, isStaff, onParticipation
   isStaff: boolean
   onParticipationChange: (appId: string, status: string) => void
   onRescore: (appId: string) => void
-  onWaPerfSave: (athleteId: string, eventId: string, data: { personalBest?: number; seasonBest?: number; worldRanking?: number }) => void
+  onWaPerfSave: (athleteId: string, eventId: string, data: { personalBest?: number; seasonBest?: number; worldRanking?: number; eaRanking?: number }) => void
   isPendingParticipation: boolean
   t: (key: string) => string
 }) {
@@ -163,12 +163,15 @@ export function BannerEventRow({ app, athlete, edition, isStaff, onParticipation
       ? formatPerf(app.waPerformance.seasonBest, app.event.catalog.discipline)
       : '',
     worldRanking: app.waPerformance?.worldRanking != null ? String(app.waPerformance.worldRanking) : '',
+    eaRanking: app.waPerformance?.eaRanking != null ? String(app.waPerformance.eaRanking) : '',
   })
 
   const wp = app.waPerformance
   const pb = wp?.personalBest ?? app.personalBest
   const sb = wp?.seasonBest ?? app.seasonBest
   const wr = wp?.worldRanking ?? app.worldRanking
+  const er = wp?.eaRanking ?? null
+  const eaObligation = er != null && edition != null && er <= edition.eaRankingThreshold
 
   const PARTICIPATION_COLORS: Record<string, string> = {
     pending: 'bg-yellow-100 text-yellow-800',
@@ -197,8 +200,10 @@ export function BannerEventRow({ app, athlete, edition, isStaff, onParticipation
             onChange={e => setPerfForm(p => ({ ...p, personalBest: e.target.value }))} />
           <input type="text" placeholder="SB" className="w-20 px-1 py-0.5 border border-gray-300 rounded text-xs font-mono" value={perfForm.seasonBest}
             onChange={e => setPerfForm(p => ({ ...p, seasonBest: e.target.value }))} />
-          <input type="number" placeholder="#" className="w-16 px-1 py-0.5 border border-gray-300 rounded text-xs" value={perfForm.worldRanking}
+          <input type="number" placeholder="WA #" title={t('athlete.worldRanking')} className="w-16 px-1 py-0.5 border border-gray-300 rounded text-xs" value={perfForm.worldRanking}
             onChange={e => setPerfForm(p => ({ ...p, worldRanking: e.target.value }))} />
+          <input type="number" placeholder="EA #" title={t('athlete.eaRanking')} className="w-16 px-1 py-0.5 border border-gray-300 rounded text-xs" value={perfForm.eaRanking}
+            onChange={e => setPerfForm(p => ({ ...p, eaRanking: e.target.value }))} />
           <button onClick={() => {
             const disc = app.event.catalog.discipline
             const parsedPB = parseHumanPerf(perfForm.personalBest, disc)
@@ -207,6 +212,7 @@ export function BannerEventRow({ app, athlete, edition, isStaff, onParticipation
               ...(parsedPB != null ? { personalBest: parsedPB } : {}),
               ...(parsedSB != null ? { seasonBest: parsedSB } : {}),
               ...(perfForm.worldRanking ? { worldRanking: parseInt(perfForm.worldRanking) } : {}),
+              ...(perfForm.eaRanking ? { eaRanking: parseInt(perfForm.eaRanking) } : {}),
             })
             setEditingPerf(false)
           }} className="text-[10px] text-green-600 hover:text-green-800">✓</button>
@@ -216,7 +222,15 @@ export function BannerEventRow({ app, athlete, edition, isStaff, onParticipation
         <div className="flex items-center gap-3 text-xs text-gray-600 flex-1">
           <span>PB: <span className="font-mono font-medium">{formatPerf(pb, app.event.catalog.discipline)}</span></span>
           <span>SB: <span className={`font-mono font-medium ${sbColorClass(sb, app, athlete)}`}>{formatPerf(sb, app.event.catalog.discipline)}</span></span>
-          <span>#{wr ?? '—'}</span>
+          <span title={t('athlete.worldRanking')}>WA #{wr ?? '—'}</span>
+          {er != null && (
+            <span
+              title={t('athlete.eaRanking')}
+              className={eaObligation ? 'px-1.5 py-0.5 rounded font-semibold bg-orange-100 text-orange-800' : ''}
+            >
+              EA #{er}
+            </span>
+          )}
 
           {/* Score with popup — staff only */}
           {isStaff && app.score != null && (

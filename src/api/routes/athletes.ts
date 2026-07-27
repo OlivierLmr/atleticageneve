@@ -428,6 +428,7 @@ athletes.get('/:id', requireAuth('athlete', 'manager', 'collaborator', 'committe
       stadiumMealCost: edition.stadiumMealCost,
       transportAirportHotelCost: edition.transportAirportHotelCost,
       transportHotelStadiumCost: edition.transportHotelStadiumCost,
+      eaRankingThreshold: edition.eaRankingThreshold,
     } : null,
   })
 })

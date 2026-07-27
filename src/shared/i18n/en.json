@@ -143,6 +143,7 @@
     "personalBest": "Personal Best",
     "seasonBest": "Season Best",
     "worldRanking": "World Ranking",
+    "eaRanking": "European Ranking",
     "event": "Event",
     "primaryEvent": "Primary event",
     "secondaryEvent": "Secondary event",
@@ -413,8 +414,13 @@
     "waDisciplineMapHint": "Maps World Athletics discipline names to local event catalog names for auto-scraping.",
     "waName": "WA Discipline Name",
     "waRankingSlug": "WA Ranking Slug",
+    "eaDiscipline": "EA Discipline",
+    "eaDisciplineHint": "Exact discipline name as shown in the European Athletics ranking, for auto-scraping.",
     "catalogName": "Catalog Name",
-    "saveMappings": "Save mappings"
+    "saveMappings": "Save mappings",
+    "eaRanking": "European Athletics Ranking",
+    "eaRankingThreshold": "EA obligation threshold",
+    "eaRankingThresholdHint": "An athlete ranked at or above this position in the European ranking (per discipline) triggers performance obligations."
   },
   "wa": {
     "fetch": "Refresh WA Data",

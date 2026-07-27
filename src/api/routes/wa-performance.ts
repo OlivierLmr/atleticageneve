@@ -19,9 +19,9 @@ waPerformance.use('*', requireAuth('collaborator', 'committee'))
 
 export async function upsertWaPerformance(
   db: Db,
-  data: { athleteId: string; eventId: string; personalBest: number | null; seasonBest: number | null; worldRanking: number | null },
+  data: { athleteId: string; eventId: string; personalBest: number | null; seasonBest: number | null; worldRanking: number | null; eaRanking?: number | null },
 ): Promise<void> {
-  const { athleteId, eventId, personalBest, seasonBest, worldRanking } = data
+  const { athleteId, eventId, personalBest, seasonBest, worldRanking, eaRanking } = data
 
   // Upsert wa_performance row
   const existing = await db
@@ -40,6 +40,7 @@ export async function upsertWaPerformance(
         personalBest: personalBest ?? existing[0].personalBest,
         seasonBest: seasonBest ?? existing[0].seasonBest,
         worldRanking: worldRanking ?? existing[0].worldRanking,
+        eaRanking: eaRanking ?? existing[0].eaRanking,
       })
       .where(eq(schema.waPerformance.id, existing[0].id))
   } else {
@@ -50,6 +51,7 @@ export async function upsertWaPerformance(
       personalBest: personalBest ?? null,
       seasonBest: seasonBest ?? null,
       worldRanking: worldRanking ?? null,
+      eaRanking: eaRanking ?? null,
     })
   }
 
@@ -184,6 +186,7 @@ waPerformance.post('/', zValidator('json', waPerformanceSchema), async (c) => {
     personalBest: data.personalBest ?? null,
     seasonBest: data.seasonBest ?? null,
     worldRanking: data.worldRanking ?? null,
+    eaRanking: data.eaRanking ?? null,
   })
   return c.json({ success: true })
 })

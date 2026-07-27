@@ -143,6 +143,7 @@
     "personalBest": "Record personnel",
     "seasonBest": "Meilleure perf. de la saison",
     "worldRanking": "Classement mondial",
+    "eaRanking": "Classement européen",
     "event": "Épreuve",
     "primaryEvent": "Épreuve principale",
     "secondaryEvent": "Épreuve secondaire",
@@ -413,8 +414,13 @@
     "waDisciplineMapHint": "Correspondance entre les noms de disciplines World Athletics et le catalogue local pour le scraping automatique.",
     "waName": "Nom discipline WA",
     "waRankingSlug": "Slug classement WA",
+    "eaDiscipline": "Discipline EA",
+    "eaDisciplineHint": "Nom exact de la discipline tel qu'affiché dans le classement européen (European Athletics) pour le scraping automatique.",
     "catalogName": "Nom catalogue",
-    "saveMappings": "Enregistrer les mappings"
+    "saveMappings": "Enregistrer les mappings",
+    "eaRanking": "Classement European Athletics",
+    "eaRankingThreshold": "Seuil d'obligation EA",
+    "eaRankingThresholdHint": "Un athlète classé à ce rang ou mieux au classement européen (par discipline) implique des obligations de prestations à fournir."
   },
   "wa": {
     "fetch": "Actualiser données WA",

@@ -86,7 +86,7 @@ export function useAthleteMutations(id: string | undefined) {
   })
 
   const waPerfMutation = useMutation({
-    mutationFn: (data: { athleteId: string; eventId: string; personalBest?: number; seasonBest?: number; worldRanking?: number }) =>
+    mutationFn: (data: { athleteId: string; eventId: string; personalBest?: number; seasonBest?: number; worldRanking?: number; eaRanking?: number }) =>
       api.post('/api/v1/wa-performance', data),
     onSuccess: invalidate,
   })

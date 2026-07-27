@@ -73,6 +73,7 @@ export interface Edition {
   weightCost: number
   bonusEap: number
   managerTierBonus: number
+  eaRankingThreshold: number
   createdAt: string
   updatedAt: string
 }
@@ -84,6 +85,7 @@ export interface EventCatalog {
   gender: Gender
   waName: string | null
   waRankingSlug: string | null
+  eaDiscipline: string | null
 }
 
 export interface Event {
@@ -281,6 +283,7 @@ export interface WaPerformance {
   personalBest: number | null
   seasonBest: number | null
   worldRanking: number | null
+  eaRanking: number | null
 }
 
 // ── Scoring ───────────────────────────────────────────────────────────────────
@@ -330,6 +333,7 @@ export interface EditionCosts {
   stadiumMealCost: number
   transportAirportHotelCost: number
   transportHotelStadiumCost: number
+  eaRankingThreshold: number
 }
 
 export interface AthleteDetail extends Athlete {
