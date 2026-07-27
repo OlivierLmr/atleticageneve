@@ -415,7 +415,7 @@
     "waName": "Nom discipline WA",
     "waRankingSlug": "Slug classement WA",
     "eaDiscipline": "Discipline EA",
-    "eaDisciplineHint": "Nom exact de la discipline tel qu'affiché dans le classement européen (European Athletics) pour le scraping automatique.",
+    "eaDisciplineHint": "Nom de la discipline tel qu'affiché dans le classement European Athletics, pour le scraping automatique (ex. \"400mH\" — le préfixe \"Men's\"/\"Women's\" est optionnel).",
     "catalogName": "Nom catalogue",
     "saveMappings": "Enregistrer les mappings",
     "eaRanking": "Classement European Athletics",
