@@ -264,6 +264,21 @@ export default function AthletePage() {
                     >
                       {mutations.waFetchMutation.isPending ? t('wa.fetching') : '↻ WA'}
                     </button>
+                    {mutations.waFetchMutation.isSuccess && mutations.waFetchMutation.data && (
+                      <span
+                        className={`text-xs ${mutations.waFetchMutation.data.errors.length > 0 ? 'text-amber-600' : 'text-gray-400'}`}
+                        title={mutations.waFetchMutation.data.errors.join('\n')}
+                      >
+                        {t('wa.fetchSuccess', {
+                          matched: mutations.waFetchMutation.data.matched,
+                          fetched: mutations.waFetchMutation.data.fetched,
+                        })}
+                        {mutations.waFetchMutation.data.errors.length > 0 && ` (${mutations.waFetchMutation.data.errors.length} ⚠)`}
+                      </span>
+                    )}
+                    {mutations.waFetchMutation.isError && (
+                      <span className="text-xs text-red-600">{t('wa.fetchError')}</span>
+                    )}
                   </span>
                 ) : (
                   athlete.waProfileUrl && (

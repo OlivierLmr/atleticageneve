@@ -152,7 +152,7 @@ export default function EventCatalogPage() {
               value={eaDiscipline}
               onChange={(e) => setEaDiscipline(e.target.value)}
               className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-gray-900"
-              placeholder="Women's 100m"
+              placeholder="400mH"
             />
           </div>
           <button

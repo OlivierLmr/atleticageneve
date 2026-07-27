@@ -415,7 +415,7 @@
     "waName": "WA Discipline Name",
     "waRankingSlug": "WA Ranking Slug",
     "eaDiscipline": "EA Discipline",
-    "eaDisciplineHint": "Exact discipline name as shown in the European Athletics ranking, for auto-scraping.",
+    "eaDisciplineHint": "Discipline name as shown in the European Athletics ranking, for auto-scraping (e.g. \"400mH\" — the \"Men's\"/\"Women's\" prefix is optional).",
     "catalogName": "Catalog Name",
     "saveMappings": "Save mappings",
     "eaRanking": "European Athletics Ranking",

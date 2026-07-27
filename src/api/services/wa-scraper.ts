@@ -231,9 +231,14 @@ export async function fetchAndUpsertWaData(
         for (const r of eaResult.rankings) {
           eaRankingByCatalog.set(r.catalogName, r.eaRanking)
         }
+        if (eaResult.rankings.length === 0) {
+          errors.push('EA profile fetched but no ranking matched a configured EA discipline — check the "Discipline EA" mapping in the event catalog')
+        }
       } catch (err) {
         errors.push(`EA fetch failed: ${err instanceof Error ? err.message : String(err)}`)
       }
+    } else {
+      errors.push('No EA discipline mappings configured in the event catalog — set "Discipline EA" for this athlete\'s events to enable EA ranking fetch')
     }
   }
 

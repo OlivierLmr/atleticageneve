@@ -67,6 +67,47 @@ describe('EA Scraper', () => {
       }
     })
 
+    test('matches when catalog mapping omits the gender prefix', async () => {
+      const mockHtml = `
+        <html><body>
+        <script id="__NEXT_DATA__" type="application/json">${JSON.stringify({
+          props: {
+            pageProps: {
+              athleteId: '14707010',
+              athleteInfo: {
+                europeanRankings: {
+                  current: [
+                    { discipline: "Women's 400mH", place: 1, score: 1424 },
+                    { discipline: "Women's 800m", place: 5, score: 1317 },
+                  ],
+                },
+              },
+            },
+          },
+        })}</script>
+        </body></html>
+      `
+
+      // Catalog configured without the "Women's"/"Men's" prefix, as the UI now suggests
+      const unprefixedMappings: EaDisciplineMapping[] = [
+        { eaDiscipline: '400mH', catalogName: '400m Haies' },
+        { eaDiscipline: '800m', catalogName: '800m' },
+      ]
+
+      const originalFetch = globalThis.fetch
+      globalThis.fetch = async () => new Response(mockHtml, { status: 200 })
+
+      try {
+        const result = await scrapeEaProfile('14707010', unprefixedMappings)
+
+        expect(result.rankings).toHaveLength(2)
+        expect(result.rankings.find(r => r.catalogName === '400m Haies')?.eaRanking).toBe(1)
+        expect(result.rankings.find(r => r.catalogName === '800m')?.eaRanking).toBe(5)
+      } finally {
+        globalThis.fetch = originalFetch
+      }
+    })
+
     test('throws when __NEXT_DATA__ is missing', async () => {
       const originalFetch = globalThis.fetch
       globalThis.fetch = async () => new Response('<html><body>no data</body></html>', { status: 200 })

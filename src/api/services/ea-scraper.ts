@@ -24,6 +24,22 @@ interface EaRankingEntry {
   place: number
 }
 
+// ── Discipline Name Normalization ────────────────────────────────────────────
+
+/**
+ * EA prefixes every discipline with the athlete's gender (e.g. "Women's 400mH"),
+ * which is redundant with the gender already stored on the event catalog row.
+ * Normalize away that prefix (plus casing/whitespace) so a catalog's `eaDiscipline`
+ * can be configured as just "400mH" — matching still works if the prefix was
+ * included too, for backward compatibility with existing configurations.
+ */
+function normalizeDiscipline(discipline: string): string {
+  return discipline
+    .replace(/^(men's|women's|mixed)\s+/i, '')
+    .trim()
+    .toLowerCase()
+}
+
 // ── WA athlete ID extraction ─────────────────────────────────────────────────
 
 /**
@@ -46,7 +62,7 @@ export async function scrapeEaProfile(
   waAthleteId: string,
   mappings: EaDisciplineMapping[],
 ): Promise<EaScrapeResult> {
-  const disciplineMap = new Map(mappings.map(m => [m.eaDiscipline, m.catalogName]))
+  const disciplineMap = new Map(mappings.map(m => [normalizeDiscipline(m.eaDiscipline), m.catalogName]))
 
   const url = `https://www.european-athletics.com/home/historical-data/athletes/${waAthleteId}`
 
@@ -78,7 +94,7 @@ export async function scrapeEaProfile(
 
   const rankings: EaScrapedRanking[] = []
   for (const r of current) {
-    const catalogName = disciplineMap.get(r.discipline)
+    const catalogName = disciplineMap.get(normalizeDiscipline(r.discipline))
     if (!catalogName) continue
     rankings.push({ eaDiscipline: r.discipline, catalogName, eaRanking: r.place })
   }
