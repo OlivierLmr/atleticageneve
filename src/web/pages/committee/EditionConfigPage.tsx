@@ -106,6 +106,15 @@ export default function EditionConfigPage() {
           </div>
         </div>
 
+        {/* European Athletics ranking obligation */}
+        <div className="bg-white rounded-lg border p-4 space-y-3">
+          <h2 className="font-semibold text-sm mb-2">{t('admin.eaRanking')}</h2>
+          <p className="text-xs text-gray-400">{t('admin.eaRankingThresholdHint')}</p>
+          <div className="grid grid-cols-5 gap-3">
+            <Field label={t('admin.eaRankingThreshold')} type="number" value={form.eaRankingThreshold ?? 0} onChange={(v) => set('eaRankingThreshold', Number(v))} />
+          </div>
+        </div>
+
         <div className="flex items-center gap-3">
           <button
             type="submit"

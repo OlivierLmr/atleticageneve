@@ -49,6 +49,7 @@ describe('WA Performance API', () => {
           personalBest: 10.05,
           seasonBest: 10.12,
           worldRanking: 15,
+          eaRanking: 22,
         }),
       })
       expect(res.status).toBe(200)
@@ -101,6 +102,7 @@ describe('WA Performance API', () => {
       expect(body.length).toBe(1)
       expect(body[0].personalBest).toBe(9.98) // updated value (numeric now)
       expect(body[0].worldRanking).toBe(8)
+      expect(body[0].eaRanking).toBe(22) // preserved — not overwritten by the second, EA-less POST
       expect(body[0].event).toBeDefined()
       expect(body[0].event.id).toBe(eventId)
     })

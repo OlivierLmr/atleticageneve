@@ -5,6 +5,8 @@
 import { and, eq, isNotNull } from 'drizzle-orm'
 import * as schema from '../db/schema'
 import type { Db } from '../lib/helpers'
+import { scrapeEaProfile, extractWaAthleteId } from './ea-scraper'
+import type { EaDisciplineMapping } from './ea-scraper'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -180,7 +182,7 @@ export async function scrapeWaProfile(
 export async function fetchAndUpsertWaData(
   db: Db,
   athleteId: string,
-  upsertFn: (db: Db, data: { athleteId: string; eventId: string; personalBest: number | null; seasonBest: number | null; worldRanking: number | null }) => Promise<void>,
+  upsertFn: (db: Db, data: { athleteId: string; eventId: string; personalBest: number | null; seasonBest: number | null; worldRanking: number | null; eaRanking: number | null }) => Promise<void>,
 ): Promise<{ fetched: number; matched: number; errors: string[] }> {
   const athletes = await db.select().from(schema.athlete).where(eq(schema.athlete.id, athleteId)).limit(1)
   if (athletes.length === 0) throw new Error('Athlete not found')
@@ -206,6 +208,35 @@ export async function fetchAndUpsertWaData(
   const result = await scrapeWaProfile(athlete.waProfileUrl, mappings)
   const fetched = result.performances.length
 
+  const errors: string[] = []
+
+  // EA ranking uses the same numeric ID as the WA profile — best-effort,
+  // failures here don't block the WA data that was already fetched.
+  const eaRankingByCatalog = new Map<string, number>()
+  const waAthleteId = extractWaAthleteId(athlete.waProfileUrl)
+  if (waAthleteId) {
+    const eaCatalogRows = await db
+      .select()
+      .from(schema.eventCatalog)
+      .where(and(isNotNull(schema.eventCatalog.eaDiscipline), eq(schema.eventCatalog.gender, athlete.gender)))
+
+    const eaMappings: EaDisciplineMapping[] = eaCatalogRows.map(r => ({
+      eaDiscipline: r.eaDiscipline!,
+      catalogName: r.name,
+    }))
+
+    if (eaMappings.length > 0) {
+      try {
+        const eaResult = await scrapeEaProfile(waAthleteId, eaMappings)
+        for (const r of eaResult.rankings) {
+          eaRankingByCatalog.set(r.catalogName, r.eaRanking)
+        }
+      } catch (err) {
+        errors.push(`EA fetch failed: ${err instanceof Error ? err.message : String(err)}`)
+      }
+    }
+  }
+
   // Load current edition + events + catalogs
   const editions = await db.select().from(schema.edition).limit(1)
   if (editions.length === 0) throw new Error('No edition found')
@@ -217,7 +248,6 @@ export async function fetchAndUpsertWaData(
     .innerJoin(schema.eventCatalog, eq(schema.event.catalogId, schema.eventCatalog.id))
     .where(eq(schema.event.editionId, edition.id))
 
-  const errors: string[] = []
   let matched = 0
 
   for (const perf of result.performances) {
@@ -238,10 +268,32 @@ export async function fetchAndUpsertWaData(
         personalBest: perf.personalBest,
         seasonBest: perf.seasonBest,
         worldRanking: perf.worldRanking,
+        eaRanking: eaRankingByCatalog.get(perf.catalogName) ?? null,
+      })
+      matched++
+      eaRankingByCatalog.delete(perf.catalogName)
+    } catch (err) {
+      errors.push(`Failed to upsert ${perf.catalogName}: ${err instanceof Error ? err.message : String(err)}`)
+    }
+  }
+
+  // Disciplines with an EA ranking but no WA PB/SB/ranking data still get upserted
+  for (const [catalogName, eaRanking] of eaRankingByCatalog) {
+    const eventMatch = events.find(e => e.catalog.name === catalogName)
+    if (!eventMatch) continue
+
+    try {
+      await upsertFn(db, {
+        athleteId,
+        eventId: eventMatch.event.id,
+        personalBest: null,
+        seasonBest: null,
+        worldRanking: null,
+        eaRanking,
       })
       matched++
     } catch (err) {
-      errors.push(`Failed to upsert ${perf.catalogName}: ${err instanceof Error ? err.message : String(err)}`)
+      errors.push(`Failed to upsert ${catalogName}: ${err instanceof Error ? err.message : String(err)}`)
     }
   }
 

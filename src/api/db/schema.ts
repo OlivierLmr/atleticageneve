@@ -25,6 +25,7 @@ export const edition = sqliteTable('edition', {
   weightCost: integer('weight_cost').notNull().default(10),
   bonusEap: integer('bonus_eap').notNull().default(5),
   managerTierBonus: integer('manager_tier_bonus').notNull().default(1),
+  eaRankingThreshold: integer('ea_ranking_threshold').notNull().default(30),
   createdAt: createdAt(),
   updatedAt: updatedAt(),
 })
@@ -38,6 +39,7 @@ export const eventCatalog = sqliteTable('event_catalog', {
   gender: text('gender').notNull(),
   waName: text('wa_name'),
   waRankingSlug: text('wa_ranking_slug'),
+  eaDiscipline: text('ea_discipline'),
 })
 
 // ── Event ─────────────────────────────────────────────────────────────────────
@@ -268,6 +270,7 @@ export const waPerformance = sqliteTable('wa_performance', {
   personalBest: real('personal_best'),
   seasonBest: real('season_best'),
   worldRanking: integer('world_ranking'),
+  eaRanking: integer('ea_ranking'),
 }, (table) => [
   uniqueIndex('idx_wa_perf_athlete_event').on(table.athleteId, table.eventId),
 ])

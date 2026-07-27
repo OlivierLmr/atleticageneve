@@ -18,6 +18,7 @@ export default function EventCatalogPage() {
   const [gender, setGender] = useState<'M' | 'F'>('M')
   const [waName, setWaName] = useState('')
   const [waRankingSlug, setWaRankingSlug] = useState('')
+  const [eaDiscipline, setEaDiscipline] = useState('')
   const [editingId, setEditingId] = useState<string | null>(null)
 
   const resetForm = () => {
@@ -26,6 +27,7 @@ export default function EventCatalogPage() {
     setGender('M')
     setWaName('')
     setWaRankingSlug('')
+    setEaDiscipline('')
     setEditingId(null)
   }
 
@@ -35,6 +37,7 @@ export default function EventCatalogPage() {
     gender,
     waName: waName.trim() || null,
     waRankingSlug: waRankingSlug.trim() || null,
+    eaDiscipline: eaDiscipline.trim() || null,
   })
 
   const addMutation = useMutation({
@@ -60,6 +63,7 @@ export default function EventCatalogPage() {
     setGender(item.gender as 'M' | 'F')
     setWaName(item.waName ?? '')
     setWaRankingSlug(item.waRankingSlug ?? '')
+    setEaDiscipline(item.eaDiscipline ?? '')
   }
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -141,6 +145,16 @@ export default function EventCatalogPage() {
               placeholder="100m"
             />
           </div>
+          <div className="flex-1">
+            <label className="block text-xs text-gray-500 mb-1">{t('admin.eaDiscipline')}</label>
+            <input
+              type="text"
+              value={eaDiscipline}
+              onChange={(e) => setEaDiscipline(e.target.value)}
+              className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-gray-900"
+              placeholder="Women's 100m"
+            />
+          </div>
           <button
             type="submit"
             disabled={addMutation.isPending || updateMutation.isPending}
@@ -156,6 +170,7 @@ export default function EventCatalogPage() {
           )}
         </div>
         <p className="text-xs text-gray-400">{t('admin.waDisciplineMapHint')}</p>
+        <p className="text-xs text-gray-400">{t('admin.eaDisciplineHint')}</p>
       </form>
 
       <div className="bg-white rounded-lg border">
@@ -167,6 +182,7 @@ export default function EventCatalogPage() {
               <th className="px-3 py-2 text-left font-medium">{t('athlete.gender')}</th>
               <th className="px-3 py-2 text-left font-medium">{t('admin.waName')}</th>
               <th className="px-3 py-2 text-left font-medium">{t('admin.waRankingSlug')}</th>
+              <th className="px-3 py-2 text-left font-medium">{t('admin.eaDiscipline')}</th>
               <th className="px-3 py-2 text-right font-medium">{t('common.actions')}</th>
             </tr>
           </thead>
@@ -178,6 +194,7 @@ export default function EventCatalogPage() {
                 <td className="px-3 py-2">{item.gender}</td>
                 <td className="px-3 py-2 text-gray-600">{item.waName ?? <span className="text-gray-300">—</span>}</td>
                 <td className="px-3 py-2 text-gray-400 font-mono text-xs">{item.waRankingSlug ?? <span className="text-gray-300">—</span>}</td>
+                <td className="px-3 py-2 text-gray-600">{item.eaDiscipline ?? <span className="text-gray-300">—</span>}</td>
                 <td className="px-3 py-2 text-right space-x-2">
                   <button onClick={() => startEdit(item)}
                     className="text-xs text-blue-600 hover:text-blue-800">
@@ -194,7 +211,7 @@ export default function EventCatalogPage() {
             ))}
             {items.length === 0 && (
               <tr>
-                <td colSpan={6} className="px-3 py-4 text-center text-gray-400 text-xs">
+                <td colSpan={7} className="px-3 py-4 text-center text-gray-400 text-xs">
                   {t('common.none')}
                 </td>
               </tr>

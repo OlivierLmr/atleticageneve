@@ -223,6 +223,7 @@ export const editionConfigSchema = z.object({
   weightCost: z.number().int().min(0).max(100).optional(),
   bonusEap: z.number().int().min(0).max(100).optional(),
   managerTierBonus: z.number().int().min(0).optional(),
+  eaRankingThreshold: z.number().int().min(0).optional(),
 }).refine((data) => {
   const hasAnyWeight = data.weightPB !== undefined || data.weightSB !== undefined ||
     data.weightRanking !== undefined || data.weightCost !== undefined
@@ -256,6 +257,7 @@ export const eventCatalogSchema = z.object({
   gender: z.enum(['M', 'F']),
   waName: z.string().min(1).nullable().optional(),
   waRankingSlug: z.string().nullable().optional(),
+  eaDiscipline: z.string().nullable().optional(),
 })
 
 // ── Country ───────────────────────────────────────────────────────────────────
@@ -303,6 +305,7 @@ export const waPerformanceSchema = z.object({
   personalBest: z.number().optional(),
   seasonBest: z.number().optional(),
   worldRanking: z.number().int().min(1).optional(),
+  eaRanking: z.number().int().min(1).optional(),
 })
 
 // ── Interaction ──────────────────────────────────────────────────────────────
