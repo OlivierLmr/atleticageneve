@@ -131,7 +131,6 @@ export default function ManagerRegisterPage() {
         eventIds: r.eventIds,
         isEap: r.isEap,
         eapCity: r.eapCity || undefined,
-        isSwiss: r.nationality === 'SUI',
         waProfileUrl: r.waProfileUrl || undefined,
         dateOfBirth: r.dateOfBirth || undefined,
       }))

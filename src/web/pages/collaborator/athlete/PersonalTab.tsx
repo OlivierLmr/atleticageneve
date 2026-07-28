@@ -41,7 +41,6 @@ export function PersonalTab({ athlete, isStaff, isAthleteOrManager, staffUsers, 
     { key: 'honours', label: t('athlete.honours'), type: 'text' },
     { key: 'distanceFromGva', label: t('athlete.distanceFromGva'), type: 'number' },
     { key: 'isEap', label: t('athlete.eapMember'), type: 'checkbox' },
-    { key: 'isSwiss', label: t('athlete.swiss'), type: 'checkbox' },
     { key: 'eapCity', label: t('athlete.eapCity'), type: 'select', options: [
       { value: '', label: '—' },
       ...eapCities.map(c => ({ value: c.id, label: c.name })),
