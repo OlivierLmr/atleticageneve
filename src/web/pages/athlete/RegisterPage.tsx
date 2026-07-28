@@ -91,7 +91,6 @@ export default function AthleteRegisterPage() {
         federation: form.federation || undefined,
         isEap: form.isEap,
         eapCity: form.eapCity || undefined,
-        isSwiss: form.nationality === 'SUI',
         swiLicence: form.swiLicence || undefined,
         athleteEmail: form.email,
         athletePhone: form.phone || undefined,

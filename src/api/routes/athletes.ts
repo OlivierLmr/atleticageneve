@@ -52,7 +52,7 @@ athletes.post('/', zValidator('json', athleteRegistrationSchema), async (c) => {
     gender: data.gender,
     federation: data.federation ?? null,
     isEap: data.isEap,
-    isSwiss: data.isSwiss,
+    isSwiss: data.nationality === 'SUI',
     distanceFromGva: data.distanceFromGva ?? 0,
     waProfileUrl: data.waProfileUrl ?? null,
     swiLicence: data.swiLicence ?? null,
@@ -228,6 +228,7 @@ athletes.post('/batch', requireAuth('manager'), zValidator('json', batchAthleteR
       nationality: data.nationality,
       gender: data.gender,
       isEap: data.isEap,
+      isSwiss: data.nationality === 'SUI',
       waProfileUrl: data.waProfileUrl ?? null,
       negotiationStatus: 'to_review',
     })
@@ -457,6 +458,9 @@ athletes.patch('/:id', requireAuth('athlete', 'manager', 'collaborator', 'commit
   }
 
   const updates: Record<string, unknown> = { ...data, updatedBy: user.id, updatedAt: new Date().toISOString() }
+  if ('nationality' in data) {
+    updates.isSwiss = data.nationality === 'SUI'
+  }
 
   await db
     .update(schema.athlete)
