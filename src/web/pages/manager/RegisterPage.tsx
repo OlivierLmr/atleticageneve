@@ -281,7 +281,7 @@ export default function ManagerRegisterPage() {
 
           <div className="flex items-center gap-3">
             {error && <p className="text-xs text-red-600">{error}</p>}
-            <Link to="/signup" className="text-xs text-gray-400 underline">{t('common.back')}</Link>
+            <Link to="/manager/portal" className="text-xs text-gray-400 underline">{t('common.back')}</Link>
             <button
               onClick={handleSubmit}
               disabled={submitting || validRows.length === 0}
