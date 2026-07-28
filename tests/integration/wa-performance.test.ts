@@ -184,6 +184,43 @@ describe('WA Performance API', () => {
       expect(typeof status.done).toBe('boolean')
     })
 
+    it('processes exactly one queued athlete per poll and cannot get stuck', async () => {
+      // Regression test: bulk refresh used to run entirely inside a single
+      // background waitUntil task, which could die partway through a large
+      // queue and leave completedCount frozen forever. Each poll now
+      // processes one athlete synchronously, so a fixed number of polls
+      // (one per queued athlete) always reaches done:true.
+      await createAthlete(ctx, { firstName: 'Queue', lastName: 'One', waProfileUrl: 'https://worldathletics.org/athletes/x-y/11111' })
+      await createAthlete(ctx, { firstName: 'Queue', lastName: 'Two', waProfileUrl: 'https://worldathletics.org/athletes/x-y/22222' })
+
+      const startRes = await ctx.request('/api/v1/wa-performance/refresh-all', {
+        method: 'POST',
+        headers: authHeaders(),
+      })
+      const { jobId, athletesQueued } = await startRes.json() as { jobId: string; athletesQueued: number }
+      expect(athletesQueued).toBeGreaterThanOrEqual(2)
+
+      let status: { totalCount: number; completedCount: number; done: boolean } | undefined
+      for (let i = 0; i < athletesQueued; i++) {
+        const res = await ctx.request(`/api/v1/wa-performance/refresh-all/${jobId}`, {
+          headers: authHeaders(),
+        })
+        status = await res.json() as any
+        expect(status!.completedCount).toBe(i + 1)
+      }
+
+      expect(status!.done).toBe(true)
+      expect(status!.completedCount).toBe(athletesQueued)
+
+      // Polling an already-finished job is a no-op and stays done.
+      const finalRes = await ctx.request(`/api/v1/wa-performance/refresh-all/${jobId}`, {
+        headers: authHeaders(),
+      })
+      const finalStatus = await finalRes.json() as any
+      expect(finalStatus.done).toBe(true)
+      expect(finalStatus.completedCount).toBe(athletesQueued)
+    })
+
     it('returns 404 for an unknown job id', async () => {
       const res = await ctx.request('/api/v1/wa-performance/refresh-all/non-existent-job', {
         headers: authHeaders(),

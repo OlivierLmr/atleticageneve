@@ -278,11 +278,19 @@ export const waPerformance = sqliteTable('wa_performance', {
 // ── WA Refresh Job ────────────────────────────────────────────────────────────
 // Tracks progress of a bulk WA/EA refresh so the UI can show "X/Y done" and know
 // when it's safe to stop polling and reload the applications table.
+//
+// `pendingAthleteIds` (JSON array) is the queue of athletes still to process.
+// Rather than scraping everything in one long-lived background task — which
+// Cloudflare Workers doesn't guarantee will run to completion — each status
+// poll from the UI processes exactly one athlete off this queue. Progress is
+// persisted to D1 after every athlete, so it survives isolate recycling and
+// naturally paces requests to WA/EA at the polling interval.
 
 export const waRefreshJob = sqliteTable('wa_refresh_job', {
   id: id(),
   totalCount: integer('total_count').notNull(),
   completedCount: integer('completed_count').notNull().default(0),
+  pendingAthleteIds: text('pending_athlete_ids').notNull().default('[]'),
   startedAt: text('started_at').notNull().default(sql`(datetime('now'))`),
   finishedAt: text('finished_at'),
 })
