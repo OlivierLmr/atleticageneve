@@ -431,7 +431,12 @@
     "fetching": "Fetching...",
     "fetchSuccess": "WA data updated: {{matched}} events matched from {{fetched}} scraped",
     "fetchError": "Failed to fetch WA data",
-    "noUrl": "No WA profile URL"
+    "noUrl": "No WA profile URL",
+    "refreshAll": "Refresh WA/EA",
+    "refreshingAll": "Starting...",
+    "refreshAllStarted": "Refresh started for {{count}} athlete(s). Data will update progressively over the next few minutes.",
+    "refreshAllNone": "No athlete has a WA profile URL set",
+    "refreshAllError": "Failed to start the refresh"
   },
   "emailPreview": {
     "title": "Email preview",

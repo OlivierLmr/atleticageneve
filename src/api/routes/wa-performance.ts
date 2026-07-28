@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
 import { zValidator } from '@hono/zod-validator'
-import { eq, and, desc } from 'drizzle-orm'
+import { eq, and, desc, isNotNull } from 'drizzle-orm'
 import * as schema from '../db/schema'
 import { waPerformanceSchema } from '@shared/validation'
 import { computeScore } from '@shared/scoring'
@@ -206,6 +206,34 @@ waPerformance.post('/fetch/:athleteId', async (c) => {
     if (message === 'No WA profile URL') return c.json({ error: message }, 400)
     return c.json({ error: message }, 500)
   }
+})
+
+// ── POST /wa-performance/refresh-all — bulk-refresh WA+EA data for every athlete with a profile URL ──
+// Scraping dozens of profiles can take minutes, so the work runs in the background via waitUntil;
+// the response only confirms how many athletes were queued.
+
+const REFRESH_ALL_CONCURRENCY = 5
+
+async function refreshAllWaData(db: Db, athleteIds: string[]): Promise<void> {
+  for (let i = 0; i < athleteIds.length; i += REFRESH_ALL_CONCURRENCY) {
+    const batch = athleteIds.slice(i, i + REFRESH_ALL_CONCURRENCY)
+    await Promise.all(
+      batch.map((athleteId) => fetchAndUpsertWaData(db, athleteId, upsertWaPerformance).catch(() => {})),
+    )
+  }
+}
+
+waPerformance.post('/refresh-all', async (c) => {
+  const db = c.get('db')
+
+  const athletes = await db
+    .select({ id: schema.athlete.id })
+    .from(schema.athlete)
+    .where(isNotNull(schema.athlete.waProfileUrl))
+
+  c.executionCtx.waitUntil(refreshAllWaData(db, athletes.map((a) => a.id)))
+
+  return c.json({ athletesQueued: athletes.length })
 })
 
 export default waPerformance
