@@ -209,37 +209,16 @@ waPerformance.post('/fetch/:athleteId', async (c) => {
 })
 
 // ── POST /wa-performance/refresh-all — bulk-refresh WA+EA data for every athlete with a profile URL ──
-// Scraping dozens of profiles can take minutes, so the work runs in the background via waitUntil.
-// Progress is tracked in wa_refresh_job so the UI can poll GET /refresh-all/:jobId and know when
-// the refresh has actually finished, instead of guessing with a fixed timeout.
+// Queues every athlete with a WA profile URL into a wa_refresh_job. No scraping happens here —
+// each athlete is processed one at a time, synchronously, by a GET /refresh-all/:jobId poll (see
+// below). This intentionally avoids Cloudflare Workers' waitUntil() for work that can take
+// minutes: waitUntil tasks aren't guaranteed to run to completion once detached from the
+// triggering request, so a long loop inside one can silently die partway through — which is
+// exactly what produced a progress counter that advances and then freezes forever.
 //
-// Requests run strictly one athlete at a time, with a pause in between. WA/EA both sit behind
-// bot-detection that a burst of concurrent requests can trip — once that happens it starts
-// blocking every request from us, including one-off single-athlete refreshes, until it clears.
-
-const REFRESH_ALL_DELAY_MS = 1_000
-
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms))
-}
-
-async function refreshAllWaData(db: Db, jobId: string, athleteIds: string[]): Promise<void> {
-  for (const athleteId of athleteIds) {
-    await fetchAndUpsertWaData(db, athleteId, upsertWaPerformance).catch(() => {})
-
-    await db
-      .update(schema.waRefreshJob)
-      .set({ completedCount: sql`${schema.waRefreshJob.completedCount} + 1` })
-      .where(eq(schema.waRefreshJob.id, jobId))
-
-    await sleep(REFRESH_ALL_DELAY_MS)
-  }
-
-  await db
-    .update(schema.waRefreshJob)
-    .set({ finishedAt: sql`(datetime('now'))` })
-    .where(eq(schema.waRefreshJob.id, jobId))
-}
+// Driving the work from the polling requests instead means every processed athlete happens
+// inside a real, live HTTP request, and progress is persisted to D1 after each one — so it can
+// never get stuck, and naturally paces requests to WA/EA at the poll interval instead of bursting.
 
 waPerformance.post('/refresh-all', async (c) => {
   const db = c.get('db')
@@ -249,15 +228,18 @@ waPerformance.post('/refresh-all', async (c) => {
     .from(schema.athlete)
     .where(isNotNull(schema.athlete.waProfileUrl))
 
+  const athleteIds = athletes.map((a) => a.id)
   const jobId = crypto.randomUUID()
-  await db.insert(schema.waRefreshJob).values({ id: jobId, totalCount: athletes.length })
+  await db.insert(schema.waRefreshJob).values({
+    id: jobId,
+    totalCount: athleteIds.length,
+    pendingAthleteIds: JSON.stringify(athleteIds),
+  })
 
-  c.executionCtx.waitUntil(refreshAllWaData(db, jobId, athletes.map((a) => a.id)))
-
-  return c.json({ jobId, athletesQueued: athletes.length })
+  return c.json({ jobId, athletesQueued: athleteIds.length })
 })
 
-// ── GET /wa-performance/refresh-all/:jobId — poll progress of a bulk refresh ─
+// ── GET /wa-performance/refresh-all/:jobId — poll progress, and process the next queued athlete ──
 
 waPerformance.get('/refresh-all/:jobId', async (c) => {
   const db = c.get('db')
@@ -271,11 +253,30 @@ waPerformance.get('/refresh-all/:jobId', async (c) => {
 
   if (!job) return c.json({ error: 'Job not found' }, 404)
 
-  return c.json({
-    totalCount: job.totalCount,
-    completedCount: job.completedCount,
-    done: job.finishedAt !== null,
-  })
+  if (job.finishedAt !== null) {
+    return c.json({ totalCount: job.totalCount, completedCount: job.completedCount, done: true })
+  }
+
+  const pending: string[] = JSON.parse(job.pendingAthleteIds)
+  const [nextAthleteId, ...rest] = pending
+
+  if (nextAthleteId) {
+    await fetchAndUpsertWaData(db, nextAthleteId, upsertWaPerformance).catch(() => {})
+  }
+
+  const completedCount = job.completedCount + (nextAthleteId ? 1 : 0)
+  const done = rest.length === 0
+
+  await db
+    .update(schema.waRefreshJob)
+    .set({
+      completedCount,
+      pendingAthleteIds: JSON.stringify(rest),
+      finishedAt: done ? sql`(datetime('now'))` : null,
+    })
+    .where(eq(schema.waRefreshJob.id, jobId))
+
+  return c.json({ totalCount: job.totalCount, completedCount, done })
 })
 
 export default waPerformance
