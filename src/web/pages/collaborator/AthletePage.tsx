@@ -283,7 +283,9 @@ export default function AthletePage() {
                       </span>
                     )}
                     {mutations.waFetchMutation.isError && (
-                      <span className="text-xs text-red-600">{t('wa.fetchError')}</span>
+                      <span className="text-xs text-red-600" title={(mutations.waFetchMutation.error as Error)?.message}>
+                        {t('wa.fetchError')}
+                      </span>
                     )}
                   </span>
                 ) : (
