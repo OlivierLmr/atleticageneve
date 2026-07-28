@@ -323,6 +323,88 @@ describe('Application Workflow API', () => {
     })
   })
 
+  // ── Add event application ───────────────────────────────────────────────
+
+  describe('Add event application', () => {
+    it('adds a new pending application for an eligible event', async () => {
+      const athleteId = await createAthlete(ctx, { editionId, gender: 'M' })
+      const newEventId = await createEvent(ctx, editionId)
+
+      const res = await ctx.request(`/api/v1/athletes/${athleteId}/applications`, {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify({ eventId: newEventId }),
+      })
+      expect(res.status).toBe(201)
+      const body = await res.json() as any
+      expect(body.participationStatus).toBe('pending')
+
+      const detailRes = await ctx.request(`/api/v1/athletes/${athleteId}`, {
+        headers: authHeaders(),
+      })
+      const detail = await detailRes.json() as any
+      expect(detail.applications.some((a: any) => a.eventId === newEventId)).toBe(true)
+      expect(detail.interactions.some((i: any) => i.content.includes('Additional event application'))).toBe(true)
+    })
+
+    it('rejects when the event gender does not match the athlete gender', async () => {
+      const athleteId = await createAthlete(ctx, { editionId, gender: 'F' })
+      const newEventId = await createEvent(ctx, editionId, { catalogId: 'cat-100m-M' })
+
+      const res = await ctx.request(`/api/v1/athletes/${athleteId}/applications`, {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify({ eventId: newEventId }),
+      })
+      expect(res.status).toBe(400)
+    })
+
+    it('rejects a duplicate application for the same event', async () => {
+      const { athleteId, eventId: existingEventId } = await freshApp()
+
+      const res = await ctx.request(`/api/v1/athletes/${athleteId}/applications`, {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify({ eventId: existingEventId }),
+      })
+      expect(res.status).toBe(409)
+    })
+
+    it('allows the athlete themselves to add a participation request', async () => {
+      const { token: athleteToken, userId: athUserId } = await createUserWithSession(ctx, {
+        role: 'athlete',
+        firstName: 'Self',
+        lastName: 'Registered',
+      })
+      const athleteId = await createAthlete(ctx, { editionId, gender: 'M', userId: athUserId })
+      const newEventId = await createEvent(ctx, editionId)
+
+      const res = await ctx.request(`/api/v1/athletes/${athleteId}/applications`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${athleteToken}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ eventId: newEventId }),
+      })
+      expect(res.status).toBe(201)
+    })
+
+    it('rejects an athlete adding a request for another athlete', async () => {
+      const { token: athleteToken } = await createUserWithSession(ctx, {
+        role: 'athlete',
+        firstName: 'Other',
+        lastName: 'Athlete',
+      })
+      const athleteId = await createAthlete(ctx, { editionId, gender: 'M' })
+      const newEventId = await createEvent(ctx, editionId)
+
+      const res = await ctx.request(`/api/v1/athletes/${athleteId}/applications`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${athleteToken}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ eventId: newEventId }),
+      })
+      expect(res.status).toBe(403)
+    })
+  })
+
   // ── Authorization ─────────────────────────────────────────────────────────
 
   describe('Authorization', () => {

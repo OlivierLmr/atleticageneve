@@ -284,7 +284,11 @@
     "available": "Disponible",
     "selectionStatus": "Statut de sélection",
     "changeSelectionStatus": "Changer le statut de sélection",
-    "confirmStatusChangeTo": "Confirmer le changement vers"
+    "confirmStatusChangeTo": "Confirmer le changement vers",
+    "addEvent": "Ajouter une épreuve",
+    "addEventTitle": "Ajouter une participation à une épreuve",
+    "selectEventPlaceholder": "Choisir une épreuve",
+    "noEventsAvailable": "Aucune épreuve supplémentaire disponible pour ce genre"
   },
   "collaborator": {
     "personalData": "Données personnelles",

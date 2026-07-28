@@ -284,7 +284,11 @@
     "available": "Available",
     "selectionStatus": "Selection status",
     "changeSelectionStatus": "Change selection status",
-    "confirmStatusChangeTo": "Confirm change to"
+    "confirmStatusChangeTo": "Confirm change to",
+    "addEvent": "Add event",
+    "addEventTitle": "Add participation to an event",
+    "selectEventPlaceholder": "Select an event",
+    "noEventsAvailable": "No additional events available for this gender"
   },
   "collaborator": {
     "personalData": "Personal Data",

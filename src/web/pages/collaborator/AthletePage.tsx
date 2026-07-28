@@ -8,7 +8,7 @@ import { STATUS_COLORS } from '@web/lib/ui-constants'
 import type { NegotiationStatus } from '@shared/types'
 import { defaultAgreement } from './athlete/types'
 import type { AgreementFormDraft } from './athlete/types'
-import { useAthleteData, useAthleteMutations, useEmailQuery } from './athlete/useAthleteData'
+import { useAthleteData, useAthleteMutations, useEmailQuery, useAvailableEventsQuery } from './athlete/useAthleteData'
 import { BannerEventRow, CostPopup } from './athlete/BannerEventRow'
 import { PersonalTab } from './athlete/PersonalTab'
 import { NegotiationTab } from './athlete/NegotiationTab'
@@ -19,6 +19,7 @@ import {
   CounterOfferModal,
   MessageModal,
   AgreementFormModal,
+  AddApplicationModal,
 } from './athlete/modals'
 
 export default function AthletePage() {
@@ -52,8 +53,10 @@ export default function AthletePage() {
   const [agreementInitialized, setAgreementInitialized] = useState(false)
   const [editingWaUrl, setEditingWaUrl] = useState(false)
   const [waUrlDraft, setWaUrlDraft] = useState('')
+  const [showAddApplicationModal, setShowAddApplicationModal] = useState(false)
 
   const { data: viewingEmail } = useEmailQuery(viewingEmailId)
+  const { data: eventsForGender = [] } = useAvailableEventsQuery(athlete?.gender)
 
   // Initialize agreement form from latest agreement once
   const latestAgreement = athlete?.agreements?.length
@@ -125,6 +128,9 @@ export default function AthletePage() {
   const costLabel = costMode === 'confirmed' ? t('selection.confirmedCostLabel') :
     costMode === 'negotiating' ? t('selection.costInNegotiation') :
     t('selection.estimatedCostLabel')
+
+  const appliedEventIds = new Set(athlete.applications.map(a => a.eventId))
+  const availableEvents = eventsForGender.filter(evt => !appliedEventIds.has(evt.id))
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -436,29 +442,35 @@ export default function AthletePage() {
           )}
 
           {/* Events in banner */}
-          {athlete.applications.length > 0 && (
-            <div className="mt-4 border-t pt-3">
-              <div className="text-xs font-semibold text-gray-500 mb-1">{t('selection.participation')}</div>
-              {athlete.applications.map(app => (
-                <BannerEventRow
-                  key={app.id}
-                  app={app}
-                  athlete={athlete}
-                  edition={athlete.edition}
-                  isStaff={!!isStaff}
-                  onParticipationChange={(appId, status) =>
-                    mutations.participationMutation.mutate({ appId, status })
-                  }
-                  onRescore={(appId) => mutations.scoreMutation.mutate(appId)}
-                  onWaPerfSave={(athleteId, eventId, data) =>
-                    mutations.waPerfMutation.mutate({ athleteId, eventId, ...data })
-                  }
-                  isPendingParticipation={mutations.participationMutation.isPending}
-                  t={t}
-                />
-              ))}
+          <div className="mt-4 border-t pt-3">
+            <div className="flex items-center justify-between mb-1">
+              <div className="text-xs font-semibold text-gray-500">{t('selection.participation')}</div>
+              <button
+                onClick={() => setShowAddApplicationModal(true)}
+                className="text-[10px] text-blue-600 hover:text-blue-800 font-medium"
+              >
+                + {t('selection.addEvent')}
+              </button>
             </div>
-          )}
+            {athlete.applications.map(app => (
+              <BannerEventRow
+                key={app.id}
+                app={app}
+                athlete={athlete}
+                edition={athlete.edition}
+                isStaff={!!isStaff}
+                onParticipationChange={(appId, status) =>
+                  mutations.participationMutation.mutate({ appId, status })
+                }
+                onRescore={(appId) => mutations.scoreMutation.mutate(appId)}
+                onWaPerfSave={(athleteId, eventId, data) =>
+                  mutations.waPerfMutation.mutate({ athleteId, eventId, ...data })
+                }
+                isPendingParticipation={mutations.participationMutation.isPending}
+                t={t}
+              />
+            ))}
+          </div>
         </div>
 
         {/* Tab navigation */}
@@ -558,6 +570,18 @@ export default function AthletePage() {
 
       {viewingEmailId && (
         <EmailPopupModal email={viewingEmail} onClose={() => setViewingEmailId(null)} />
+      )}
+
+      {showAddApplicationModal && (
+        <AddApplicationModal
+          events={availableEvents}
+          onSubmit={(eventId) => mutations.addApplicationMutation.mutate(eventId, {
+            onSuccess: () => setShowAddApplicationModal(false),
+          })}
+          onClose={() => setShowAddApplicationModal(false)}
+          isPending={mutations.addApplicationMutation.isPending}
+          error={mutations.addApplicationMutation.error}
+        />
       )}
 
       {showAgreementForm && isStaff && (

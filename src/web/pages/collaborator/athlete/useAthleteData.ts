@@ -110,6 +110,12 @@ export function useAthleteMutations(id: string | undefined) {
     onSuccess: invalidate,
   })
 
+  const addApplicationMutation = useMutation({
+    mutationFn: (eventId: string) =>
+      api.post(`/api/v1/athletes/${id}/applications`, { eventId }),
+    onSuccess: invalidate,
+  })
+
   const archiveMutation = useMutation({
     mutationFn: () => api.delete(`/api/v1/athletes/${id}`),
     onSuccess: () => navigate(
@@ -132,8 +138,17 @@ export function useAthleteMutations(id: string | undefined) {
     waFetchMutation,
     counterOfferMutation,
     freeMessageMutation,
+    addApplicationMutation,
     archiveMutation,
   }
+}
+
+export function useAvailableEventsQuery(gender: string | undefined) {
+  return useQuery<{ id: string; name: string; discipline: string; gender: string }[]>({
+    queryKey: ['events', gender],
+    queryFn: () => api.get(`/api/v1/events?gender=${gender}`),
+    enabled: !!gender,
+  })
 }
 
 export function useEmailQuery(emailId: string | null) {
