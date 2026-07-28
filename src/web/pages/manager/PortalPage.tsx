@@ -100,9 +100,6 @@ export default function ManagerPortalPage() {
                 {t('auth.logout')}
               </button>
             )}
-            <Link to="/manager/register" className="text-xs text-blue-600 hover:text-blue-800 border border-blue-200 rounded px-2 py-1">
-              + {t('manager.addAthlete')}
-            </Link>
             <LanguageSwitcher />
           </div>
         </div>
@@ -193,6 +190,9 @@ export default function ManagerPortalPage() {
             ))}
           </select>
           <span className="text-xs text-gray-400 ml-auto">{filtered.length} {t('common.athletes')}</span>
+          <Link to="/manager/register" className="text-xs text-blue-600 hover:text-blue-800 border border-blue-200 rounded px-2 py-1">
+            + {t('manager.addAthlete')}
+          </Link>
         </div>
 
         {/* Athletes table */}
