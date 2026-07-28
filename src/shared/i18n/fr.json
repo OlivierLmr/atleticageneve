@@ -435,6 +435,8 @@
     "refreshAll": "Actualiser WA/EA",
     "refreshingAll": "Lancement...",
     "refreshAllStarted": "Rafraîchissement lancé pour {{count}} athlète(s). Les données seront mises à jour progressivement dans les prochaines minutes.",
+    "refreshAllProgress": "Rafraîchissement en cours : {{completed}}/{{total}} athlète(s) traité(s)...",
+    "refreshAllDone": "Rafraîchissement terminé pour {{count}} athlète(s). Le tableau a été mis à jour.",
     "refreshAllNone": "Aucun athlète n'a d'URL de profil WA renseignée",
     "refreshAllError": "Échec du lancement du rafraîchissement"
   },

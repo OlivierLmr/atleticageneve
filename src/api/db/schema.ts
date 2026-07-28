@@ -275,6 +275,18 @@ export const waPerformance = sqliteTable('wa_performance', {
   uniqueIndex('idx_wa_perf_athlete_event').on(table.athleteId, table.eventId),
 ])
 
+// ── WA Refresh Job ────────────────────────────────────────────────────────────
+// Tracks progress of a bulk WA/EA refresh so the UI can show "X/Y done" and know
+// when it's safe to stop polling and reload the applications table.
+
+export const waRefreshJob = sqliteTable('wa_refresh_job', {
+  id: id(),
+  totalCount: integer('total_count').notNull(),
+  completedCount: integer('completed_count').notNull().default(0),
+  startedAt: text('started_at').notNull().default(sql`(datetime('now'))`),
+  finishedAt: text('finished_at'),
+})
+
 // ── Session ───────────────────────────────────────────────────────────────────
 
 export const session = sqliteTable('session', {

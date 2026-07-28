@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef } from 'react'
+import { useState, useMemo, useRef, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { useTranslation } from 'react-i18next'
 import { Link, useSearchParams } from 'react-router-dom'
@@ -584,21 +584,43 @@ export default function CandidatesPage() {
     },
   })
 
+  const [refreshJobId, setRefreshJobId] = useState<string | null>(null)
+
   const refreshAllMutation = useMutation({
-    mutationFn: () => api.post<{ athletesQueued: number }>('/api/v1/wa-performance/refresh-all'),
-    onSuccess: ({ athletesQueued }) => {
-      setRefreshMessage(
-        athletesQueued > 0
-          ? t('wa.refreshAllStarted', { count: athletesQueued })
-          : t('wa.refreshAllNone')
-      )
-      // Scraping happens in the background; poll for updated data a couple of times.
-      for (const delay of [20_000, 60_000, 120_000]) {
-        setTimeout(() => queryClient.invalidateQueries({ queryKey: ['applications'] }), delay)
+    mutationFn: () => api.post<{ jobId: string; athletesQueued: number }>('/api/v1/wa-performance/refresh-all'),
+    onSuccess: ({ jobId, athletesQueued }) => {
+      if (athletesQueued > 0) {
+        setRefreshMessage(t('wa.refreshAllStarted', { count: athletesQueued }))
+        setRefreshJobId(jobId)
+      } else {
+        setRefreshMessage(t('wa.refreshAllNone'))
       }
     },
     onError: () => setRefreshMessage(t('wa.refreshAllError')),
   })
+
+  const refreshStatusQuery = useQuery({
+    queryKey: ['wa-refresh-status', refreshJobId],
+    queryFn: () =>
+      api.get<{ totalCount: number; completedCount: number; done: boolean }>(
+        `/api/v1/wa-performance/refresh-all/${refreshJobId}`
+      ),
+    enabled: refreshJobId !== null,
+    refetchInterval: (query) => (query.state.data?.done ? false : 3000),
+  })
+
+  useEffect(() => {
+    const status = refreshStatusQuery.data
+    if (!status || refreshJobId === null) return
+
+    if (status.done) {
+      setRefreshMessage(t('wa.refreshAllDone', { count: status.totalCount }))
+      queryClient.invalidateQueries({ queryKey: ['applications'] })
+      setRefreshJobId(null)
+    } else {
+      setRefreshMessage(t('wa.refreshAllProgress', { completed: status.completedCount, total: status.totalCount }))
+    }
+  }, [refreshStatusQuery.data, refreshJobId, t, queryClient])
 
   const getSortValue = (app: ApplicationRow): string | number => {
     const pb = app.waPerformance?.personalBest ?? app.personalBest
@@ -702,13 +724,13 @@ export default function CandidatesPage() {
           <div className="flex items-center gap-3">
             <button
               className="text-xs border border-gray-300 rounded px-2.5 py-1.5 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
-              disabled={refreshAllMutation.isPending}
+              disabled={refreshAllMutation.isPending || refreshJobId !== null}
               onClick={() => {
                 setRefreshMessage(null)
                 refreshAllMutation.mutate()
               }}
             >
-              {refreshAllMutation.isPending ? t('wa.refreshingAll') : `↻ ${t('wa.refreshAll')}`}
+              {refreshAllMutation.isPending || refreshJobId !== null ? t('wa.refreshingAll') : `↻ ${t('wa.refreshAll')}`}
             </button>
             <LanguageSwitcher />
           </div>

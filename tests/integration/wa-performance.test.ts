@@ -146,7 +146,7 @@ describe('WA Performance API', () => {
   })
 
   describe('POST /api/v1/wa-performance/refresh-all', () => {
-    it('queues only athletes with a WA profile URL', async () => {
+    it('queues only athletes with a WA profile URL and returns a job id', async () => {
       await createAthlete(ctx, { firstName: 'No', lastName: 'Url' })
       await createAthlete(ctx, { firstName: 'With', lastName: 'Url', waProfileUrl: 'https://worldathletics.org/athletes/x-y/12345' })
 
@@ -157,10 +157,42 @@ describe('WA Performance API', () => {
       expect(res.status).toBe(200)
       const body = await res.json() as any
       expect(body.athletesQueued).toBe(1)
+      expect(typeof body.jobId).toBe('string')
     })
 
     it('rejects unauthenticated requests', async () => {
       const res = await ctx.request('/api/v1/wa-performance/refresh-all', { method: 'POST' })
+      expect(res.status).toBe(401)
+    })
+  })
+
+  describe('GET /api/v1/wa-performance/refresh-all/:jobId', () => {
+    it('reports progress and marks the job done once queued athletes are processed', async () => {
+      const startRes = await ctx.request('/api/v1/wa-performance/refresh-all', {
+        method: 'POST',
+        headers: authHeaders(),
+      })
+      const { jobId, athletesQueued } = await startRes.json() as { jobId: string; athletesQueued: number }
+
+      const statusRes = await ctx.request(`/api/v1/wa-performance/refresh-all/${jobId}`, {
+        headers: authHeaders(),
+      })
+      expect(statusRes.status).toBe(200)
+      const status = await statusRes.json() as any
+      expect(status.totalCount).toBe(athletesQueued)
+      expect(typeof status.completedCount).toBe('number')
+      expect(typeof status.done).toBe('boolean')
+    })
+
+    it('returns 404 for an unknown job id', async () => {
+      const res = await ctx.request('/api/v1/wa-performance/refresh-all/non-existent-job', {
+        headers: authHeaders(),
+      })
+      expect(res.status).toBe(404)
+    })
+
+    it('rejects unauthenticated requests', async () => {
+      const res = await ctx.request('/api/v1/wa-performance/refresh-all/some-id')
       expect(res.status).toBe(401)
     })
   })
