@@ -212,24 +212,27 @@ waPerformance.post('/fetch/:athleteId', async (c) => {
 // Scraping dozens of profiles can take minutes, so the work runs in the background via waitUntil.
 // Progress is tracked in wa_refresh_job so the UI can poll GET /refresh-all/:jobId and know when
 // the refresh has actually finished, instead of guessing with a fixed timeout.
+//
+// Requests run strictly one athlete at a time, with a pause in between. WA/EA both sit behind
+// bot-detection that a burst of concurrent requests can trip — once that happens it starts
+// blocking every request from us, including one-off single-athlete refreshes, until it clears.
 
-const REFRESH_ALL_CONCURRENCY = 5
+const REFRESH_ALL_DELAY_MS = 1_000
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
 
 async function refreshAllWaData(db: Db, jobId: string, athleteIds: string[]): Promise<void> {
-  for (let i = 0; i < athleteIds.length; i += REFRESH_ALL_CONCURRENCY) {
-    const batch = athleteIds.slice(i, i + REFRESH_ALL_CONCURRENCY)
-    await Promise.all(
-      batch.map((athleteId) =>
-        fetchAndUpsertWaData(db, athleteId, upsertWaPerformance)
-          .catch(() => {})
-          .finally(() =>
-            db
-              .update(schema.waRefreshJob)
-              .set({ completedCount: sql`${schema.waRefreshJob.completedCount} + 1` })
-              .where(eq(schema.waRefreshJob.id, jobId)),
-          ),
-      ),
-    )
+  for (const athleteId of athleteIds) {
+    await fetchAndUpsertWaData(db, athleteId, upsertWaPerformance).catch(() => {})
+
+    await db
+      .update(schema.waRefreshJob)
+      .set({ completedCount: sql`${schema.waRefreshJob.completedCount} + 1` })
+      .where(eq(schema.waRefreshJob.id, jobId))
+
+    await sleep(REFRESH_ALL_DELAY_MS)
   }
 
   await db
