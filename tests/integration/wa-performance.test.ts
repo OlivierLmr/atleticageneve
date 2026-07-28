@@ -145,6 +145,26 @@ describe('WA Performance API', () => {
     })
   })
 
+  describe('POST /api/v1/wa-performance/refresh-all', () => {
+    it('queues only athletes with a WA profile URL', async () => {
+      await createAthlete(ctx, { firstName: 'No', lastName: 'Url' })
+      await createAthlete(ctx, { firstName: 'With', lastName: 'Url', waProfileUrl: 'https://worldathletics.org/athletes/x-y/12345' })
+
+      const res = await ctx.request('/api/v1/wa-performance/refresh-all', {
+        method: 'POST',
+        headers: authHeaders(),
+      })
+      expect(res.status).toBe(200)
+      const body = await res.json() as any
+      expect(body.athletesQueued).toBe(1)
+    })
+
+    it('rejects unauthenticated requests', async () => {
+      const res = await ctx.request('/api/v1/wa-performance/refresh-all', { method: 'POST' })
+      expect(res.status).toBe(401)
+    })
+  })
+
   describe('Authorization', () => {
     it('rejects unauthenticated requests', async () => {
       const res = await ctx.request(`/api/v1/wa-performance?athleteId=${athleteId}`)

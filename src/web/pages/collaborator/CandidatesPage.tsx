@@ -476,6 +476,7 @@ export default function CandidatesPage() {
   const queryClient = useQueryClient()
   const [searchParams, setSearchParams] = useSearchParams()
   const [statusModal, setStatusModal] = useState<StatusModal | null>(null)
+  const [refreshMessage, setRefreshMessage] = useState<string | null>(null)
 
   // Filter state derived from URL search params
   const eventFilter = searchParams.get('event') ?? ''
@@ -583,6 +584,22 @@ export default function CandidatesPage() {
     },
   })
 
+  const refreshAllMutation = useMutation({
+    mutationFn: () => api.post<{ athletesQueued: number }>('/api/v1/wa-performance/refresh-all'),
+    onSuccess: ({ athletesQueued }) => {
+      setRefreshMessage(
+        athletesQueued > 0
+          ? t('wa.refreshAllStarted', { count: athletesQueued })
+          : t('wa.refreshAllNone')
+      )
+      // Scraping happens in the background; poll for updated data a couple of times.
+      for (const delay of [20_000, 60_000, 120_000]) {
+        setTimeout(() => queryClient.invalidateQueries({ queryKey: ['applications'] }), delay)
+      }
+    },
+    onError: () => setRefreshMessage(t('wa.refreshAllError')),
+  })
+
   const getSortValue = (app: ApplicationRow): string | number => {
     const pb = app.waPerformance?.personalBest ?? app.personalBest
     const sb = app.waPerformance?.seasonBest ?? app.seasonBest
@@ -683,12 +700,28 @@ export default function CandidatesPage() {
             <span className="text-lg font-bold">{t('selection.title')}</span>
           </div>
           <div className="flex items-center gap-3">
+            <button
+              className="text-xs border border-gray-300 rounded px-2.5 py-1.5 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+              disabled={refreshAllMutation.isPending}
+              onClick={() => {
+                setRefreshMessage(null)
+                refreshAllMutation.mutate()
+              }}
+            >
+              {refreshAllMutation.isPending ? t('wa.refreshingAll') : `↻ ${t('wa.refreshAll')}`}
+            </button>
             <LanguageSwitcher />
           </div>
         </div>
       </div>
 
       <div className="max-w-7xl mx-auto px-6 py-6">
+        {refreshMessage && (
+          <div className="mb-4 text-xs text-blue-700 bg-blue-50 border border-blue-100 rounded-lg px-3 py-2">
+            {refreshMessage}
+          </div>
+        )}
+
         {/* Stats bar */}
         <div className="grid grid-cols-4 gap-4 mb-6">
           {[

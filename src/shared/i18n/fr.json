@@ -431,7 +431,12 @@
     "fetching": "Récupération...",
     "fetchSuccess": "Données WA mises à jour : {{matched}} épreuves trouvées sur {{fetched}} récupérées",
     "fetchError": "Échec de la récupération des données WA",
-    "noUrl": "Pas d'URL de profil WA"
+    "noUrl": "Pas d'URL de profil WA",
+    "refreshAll": "Actualiser WA/EA",
+    "refreshingAll": "Lancement...",
+    "refreshAllStarted": "Rafraîchissement lancé pour {{count}} athlète(s). Les données seront mises à jour progressivement dans les prochaines minutes.",
+    "refreshAllNone": "Aucun athlète n'a d'URL de profil WA renseignée",
+    "refreshAllError": "Échec du lancement du rafraîchissement"
   },
   "emailPreview": {
     "title": "Aperçu du mail envoyé",
