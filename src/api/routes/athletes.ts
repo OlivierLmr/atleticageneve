@@ -2,7 +2,7 @@ import { Hono } from 'hono'
 import { zValidator } from '@hono/zod-validator'
 import { and, eq, isNotNull, isNull, or, sql } from 'drizzle-orm'
 import * as schema from '../db/schema'
-import { athleteRegistrationSchema, batchAthleteRegistrationSchema, athleteUpdateSchema, negotiationStatusChangeSchema, interactionSchema } from '@shared/validation'
+import { athleteRegistrationSchema, batchAthleteRegistrationSchema, athleteUpdateSchema, negotiationStatusChangeSchema, interactionSchema, applicationCreateSchema } from '@shared/validation'
 import { NEGOTIATION_TRANSITIONS, COMMITTEE_EXTRA_TRANSITIONS, ATHLETE_TRANSITIONS } from '@shared/constants'
 import { requireAuth } from '../middleware/auth'
 import { sendEmail, sendApplicationEmail, buildTransitionEmail, buildManagerAthleteNotificationEmail, buildBatchNotificationEmail } from '../services/email'
@@ -728,6 +728,80 @@ athletes.post('/:id/interactions', requireAuth('athlete', 'manager', 'collaborat
   })
 
   return c.json({ id: interactionId }, 201)
+})
+
+// ── POST /athletes/:id/applications — add participation request to an event ──
+
+athletes.post('/:id/applications', requireAuth('athlete', 'manager', 'collaborator', 'committee'), zValidator('json', applicationCreateSchema), async (c) => {
+  const db = c.get('db')
+  const user = c.get('user')!
+  const id = c.req.param('id')!
+  const { eventId } = c.req.valid('json')
+
+  const athRows = await db.select().from(schema.athlete).where(eq(schema.athlete.id, id)).limit(1)
+  if (athRows.length === 0) {
+    return c.json({ error: 'Athlete not found' }, 404)
+  }
+  const ath = athRows[0]
+
+  // Ownership check for athlete/manager
+  const staff = isStaff(user.role)
+  if (!staff) {
+    if (ath.userId !== user.id && ath.managerId !== user.id) {
+      return c.json({ error: 'Not authorized to act on this athlete' }, 403)
+    }
+  }
+
+  // Verify event exists and matches the athlete's edition and gender
+  const eventRows = await db
+    .select({ event: schema.event, catalog: schema.eventCatalog })
+    .from(schema.event)
+    .innerJoin(schema.eventCatalog, eq(schema.event.catalogId, schema.eventCatalog.id))
+    .where(eq(schema.event.id, eventId))
+    .limit(1)
+  if (eventRows.length === 0) {
+    return c.json({ error: 'Event not found' }, 404)
+  }
+  const { event: evt, catalog } = eventRows[0]
+
+  if (ath.editionId !== evt.editionId) {
+    return c.json({ error: "Event does not belong to the athlete's edition" }, 400)
+  }
+  if (catalog.gender !== ath.gender) {
+    return c.json({ error: 'Event gender does not match athlete gender' }, 400)
+  }
+
+  const existing = await db
+    .select()
+    .from(schema.application)
+    .where(and(eq(schema.application.athleteId, id), eq(schema.application.eventId, eventId)))
+    .limit(1)
+  if (existing.length > 0) {
+    return c.json({ error: 'Athlete already has an application for this event' }, 409)
+  }
+
+  const applicationId = crypto.randomUUID()
+  await db.insert(schema.application).values({
+    id: applicationId,
+    athleteId: id,
+    eventId,
+    editionId: evt.editionId,
+    participationStatus: 'pending',
+  })
+
+  const eventName = `${catalog.name} ${catalog.gender === 'M' ? 'Men' : 'Women'}`
+  await db.insert(schema.interaction).values({
+    athleteId: id,
+    applicationId,
+    type: 'status_change',
+    content: `[${eventName}] Additional event application submitted by ${user.firstName} ${user.lastName}`,
+    authorId: user.id,
+    authorName: `${user.firstName} ${user.lastName}`,
+    authorRole: user.role,
+    createdAt: new Date().toISOString(),
+  })
+
+  return c.json({ id: applicationId, eventId, participationStatus: 'pending' }, 201)
 })
 
 export default athletes

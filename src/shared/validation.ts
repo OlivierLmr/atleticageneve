@@ -308,6 +308,12 @@ export const waPerformanceSchema = z.object({
   eaRanking: z.number().int().min(1).optional(),
 })
 
+// ── Application create (add participation to an event) ──────────────────────
+
+export const applicationCreateSchema = z.object({
+  eventId: z.string().min(1),
+})
+
 // ── Interaction ──────────────────────────────────────────────────────────────
 
 export const interactionSchema = z.object({

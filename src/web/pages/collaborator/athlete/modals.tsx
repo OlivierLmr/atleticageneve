@@ -220,6 +220,59 @@ export function MessageModal({ text, onTextChange, onSubmit, onCancel, isPending
   )
 }
 
+// ── Add event application modal ─────────────────────────────────────────────
+
+export function AddApplicationModal({ events, onSubmit, onClose, isPending, error }: {
+  events: { id: string; name: string; discipline: string; gender: string }[]
+  onSubmit: (eventId: string) => void
+  onClose: () => void
+  isPending: boolean
+  error: Error | null
+}) {
+  const { t } = useTranslation()
+  const [eventId, setEventId] = useState('')
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30" onClick={onClose}>
+      <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4 p-6" onClick={e => e.stopPropagation()}>
+        <h3 className="font-semibold text-sm mb-3">{t('selection.addEventTitle')}</h3>
+        {events.length === 0 ? (
+          <p className="text-sm text-gray-500">{t('selection.noEventsAvailable')}</p>
+        ) : (
+          <select
+            className="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-gray-900"
+            value={eventId}
+            onChange={e => setEventId(e.target.value)}
+          >
+            <option value="">— {t('selection.selectEventPlaceholder')} —</option>
+            {events.map(evt => (
+              <option key={evt.id} value={evt.id}>{evt.name}</option>
+            ))}
+          </select>
+        )}
+        {error && (
+          <p className="text-xs text-red-600 mt-2">{error.message || t('common.error')}</p>
+        )}
+        <div className="flex gap-2 justify-end mt-4">
+          <button
+            onClick={onClose}
+            className="text-xs px-3 py-1.5 rounded border border-gray-300 hover:bg-gray-50"
+          >
+            {t('common.cancel')}
+          </button>
+          <button
+            onClick={() => eventId && onSubmit(eventId)}
+            disabled={isPending || !eventId}
+            className="text-xs px-3 py-1.5 rounded font-medium bg-gray-900 text-white hover:bg-gray-800 disabled:opacity-50"
+          >
+            {isPending ? t('common.loading') : t('common.submit')}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── Agreement form modal ────────────────────────────────────────────────────
 
 export function AgreementFormModal({ form, onChange, allRooms, athlete, onSubmit, onClose, isPending, error }: {
