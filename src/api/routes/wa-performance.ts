@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
 import { zValidator } from '@hono/zod-validator'
-import { eq, and, desc, isNotNull } from 'drizzle-orm'
+import { eq, and, desc, isNotNull, sql } from 'drizzle-orm'
 import * as schema from '../db/schema'
 import { waPerformanceSchema } from '@shared/validation'
 import { computeScore } from '@shared/scoring'
@@ -209,18 +209,33 @@ waPerformance.post('/fetch/:athleteId', async (c) => {
 })
 
 // ── POST /wa-performance/refresh-all — bulk-refresh WA+EA data for every athlete with a profile URL ──
-// Scraping dozens of profiles can take minutes, so the work runs in the background via waitUntil;
-// the response only confirms how many athletes were queued.
+// Scraping dozens of profiles can take minutes, so the work runs in the background via waitUntil.
+// Progress is tracked in wa_refresh_job so the UI can poll GET /refresh-all/:jobId and know when
+// the refresh has actually finished, instead of guessing with a fixed timeout.
 
 const REFRESH_ALL_CONCURRENCY = 5
 
-async function refreshAllWaData(db: Db, athleteIds: string[]): Promise<void> {
+async function refreshAllWaData(db: Db, jobId: string, athleteIds: string[]): Promise<void> {
   for (let i = 0; i < athleteIds.length; i += REFRESH_ALL_CONCURRENCY) {
     const batch = athleteIds.slice(i, i + REFRESH_ALL_CONCURRENCY)
     await Promise.all(
-      batch.map((athleteId) => fetchAndUpsertWaData(db, athleteId, upsertWaPerformance).catch(() => {})),
+      batch.map((athleteId) =>
+        fetchAndUpsertWaData(db, athleteId, upsertWaPerformance)
+          .catch(() => {})
+          .finally(() =>
+            db
+              .update(schema.waRefreshJob)
+              .set({ completedCount: sql`${schema.waRefreshJob.completedCount} + 1` })
+              .where(eq(schema.waRefreshJob.id, jobId)),
+          ),
+      ),
     )
   }
+
+  await db
+    .update(schema.waRefreshJob)
+    .set({ finishedAt: sql`(datetime('now'))` })
+    .where(eq(schema.waRefreshJob.id, jobId))
 }
 
 waPerformance.post('/refresh-all', async (c) => {
@@ -231,9 +246,33 @@ waPerformance.post('/refresh-all', async (c) => {
     .from(schema.athlete)
     .where(isNotNull(schema.athlete.waProfileUrl))
 
-  c.executionCtx.waitUntil(refreshAllWaData(db, athletes.map((a) => a.id)))
+  const jobId = crypto.randomUUID()
+  await db.insert(schema.waRefreshJob).values({ id: jobId, totalCount: athletes.length })
 
-  return c.json({ athletesQueued: athletes.length })
+  c.executionCtx.waitUntil(refreshAllWaData(db, jobId, athletes.map((a) => a.id)))
+
+  return c.json({ jobId, athletesQueued: athletes.length })
+})
+
+// ── GET /wa-performance/refresh-all/:jobId — poll progress of a bulk refresh ─
+
+waPerformance.get('/refresh-all/:jobId', async (c) => {
+  const db = c.get('db')
+  const { jobId } = c.req.param()
+
+  const [job] = await db
+    .select()
+    .from(schema.waRefreshJob)
+    .where(eq(schema.waRefreshJob.id, jobId))
+    .limit(1)
+
+  if (!job) return c.json({ error: 'Job not found' }, 404)
+
+  return c.json({
+    totalCount: job.totalCount,
+    completedCount: job.completedCount,
+    done: job.finishedAt !== null,
+  })
 })
 
 export default waPerformance

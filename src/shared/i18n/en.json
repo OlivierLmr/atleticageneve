@@ -435,6 +435,8 @@
     "refreshAll": "Refresh WA/EA",
     "refreshingAll": "Starting...",
     "refreshAllStarted": "Refresh started for {{count}} athlete(s). Data will update progressively over the next few minutes.",
+    "refreshAllProgress": "Refreshing: {{completed}}/{{total}} athlete(s) processed...",
+    "refreshAllDone": "Refresh finished for {{count}} athlete(s). The table has been updated.",
     "refreshAllNone": "No athlete has a WA profile URL set",
     "refreshAllError": "Failed to start the refresh"
   },
