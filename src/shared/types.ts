@@ -16,6 +16,8 @@ export type Gender = 'M' | 'F'
 
 export type UserRole = 'athlete' | 'manager' | 'collaborator' | 'committee'
 
+export type TravelMode = 'plane' | 'train' | 'road'
+
 export type IRunCleanStatus = 'yes' | 'no' | 'in_progress' | 'unknown'
 export type DopingFreeStatus = 'yes' | 'no' | 'unknown'
 export type PaymentStatus = 'pending' | 'done'
@@ -150,10 +152,12 @@ export interface Athlete {
   iRunClean: IRunCleanStatus
   dopingFree: DopingFreeStatus
   accommodationReqs: string | null
+  arrivalTravelMode: TravelMode
   arrivalDate: string | null
   arrivalFlight: string | null
   arrivalFrom: string | null
   arrivalTime: string | null
+  departureTravelMode: TravelMode
   departureDate: string | null
   departureFlight: string | null
   departureTo: string | null
