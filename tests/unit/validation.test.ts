@@ -447,4 +447,15 @@ describe('athleteUpdateSchema', () => {
       expect(athleteUpdateSchema.safeParse({ paymentMethod: method }).success).toBe(true)
     }
   })
+
+  it('accepts valid travel modes', () => {
+    for (const mode of ['plane', 'train', 'road']) {
+      expect(athleteUpdateSchema.safeParse({ arrivalTravelMode: mode }).success).toBe(true)
+      expect(athleteUpdateSchema.safeParse({ departureTravelMode: mode }).success).toBe(true)
+    }
+  })
+
+  it('rejects invalid travel mode', () => {
+    expect(athleteUpdateSchema.safeParse({ arrivalTravelMode: 'boat' }).success).toBe(false)
+  })
 })

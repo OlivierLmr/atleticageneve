@@ -516,6 +516,7 @@ export default function AthletePage() {
           <LogisticsTab
             athlete={athlete}
             isStaff={!!isStaff}
+            isAthleteOrManager={isAthleteOrManager}
             mutations={{
               athleteUpdate: mutations.athleteUpdateMutation,
             }}
