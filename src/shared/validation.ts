@@ -75,6 +75,8 @@ export const managerRegistrationSchema = z.object({
 
 // ── Athlete update (PATCH) ───────────────────────────────────────────────────
 
+const timeHHMM = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Time must be in hh:mm format (24h)')
+
 export const athleteUpdateSchema = z.object({
   firstName: z.string().min(1).optional(),
   lastName: z.string().min(1).optional(),
@@ -99,11 +101,11 @@ export const athleteUpdateSchema = z.object({
   arrivalDate: z.string().optional().nullable(),
   arrivalFlight: z.string().optional().nullable(),
   arrivalFrom: z.string().optional().nullable(),
-  arrivalTime: z.string().optional().nullable(),
+  arrivalTime: timeHHMM.nullable().optional(),
   departureDate: z.string().optional().nullable(),
   departureFlight: z.string().optional().nullable(),
   departureTo: z.string().optional().nullable(),
-  departureTime: z.string().optional().nullable(),
+  departureTime: timeHHMM.nullable().optional(),
   bankIban: z.string().optional().nullable(),
   paymentStatus: z.enum(['pending', 'done']).optional(),
   paymentAmount: z.number().int().min(0).optional().nullable(),

@@ -457,4 +457,21 @@ describe('athleteUpdateSchema', () => {
   it('rejects invalid travel mode', () => {
     expect(athleteUpdateSchema.safeParse({ travelMode: 'boat' }).success).toBe(false)
   })
+
+  it('accepts valid hh:mm (24h) times', () => {
+    for (const time of ['00:00', '09:05', '13:45', '23:59']) {
+      expect(athleteUpdateSchema.safeParse({ arrivalTime: time, departureTime: time }).success).toBe(true)
+    }
+  })
+
+  it('accepts null times', () => {
+    expect(athleteUpdateSchema.safeParse({ arrivalTime: null, departureTime: null }).success).toBe(true)
+  })
+
+  it('rejects invalid time formats', () => {
+    for (const time of ['24:00', '9:05', '13:60', '1345', 'noon', '13:45:00']) {
+      expect(athleteUpdateSchema.safeParse({ arrivalTime: time }).success).toBe(false)
+      expect(athleteUpdateSchema.safeParse({ departureTime: time }).success).toBe(false)
+    }
+  })
 })
