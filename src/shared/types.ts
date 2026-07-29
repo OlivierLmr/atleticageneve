@@ -152,12 +152,11 @@ export interface Athlete {
   iRunClean: IRunCleanStatus
   dopingFree: DopingFreeStatus
   accommodationReqs: string | null
-  arrivalTravelMode: TravelMode
+  travelMode: TravelMode
   arrivalDate: string | null
   arrivalFlight: string | null
   arrivalFrom: string | null
   arrivalTime: string | null
-  departureTravelMode: TravelMode
   departureDate: string | null
   departureFlight: string | null
   departureTo: string | null

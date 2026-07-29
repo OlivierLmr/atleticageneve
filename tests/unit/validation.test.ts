@@ -450,12 +450,11 @@ describe('athleteUpdateSchema', () => {
 
   it('accepts valid travel modes', () => {
     for (const mode of ['plane', 'train', 'road']) {
-      expect(athleteUpdateSchema.safeParse({ arrivalTravelMode: mode }).success).toBe(true)
-      expect(athleteUpdateSchema.safeParse({ departureTravelMode: mode }).success).toBe(true)
+      expect(athleteUpdateSchema.safeParse({ travelMode: mode }).success).toBe(true)
     }
   })
 
   it('rejects invalid travel mode', () => {
-    expect(athleteUpdateSchema.safeParse({ arrivalTravelMode: 'boat' }).success).toBe(false)
+    expect(athleteUpdateSchema.safeParse({ travelMode: 'boat' }).success).toBe(false)
   })
 })
