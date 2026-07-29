@@ -11,6 +11,7 @@ import type { AgreementFormDraft } from './athlete/types'
 import { useAthleteData, useAthleteMutations, useEmailQuery, useAvailableEventsQuery } from './athlete/useAthleteData'
 import { BannerEventRow, CostPopup } from './athlete/BannerEventRow'
 import { PersonalTab } from './athlete/PersonalTab'
+import { LogisticsTab } from './athlete/LogisticsTab'
 import { NegotiationTab } from './athlete/NegotiationTab'
 import {
   ConfirmTransitionDialog,
@@ -33,7 +34,7 @@ export default function AthletePage() {
   const mutations = useAthleteMutations(id)
 
   // ── UI state ───────────────��──────────────────────────────────────────
-  const [activeTab, setActiveTab] = useState<'personal' | 'negotiation'>('negotiation')
+  const [activeTab, setActiveTab] = useState<'personal' | 'logistics' | 'negotiation'>('negotiation')
   const [confirmDialog, setConfirmDialog] = useState<{
     fromStatus: NegotiationStatus
     toStatus: NegotiationStatus
@@ -477,7 +478,7 @@ export default function AthletePage() {
 
         {/* Tab navigation */}
         <div className="max-w-7xl mx-auto px-6 flex gap-0 border-t">
-          {(['personal', 'negotiation'] as const).map(tab => (
+          {(['personal', 'logistics', 'negotiation'] as const).map(tab => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -487,7 +488,9 @@ export default function AthletePage() {
                   : 'border-transparent text-gray-500 hover:text-gray-700'
               }`}
             >
-              {tab === 'personal' ? t('collaborator.tabPersonal') : t('collaborator.tabNegotiation')}
+              {tab === 'personal' ? t('collaborator.tabPersonal')
+                : tab === 'logistics' ? t('collaborator.tabLogistics')
+                : t('collaborator.tabNegotiation')}
             </button>
           ))}
         </div>
@@ -505,6 +508,16 @@ export default function AthletePage() {
             mutations={{
               athleteUpdate: mutations.athleteUpdateMutation,
               internalNotes: mutations.internalNotesMutation,
+            }}
+          />
+        )}
+
+        {activeTab === 'logistics' && (
+          <LogisticsTab
+            athlete={athlete}
+            isStaff={!!isStaff}
+            mutations={{
+              athleteUpdate: mutations.athleteUpdateMutation,
             }}
           />
         )}
