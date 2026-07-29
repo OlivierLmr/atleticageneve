@@ -145,7 +145,7 @@ export function LogisticsTab({ athlete, isStaff, isAthleteOrManager, mutations }
           </Row>
           {showTime && (
             <Row label={t('logistics.time')} isEditing={isEditing} viewValue={form.arrivalTime}>
-              <input type="text" className={rowInputCls} value={form.arrivalTime} onChange={e => set('arrivalTime', e.target.value)} />
+              <input type="time" className={rowInputCls} value={form.arrivalTime} onChange={e => set('arrivalTime', e.target.value)} />
             </Row>
           )}
           {showTime && (
@@ -167,7 +167,7 @@ export function LogisticsTab({ athlete, isStaff, isAthleteOrManager, mutations }
           </Row>
           {showTime && (
             <Row label={t('logistics.time')} isEditing={isEditing} viewValue={form.departureTime}>
-              <input type="text" className={rowInputCls} value={form.departureTime} onChange={e => set('departureTime', e.target.value)} />
+              <input type="time" className={rowInputCls} value={form.departureTime} onChange={e => set('departureTime', e.target.value)} />
             </Row>
           )}
           {showTime && (
