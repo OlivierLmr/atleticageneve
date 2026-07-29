@@ -7,12 +7,11 @@ const rowInputCls =
   'w-full px-1.5 py-0.5 border border-gray-300 rounded text-xs text-right focus:outline-none focus:ring-1 focus:ring-gray-900'
 
 type LogisticsForm = {
-  arrivalTravelMode: TravelMode
+  travelMode: TravelMode
   arrivalDate: string
   arrivalFlight: string
   arrivalFrom: string
   arrivalTime: string
-  departureTravelMode: TravelMode
   departureDate: string
   departureFlight: string
   departureTo: string
@@ -22,12 +21,11 @@ type LogisticsForm = {
 
 function formFromAthlete(athlete: AthleteDetail): LogisticsForm {
   return {
-    arrivalTravelMode: athlete.arrivalTravelMode,
+    travelMode: athlete.travelMode,
     arrivalDate: athlete.arrivalDate ?? '',
     arrivalFlight: athlete.arrivalFlight ?? '',
     arrivalFrom: athlete.arrivalFrom ?? '',
     arrivalTime: athlete.arrivalTime ?? '',
-    departureTravelMode: athlete.departureTravelMode,
     departureDate: athlete.departureDate ?? '',
     departureFlight: athlete.departureFlight ?? '',
     departureTo: athlete.departureTo ?? '',
@@ -82,21 +80,21 @@ export function LogisticsTab({ athlete, isStaff, isAthleteOrManager, mutations }
     { value: 'train', label: t('logistics.byTrain') },
     { value: 'road', label: t('logistics.byRoad') },
   ]
-  const travelModeLabel = (mode: TravelMode) => travelModeOptions.find(o => o.value === mode)?.label ?? mode
+  const showTime = form.travelMode !== 'road'
+  const showFlight = form.travelMode === 'plane'
 
   const handleSave = () => {
     mutations.athleteUpdate.mutate(
       {
-        arrivalTravelMode: form.arrivalTravelMode,
+        travelMode: form.travelMode,
         arrivalDate: form.arrivalDate || null,
-        arrivalFlight: form.arrivalTravelMode === 'plane' ? (form.arrivalFlight || null) : null,
-        arrivalFrom: form.arrivalFrom || null,
-        arrivalTime: form.arrivalTime || null,
-        departureTravelMode: form.departureTravelMode,
+        arrivalFlight: showFlight ? (form.arrivalFlight || null) : null,
+        arrivalFrom: showTime ? (form.arrivalFrom || null) : null,
+        arrivalTime: showTime ? (form.arrivalTime || null) : null,
         departureDate: form.departureDate || null,
-        departureFlight: form.departureTravelMode === 'plane' ? (form.departureFlight || null) : null,
-        departureTo: form.departureTo || null,
-        departureTime: form.departureTime || null,
+        departureFlight: showFlight ? (form.departureFlight || null) : null,
+        departureTo: showTime ? (form.departureTo || null) : null,
+        departureTime: showTime ? (form.departureTime || null) : null,
         accommodationReqs: form.accommodationReqs || null,
       },
       { onSuccess: () => setIsEditing(false) },
@@ -120,51 +118,68 @@ export function LogisticsTab({ athlete, isStaff, isAthleteOrManager, mutations }
         )}
       </div>
 
+      <div className="bg-white rounded-lg border p-4 mb-4">
+        <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">{t('logistics.travelMode')}</h3>
+        <div className="flex gap-6">
+          {travelModeOptions.map(o => (
+            <label key={o.value} className={`flex items-center gap-1.5 text-xs ${isEditing ? 'cursor-pointer' : 'cursor-default'}`}>
+              <input
+                type="radio"
+                name="travelMode"
+                checked={form.travelMode === o.value}
+                disabled={!isEditing}
+                onChange={() => set('travelMode', o.value)}
+                className="accent-gray-900"
+              />
+              <span className={form.travelMode === o.value ? 'text-gray-900 font-medium' : 'text-gray-500'}>{o.label}</span>
+            </label>
+          ))}
+        </div>
+      </div>
+
       <div className="grid grid-cols-2 gap-4">
         <div className="bg-white rounded-lg border p-4">
           <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">{t('logistics.arrival')}</h3>
-          <Row label={t('logistics.travelMode')} isEditing={isEditing} viewValue={travelModeLabel(form.arrivalTravelMode)}>
-            <select className={rowInputCls} value={form.arrivalTravelMode} onChange={e => set('arrivalTravelMode', e.target.value as TravelMode)}>
-              {travelModeOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-            </select>
-          </Row>
           <Row label={t('logistics.date')} isEditing={isEditing} viewValue={form.arrivalDate}>
             <input type="date" className={rowInputCls} value={form.arrivalDate} onChange={e => set('arrivalDate', e.target.value)} />
           </Row>
-          {form.arrivalTravelMode === 'plane' && (
+          {showTime && (
+            <Row label={t('logistics.time')} isEditing={isEditing} viewValue={form.arrivalTime}>
+              <input type="text" className={rowInputCls} value={form.arrivalTime} onChange={e => set('arrivalTime', e.target.value)} />
+            </Row>
+          )}
+          {showTime && (
+            <Row label={t('logistics.from')} isEditing={isEditing} viewValue={form.arrivalFrom}>
+              <input type="text" className={rowInputCls} value={form.arrivalFrom} onChange={e => set('arrivalFrom', e.target.value)} />
+            </Row>
+          )}
+          {showFlight && (
             <Row label={t('logistics.flightNumber')} isEditing={isEditing} viewValue={form.arrivalFlight}>
               <input type="text" className={rowInputCls} value={form.arrivalFlight} onChange={e => set('arrivalFlight', e.target.value)} />
             </Row>
           )}
-          <Row label={t('logistics.from')} isEditing={isEditing} viewValue={form.arrivalFrom}>
-            <input type="text" className={rowInputCls} value={form.arrivalFrom} onChange={e => set('arrivalFrom', e.target.value)} />
-          </Row>
-          <Row label={t('logistics.time')} isEditing={isEditing} viewValue={form.arrivalTime}>
-            <input type="text" className={rowInputCls} value={form.arrivalTime} onChange={e => set('arrivalTime', e.target.value)} />
-          </Row>
         </div>
 
         <div className="bg-white rounded-lg border p-4">
           <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">{t('logistics.departure')}</h3>
-          <Row label={t('logistics.travelMode')} isEditing={isEditing} viewValue={travelModeLabel(form.departureTravelMode)}>
-            <select className={rowInputCls} value={form.departureTravelMode} onChange={e => set('departureTravelMode', e.target.value as TravelMode)}>
-              {travelModeOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-            </select>
-          </Row>
           <Row label={t('logistics.date')} isEditing={isEditing} viewValue={form.departureDate}>
             <input type="date" className={rowInputCls} value={form.departureDate} onChange={e => set('departureDate', e.target.value)} />
           </Row>
-          {form.departureTravelMode === 'plane' && (
+          {showTime && (
+            <Row label={t('logistics.time')} isEditing={isEditing} viewValue={form.departureTime}>
+              <input type="text" className={rowInputCls} value={form.departureTime} onChange={e => set('departureTime', e.target.value)} />
+            </Row>
+          )}
+          {showTime && (
+            <Row label={t('logistics.to')} isEditing={isEditing} viewValue={form.departureTo}>
+              <input type="text" className={rowInputCls} value={form.departureTo} onChange={e => set('departureTo', e.target.value)} />
+            </Row>
+          )}
+          {showFlight && (
             <Row label={t('logistics.flightNumber')} isEditing={isEditing} viewValue={form.departureFlight}>
               <input type="text" className={rowInputCls} value={form.departureFlight} onChange={e => set('departureFlight', e.target.value)} />
             </Row>
           )}
-          <Row label={t('logistics.to')} isEditing={isEditing} viewValue={form.departureTo}>
-            <input type="text" className={rowInputCls} value={form.departureTo} onChange={e => set('departureTo', e.target.value)} />
-          </Row>
-          <Row label={t('logistics.time')} isEditing={isEditing} viewValue={form.departureTime}>
-            <input type="text" className={rowInputCls} value={form.departureTime} onChange={e => set('departureTime', e.target.value)} />
-          </Row>
         </div>
 
         <div className="bg-white rounded-lg border p-4 col-span-2">
