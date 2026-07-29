@@ -61,18 +61,6 @@ export function PersonalTab({ athlete, isStaff, isAthleteOrManager, staffUsers, 
     ]},
   ]
 
-  const logisticsFields: FieldDef[] = [
-    { key: 'arrivalDate', label: `${t('logistics.arrival')} ${t('logistics.date')}`, type: 'date' },
-    { key: 'arrivalFlight', label: `${t('logistics.arrival')} ${t('logistics.flightNumber')}`, type: 'text' },
-    { key: 'arrivalFrom', label: `${t('logistics.arrival')} ${t('logistics.from')}`, type: 'text' },
-    { key: 'arrivalTime', label: `${t('logistics.arrival')} ${t('logistics.time')}`, type: 'text' },
-    { key: 'departureDate', label: `${t('logistics.departure')} ${t('logistics.date')}`, type: 'date' },
-    { key: 'departureFlight', label: `${t('logistics.departure')} ${t('logistics.flightNumber')}`, type: 'text' },
-    { key: 'departureTo', label: `${t('logistics.departure')} ${t('logistics.to')}`, type: 'text' },
-    { key: 'departureTime', label: `${t('logistics.departure')} ${t('logistics.time')}`, type: 'text' },
-    { key: 'accommodationReqs', label: t('logistics.specialRequests'), type: 'textarea' },
-  ]
-
   const costFields: FieldDef[] = [
     { key: 'estAppearance', label: t('collaborator.estAppearance'), type: 'number' },
     { key: 'estTravel', label: t('collaborator.estTravel'), type: 'number' },
@@ -135,7 +123,6 @@ export function PersonalTab({ athlete, isStaff, isAthleteOrManager, staffUsers, 
           )
         }
         {renderSection('compliance', t('compliance.title'), complianceFields, true)}
-        {renderSection('logistics', t('logistics.title'), logisticsFields, true)}
       </div>
 
       <div className="space-y-4">

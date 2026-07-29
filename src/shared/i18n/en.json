@@ -293,6 +293,7 @@
   "collaborator": {
     "personalData": "Personal Data",
     "tabPersonal": "Personal Data",
+    "tabLogistics": "Logistics",
     "tabNegotiation": "Agreement & Negotiation",
     "identity": "Identity",
     "payment": "Payment",
