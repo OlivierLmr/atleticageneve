@@ -72,7 +72,8 @@
     "emailLog": "Journal des emails",
     "candidates": "Candidats",
     "results": "Résultats",
-    "payments": "Paiements"
+    "payments": "Paiements",
+    "logistics": "Logistique"
   },
   "status": {
     "to_review": "À examiner",
@@ -240,7 +241,8 @@
     "room": "Chambre",
     "specialRequests": "Demandes spéciales",
     "additionalNotes": "Notes complémentaires",
-    "invitationLetter": "Lettre d'invitation demandée"
+    "invitationLetter": "Lettre d'invitation demandée",
+    "selectModeFirst": "Sélectionnez d'abord un moyen de transport"
   },
   "participation": {
     "pending": "En attente",
@@ -509,5 +511,26 @@
     "prizeMoneyEdit": "Prize money par rang",
     "noEvents": "Aucune épreuve trouvée pour l'édition en cours.",
     "noAthletes": "Aucun athlète confirmé inscrit à cette épreuve."
+  },
+  "logisticsTracking": {
+    "title": "Logistique voyage",
+    "subtitle": "Suivez les athlètes confirmés qui n'ont pas encore fourni leurs informations de voyage",
+    "athlete": "Athlète",
+    "recipient": "Destinataire",
+    "travelMode": "Moyen de transport",
+    "arrival": "Arrivée",
+    "departure": "Départ",
+    "status": "Statut",
+    "complete": "Complet",
+    "pending": "En attente",
+    "notSet": "Non renseigné",
+    "filterByAthlete": "Filtrer par athlète…",
+    "filterByRecipient": "Filtrer par destinataire…",
+    "allStatuses": "Tous les statuts",
+    "resetFilters": "Réinitialiser",
+    "noResults": "Aucun athlète ne correspond aux filtres actifs.",
+    "noAthletes": "Aucun athlète confirmé pour l'instant.",
+    "sendReminder": "Relancer",
+    "sending": "Envoi…"
   }
 }

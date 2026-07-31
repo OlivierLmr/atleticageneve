@@ -72,7 +72,8 @@
     "emailLog": "Email Log",
     "candidates": "Candidates",
     "results": "Results",
-    "payments": "Payments"
+    "payments": "Payments",
+    "logistics": "Logistics"
   },
   "status": {
     "to_review": "Under review",
@@ -240,7 +241,8 @@
     "room": "Room",
     "specialRequests": "Special requests",
     "additionalNotes": "Additional notes",
-    "invitationLetter": "Invitation letter requested"
+    "invitationLetter": "Invitation letter requested",
+    "selectModeFirst": "Select a travel mode first"
   },
   "participation": {
     "pending": "Pending",
@@ -509,5 +511,26 @@
     "prizeMoneyEdit": "Prize money per rank",
     "noEvents": "No events found for the current edition.",
     "noAthletes": "No confirmed athletes registered for this event."
+  },
+  "logisticsTracking": {
+    "title": "Travel Logistics",
+    "subtitle": "Track which confirmed athletes still need to submit their travel logistics",
+    "athlete": "Athlete",
+    "recipient": "Recipient",
+    "travelMode": "Travel mode",
+    "arrival": "Arrival",
+    "departure": "Departure",
+    "status": "Status",
+    "complete": "Complete",
+    "pending": "Pending",
+    "notSet": "Not set",
+    "filterByAthlete": "Filter by athlete…",
+    "filterByRecipient": "Filter by recipient…",
+    "allStatuses": "All statuses",
+    "resetFilters": "Reset",
+    "noResults": "No athletes match the current filters.",
+    "noAthletes": "No confirmed athletes yet.",
+    "sendReminder": "Send reminder",
+    "sending": "Sending…"
   }
 }

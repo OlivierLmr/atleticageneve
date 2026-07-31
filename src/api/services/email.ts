@@ -382,6 +382,34 @@ For the attention of: Finance Department</p>
   return { subject, body, htmlBody }
 }
 
+// ── Travel logistics reminder (to manager or athlete) ─────────────────────────
+
+export function buildLogisticsReminderEmail(params: {
+  recipientName: string
+  athleteFirstName: string
+  athleteLastName: string
+  meetingName: string
+  lang: 'en' | 'fr'
+  portalLink: string
+}): EmailContent {
+  const { recipientName, athleteFirstName, athleteLastName, meetingName, lang, portalLink } = params
+  const athleteName = `${athleteFirstName} ${athleteLastName}`
+
+  const subject = lang === 'fr'
+    ? `${meetingName} — Merci de compléter les informations de voyage de ${athleteName}`
+    : `${meetingName} — Please complete ${athleteName}'s travel details`
+
+  const body = lang === 'fr'
+    ? `Bonjour ${recipientName},\n\n${meetingName} approche et nous n'avons pas encore reçu toutes les informations de logistique de voyage de ${athleteName} (moyen de transport, horaires d'arrivée et de départ).\n\nMerci de bien vouloir les compléter dès que possible depuis le portail :\n\n${portalLink}\n\nCes informations nous permettent d'organiser au mieux l'accueil et les transferts.\n\nBien cordialement,\nL'équipe Atletica Genève`
+    : `Dear ${recipientName},\n\n${meetingName} is approaching and we have not yet received all of ${athleteName}'s travel logistics details (travel mode, arrival and departure schedule).\n\nPlease complete them as soon as possible via the portal:\n\n${portalLink}\n\nThis information helps us organize arrival and transfer arrangements as smoothly as possible.\n\nKind regards,\nThe Atletica Geneve Team`
+
+  const htmlBody = lang === 'fr'
+    ? `<div style="font-family:sans-serif;font-size:14px;line-height:1.6;color:#333"><p>Bonjour ${recipientName},</p><p><strong>${meetingName}</strong> approche et nous n'avons pas encore reçu toutes les informations de logistique de voyage de <strong>${athleteName}</strong> (moyen de transport, horaires d'arrivée et de départ).</p><p>Merci de bien vouloir les compléter dès que possible depuis le portail :</p>${linkButton(portalLink, 'Compléter mes informations')}<p>Ces informations nous permettent d'organiser au mieux l'accueil et les transferts.</p><p>Bien cordialement,<br/>L'équipe Atletica Genève</p></div>`
+    : `<div style="font-family:sans-serif;font-size:14px;line-height:1.6;color:#333"><p>Dear ${recipientName},</p><p><strong>${meetingName}</strong> is approaching and we have not yet received all of <strong>${athleteName}</strong>'s travel logistics details (travel mode, arrival and departure schedule).</p><p>Please complete them as soon as possible via the portal:</p>${linkButton(portalLink, 'Complete my details')}<p>This information helps us organize arrival and transfer arrangements as smoothly as possible.</p><p>Kind regards,<br/>The Atletica Geneve Team</p></div>`
+
+  return { subject, body, htmlBody }
+}
+
 // ── Portal response notification (to organisation committee) ──────────────────
 export function buildPortalResponseEmail(params: {
   athleteFirstName: string

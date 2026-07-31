@@ -134,7 +134,7 @@ export const athlete = sqliteTable('athlete', {
   iRunClean: text('i_run_clean').notNull().default('unknown'),
   dopingFree: text('doping_free').notNull().default('unknown'),
   accommodationReqs: text('accommodation_reqs'),
-  travelMode: text('travel_mode').notNull().default('plane'),
+  travelMode: text('travel_mode'),
   arrivalDate: text('arrival_date'),
   arrivalFlight: text('arrival_flight'),
   arrivalFrom: text('arrival_from'),

@@ -22,6 +22,7 @@ import EmailLogPage from '@web/pages/committee/EmailLogPage'
 import EventsPage from '@web/pages/committee/EventsPage'
 import PaymentsPage from '@web/pages/committee/PaymentsPage'
 import ResultsPage from '@web/pages/committee/ResultsPage'
+import LogisticsPage from '@web/pages/committee/LogisticsPage'
 import { api, ApiError } from '@web/lib/api'
 import type { ReactNode } from 'react'
 import type { UserRole } from '@shared/types'
@@ -92,6 +93,7 @@ const COMMITTEE_NAV: NavItem[] = [
   { to: '/committee/candidates', key: 'nav.candidates', activePrefix: '/committee/athletes/' },
   { to: '/committee/results', key: 'nav.results' },
   { to: '/committee/payments', key: 'nav.payments' },
+  { to: '/committee/logistics', key: 'nav.logistics' },
 ]
 
 const COLLABORATOR_NAV: NavItem[] = [
@@ -436,6 +438,7 @@ export default function App() {
               <Route path="athletes/:id" element={<CollaboratorAthletePage />} />
               <Route path="results" element={<ResultsPage />} />
               <Route path="payments" element={<PaymentsPage />} />
+              <Route path="logistics" element={<LogisticsPage />} />
             </Route>
 
             {/* Redirects for committee users hitting collaborator paths */}

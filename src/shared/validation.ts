@@ -97,7 +97,7 @@ export const athleteUpdateSchema = z.object({
   dopingFree: z.enum(['yes', 'no', 'unknown']).optional(),
   assignedSelector: z.string().optional().nullable(),
   accommodationReqs: z.string().optional().nullable(),
-  travelMode: z.enum(['plane', 'train', 'road']).optional(),
+  travelMode: z.enum(['plane', 'train', 'road']).optional().nullable(),
   arrivalDate: z.string().optional().nullable(),
   arrivalFlight: z.string().optional().nullable(),
   arrivalFrom: z.string().optional().nullable(),
