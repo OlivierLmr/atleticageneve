@@ -3,6 +3,14 @@
 -- touched. Travel logistics tracking needs that distinction (no mode chosen
 -- yet = logistics not started), so travel_mode now starts out NULL instead of
 -- defaulting to 'plane'. SQLite has no ALTER COLUMN, so the table is rebuilt.
+--
+-- application/agreement/interaction/email_log/wa_performance all hold foreign
+-- keys to athlete.id, so dropping athlete while those rows exist violates FK
+-- constraints. `PRAGMA foreign_keys=OFF` is a no-op mid-transaction (wrangler
+-- runs each migration file as one transaction), so defer_foreign_keys is used
+-- instead: checks are postponed until commit, by which point __new_athlete has
+-- already been renamed to athlete and every reference resolves again.
+PRAGMA defer_foreign_keys=TRUE;
 
 CREATE TABLE __new_athlete (
   id TEXT PRIMARY KEY,
