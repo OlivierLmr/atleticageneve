@@ -22,6 +22,7 @@ import emailRoutes from './routes/emails'
 import userRoutes from './routes/users'
 import paymentRoutes from './routes/payments'
 import resultRoutes from './routes/results'
+import logisticsRoutes from './routes/logistics'
 
 export type Env = {
   Bindings: {
@@ -80,5 +81,6 @@ app.route('/api/v1/emails', emailRoutes)
 app.route('/api/v1/users', userRoutes)
 app.route('/api/v1/payments', paymentRoutes)
 app.route('/api/v1/results', resultRoutes)
+app.route('/api/v1/logistics', logisticsRoutes)
 
 export default app

@@ -7,7 +7,7 @@ const rowInputCls =
   'w-full px-1.5 py-0.5 border border-gray-300 rounded text-xs text-right focus:outline-none focus:ring-1 focus:ring-gray-900'
 
 type LogisticsForm = {
-  travelMode: TravelMode
+  travelMode: TravelMode | null
   arrivalDate: string
   arrivalFlight: string
   arrivalFrom: string
@@ -80,18 +80,19 @@ export function LogisticsTab({ athlete, isStaff, isAthleteOrManager, mutations }
     { value: 'train', label: t('logistics.byTrain') },
     { value: 'road', label: t('logistics.byRoad') },
   ]
-  const showTime = form.travelMode !== 'road'
+  const hasMode = form.travelMode !== null
+  const showTime = hasMode && form.travelMode !== 'road'
   const showFlight = form.travelMode === 'plane'
 
   const handleSave = () => {
     mutations.athleteUpdate.mutate(
       {
         travelMode: form.travelMode,
-        arrivalDate: form.arrivalDate || null,
+        arrivalDate: hasMode ? (form.arrivalDate || null) : null,
         arrivalFlight: showFlight ? (form.arrivalFlight || null) : null,
         arrivalFrom: showTime ? (form.arrivalFrom || null) : null,
         arrivalTime: showTime ? (form.arrivalTime || null) : null,
-        departureDate: form.departureDate || null,
+        departureDate: hasMode ? (form.departureDate || null) : null,
         departureFlight: showFlight ? (form.departureFlight || null) : null,
         departureTo: showTime ? (form.departureTo || null) : null,
         departureTime: showTime ? (form.departureTime || null) : null,
@@ -140,45 +141,57 @@ export function LogisticsTab({ athlete, isStaff, isAthleteOrManager, mutations }
       <div className="grid grid-cols-2 gap-4">
         <div className="bg-white rounded-lg border p-4">
           <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">{t('logistics.arrival')}</h3>
-          <Row label={t('logistics.date')} isEditing={isEditing} viewValue={form.arrivalDate}>
-            <input type="date" className={rowInputCls} value={form.arrivalDate} onChange={e => set('arrivalDate', e.target.value)} />
-          </Row>
-          {showTime && (
-            <Row label={t('logistics.time')} isEditing={isEditing} viewValue={form.arrivalTime}>
-              <input type="time" className={rowInputCls} value={form.arrivalTime} onChange={e => set('arrivalTime', e.target.value)} />
-            </Row>
-          )}
-          {showTime && (
-            <Row label={t('logistics.from')} isEditing={isEditing} viewValue={form.arrivalFrom}>
-              <input type="text" className={rowInputCls} value={form.arrivalFrom} onChange={e => set('arrivalFrom', e.target.value)} />
-            </Row>
-          )}
-          {showFlight && (
-            <Row label={t('logistics.flightNumber')} isEditing={isEditing} viewValue={form.arrivalFlight}>
-              <input type="text" className={rowInputCls} value={form.arrivalFlight} onChange={e => set('arrivalFlight', e.target.value)} />
-            </Row>
+          {!hasMode ? (
+            <p className="text-xs text-gray-400 italic">{t('logistics.selectModeFirst')}</p>
+          ) : (
+            <>
+              <Row label={t('logistics.date')} isEditing={isEditing} viewValue={form.arrivalDate}>
+                <input type="date" className={rowInputCls} value={form.arrivalDate} onChange={e => set('arrivalDate', e.target.value)} />
+              </Row>
+              {showTime && (
+                <Row label={t('logistics.time')} isEditing={isEditing} viewValue={form.arrivalTime}>
+                  <input type="time" className={rowInputCls} value={form.arrivalTime} onChange={e => set('arrivalTime', e.target.value)} />
+                </Row>
+              )}
+              {showTime && (
+                <Row label={t('logistics.from')} isEditing={isEditing} viewValue={form.arrivalFrom}>
+                  <input type="text" className={rowInputCls} value={form.arrivalFrom} onChange={e => set('arrivalFrom', e.target.value)} />
+                </Row>
+              )}
+              {showFlight && (
+                <Row label={t('logistics.flightNumber')} isEditing={isEditing} viewValue={form.arrivalFlight}>
+                  <input type="text" className={rowInputCls} value={form.arrivalFlight} onChange={e => set('arrivalFlight', e.target.value)} />
+                </Row>
+              )}
+            </>
           )}
         </div>
 
         <div className="bg-white rounded-lg border p-4">
           <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">{t('logistics.departure')}</h3>
-          <Row label={t('logistics.date')} isEditing={isEditing} viewValue={form.departureDate}>
-            <input type="date" className={rowInputCls} value={form.departureDate} onChange={e => set('departureDate', e.target.value)} />
-          </Row>
-          {showTime && (
-            <Row label={t('logistics.time')} isEditing={isEditing} viewValue={form.departureTime}>
-              <input type="time" className={rowInputCls} value={form.departureTime} onChange={e => set('departureTime', e.target.value)} />
-            </Row>
-          )}
-          {showTime && (
-            <Row label={t('logistics.to')} isEditing={isEditing} viewValue={form.departureTo}>
-              <input type="text" className={rowInputCls} value={form.departureTo} onChange={e => set('departureTo', e.target.value)} />
-            </Row>
-          )}
-          {showFlight && (
-            <Row label={t('logistics.flightNumber')} isEditing={isEditing} viewValue={form.departureFlight}>
-              <input type="text" className={rowInputCls} value={form.departureFlight} onChange={e => set('departureFlight', e.target.value)} />
-            </Row>
+          {!hasMode ? (
+            <p className="text-xs text-gray-400 italic">{t('logistics.selectModeFirst')}</p>
+          ) : (
+            <>
+              <Row label={t('logistics.date')} isEditing={isEditing} viewValue={form.departureDate}>
+                <input type="date" className={rowInputCls} value={form.departureDate} onChange={e => set('departureDate', e.target.value)} />
+              </Row>
+              {showTime && (
+                <Row label={t('logistics.time')} isEditing={isEditing} viewValue={form.departureTime}>
+                  <input type="time" className={rowInputCls} value={form.departureTime} onChange={e => set('departureTime', e.target.value)} />
+                </Row>
+              )}
+              {showTime && (
+                <Row label={t('logistics.to')} isEditing={isEditing} viewValue={form.departureTo}>
+                  <input type="text" className={rowInputCls} value={form.departureTo} onChange={e => set('departureTo', e.target.value)} />
+                </Row>
+              )}
+              {showFlight && (
+                <Row label={t('logistics.flightNumber')} isEditing={isEditing} viewValue={form.departureFlight}>
+                  <input type="text" className={rowInputCls} value={form.departureFlight} onChange={e => set('departureFlight', e.target.value)} />
+                </Row>
+              )}
+            </>
           )}
         </div>
 

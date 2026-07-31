@@ -152,7 +152,7 @@ export interface Athlete {
   iRunClean: IRunCleanStatus
   dopingFree: DopingFreeStatus
   accommodationReqs: string | null
-  travelMode: TravelMode
+  travelMode: TravelMode | null
   arrivalDate: string | null
   arrivalFlight: string | null
   arrivalFrom: string | null
@@ -392,6 +392,24 @@ export interface PaymentEntry {
   paymentStatus: PaymentStatus
   paymentDate: string | null
   currency: string
+}
+
+// ── Logistics ─────────────────────────────────────────────────────────────────
+
+export interface LogisticsEntry {
+  athleteId: string
+  athleteFirstName: string
+  athleteLastName: string
+  managerId: string | null
+  managerName: string | null
+  recipientName: string
+  recipientEmail: string | null
+  travelMode: TravelMode | null
+  arrivalDate: string | null
+  arrivalTime: string | null
+  departureDate: string | null
+  departureTime: string | null
+  logisticsComplete: boolean
 }
 
 // ── Results ───────────────────────────────────────────────────────────────────

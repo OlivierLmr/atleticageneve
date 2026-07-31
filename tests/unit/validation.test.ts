@@ -458,6 +458,10 @@ describe('athleteUpdateSchema', () => {
     expect(athleteUpdateSchema.safeParse({ travelMode: 'boat' }).success).toBe(false)
   })
 
+  it('accepts null travel mode', () => {
+    expect(athleteUpdateSchema.safeParse({ travelMode: null }).success).toBe(true)
+  })
+
   it('accepts valid hh:mm (24h) times', () => {
     for (const time of ['00:00', '09:05', '13:45', '23:59']) {
       expect(athleteUpdateSchema.safeParse({ arrivalTime: time, departureTime: time }).success).toBe(true)
