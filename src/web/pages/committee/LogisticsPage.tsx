@@ -1,4 +1,5 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import { useTranslation } from 'react-i18next'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
@@ -44,6 +45,37 @@ function SortIcon({ column, sortConfig }: { column: SortColumn; sortConfig: Sort
   return <span className="ml-1">{sortConfig.direction === 'asc' ? '↑' : '↓'}</span>
 }
 
+// Renders its popup via a portal so an ancestor's `opacity` (e.g. a dimmed completed row)
+// can't make the popup's own background translucent.
+function HoverPopover({ trigger, children }: { trigger: React.ReactNode; children: React.ReactNode }) {
+  const anchorRef = useRef<HTMLSpanElement>(null)
+  const [position, setPosition] = useState<{ top: number; left: number } | null>(null)
+
+  return (
+    <span
+      ref={anchorRef}
+      className="relative inline-block cursor-help"
+      onMouseEnter={() => {
+        const rect = anchorRef.current?.getBoundingClientRect()
+        if (rect) setPosition({ top: rect.bottom + 4, left: rect.left })
+      }}
+      onMouseLeave={() => setPosition(null)}
+    >
+      {trigger}
+      {position &&
+        createPortal(
+          <div
+            className="fixed z-50 bg-white border rounded-lg shadow-lg p-3 text-xs w-56 normal-case font-normal text-gray-900 cursor-default"
+            style={{ top: position.top, left: position.left }}
+          >
+            {children}
+          </div>,
+          document.body
+        )}
+    </span>
+  )
+}
+
 export default function LogisticsPage() {
   const { t } = useTranslation()
   const queryClient = useQueryClient()
@@ -57,8 +89,6 @@ export default function LogisticsPage() {
   const [sendingId, setSendingId] = useState<string | null>(null)
   const [sortConfig, setSortConfig] = useState<SortConfig | null>(null)
   const [filters, setFilters] = useState<FilterConfig>(DEFAULT_FILTERS)
-  const [hoveredPlaneId, setHoveredPlaneId] = useState<string | null>(null)
-  const [hoveredRequestId, setHoveredRequestId] = useState<string | null>(null)
 
   const sendEmailMutation = useMutation({
     mutationFn: (athleteId: string) =>
@@ -263,37 +293,28 @@ export default function LogisticsPage() {
                 </td>
 
                 {/* Travel mode */}
-                <td className="px-3 py-2.5 text-xs relative">
+                <td className="px-3 py-2.5 text-xs">
                   {e.travelMode ? (
                     e.travelMode === 'plane' && e.logisticsComplete ? (
-                      <span
-                        className="relative inline-block underline decoration-dotted cursor-help"
-                        onMouseEnter={() => setHoveredPlaneId(e.athleteId)}
-                        onMouseLeave={() => setHoveredPlaneId(null)}
-                      >
-                        {t(TRAVEL_MODE_KEY.plane)}
-                        {hoveredPlaneId === e.athleteId && (
-                          <div className="absolute z-20 left-0 top-5 bg-white border rounded-lg shadow-lg p-3 text-xs w-56 normal-case cursor-default">
-                            <div className="flex justify-between gap-3 py-0.5">
-                              <span className="text-gray-500">{t('logistics.from')}</span>
-                              <span className="font-medium text-gray-900">{e.arrivalFrom || '—'}</span>
-                            </div>
-                            <div className="flex justify-between gap-3 py-0.5">
-                              <span className="text-gray-500">{t('logistics.flightNumber')}</span>
-                              <span className="font-medium text-gray-900">{e.arrivalFlight || '—'}</span>
-                            </div>
-                            <div className="border-t my-1" />
-                            <div className="flex justify-between gap-3 py-0.5">
-                              <span className="text-gray-500">{t('logistics.to')}</span>
-                              <span className="font-medium text-gray-900">{e.departureTo || '—'}</span>
-                            </div>
-                            <div className="flex justify-between gap-3 py-0.5">
-                              <span className="text-gray-500">{t('logistics.flightNumber')}</span>
-                              <span className="font-medium text-gray-900">{e.departureFlight || '—'}</span>
-                            </div>
-                          </div>
-                        )}
-                      </span>
+                      <HoverPopover trigger={<span className="underline decoration-dotted">{t(TRAVEL_MODE_KEY.plane)}</span>}>
+                        <div className="flex justify-between gap-3 py-0.5">
+                          <span className="text-gray-500">{t('logistics.from')}</span>
+                          <span className="font-medium text-gray-900">{e.arrivalFrom || '—'}</span>
+                        </div>
+                        <div className="flex justify-between gap-3 py-0.5">
+                          <span className="text-gray-500">{t('logistics.flightNumber')}</span>
+                          <span className="font-medium text-gray-900">{e.arrivalFlight || '—'}</span>
+                        </div>
+                        <div className="border-t my-1" />
+                        <div className="flex justify-between gap-3 py-0.5">
+                          <span className="text-gray-500">{t('logistics.to')}</span>
+                          <span className="font-medium text-gray-900">{e.departureTo || '—'}</span>
+                        </div>
+                        <div className="flex justify-between gap-3 py-0.5">
+                          <span className="text-gray-500">{t('logistics.flightNumber')}</span>
+                          <span className="font-medium text-gray-900">{e.departureFlight || '—'}</span>
+                        </div>
+                      </HoverPopover>
                     ) : (
                       t(TRAVEL_MODE_KEY[e.travelMode])
                     )
@@ -324,20 +345,11 @@ export default function LogisticsPage() {
                 </td>
 
                 {/* Special request */}
-                <td className="px-3 py-2.5 text-xs relative">
+                <td className="px-3 py-2.5 text-xs">
                   {e.accommodationReqs && (
-                    <span
-                      className="relative inline-block cursor-help text-amber-600"
-                      onMouseEnter={() => setHoveredRequestId(e.athleteId)}
-                      onMouseLeave={() => setHoveredRequestId(null)}
-                    >
-                      ●
-                      {hoveredRequestId === e.athleteId && (
-                        <div className="absolute z-20 left-0 top-5 bg-white border rounded-lg shadow-lg p-3 text-xs w-56 whitespace-pre-wrap font-normal text-gray-900 cursor-default">
-                          {e.accommodationReqs}
-                        </div>
-                      )}
-                    </span>
+                    <HoverPopover trigger={<span className="text-amber-600">●</span>}>
+                      <div className="whitespace-pre-wrap">{e.accommodationReqs}</div>
+                    </HoverPopover>
                   )}
                 </td>
 
