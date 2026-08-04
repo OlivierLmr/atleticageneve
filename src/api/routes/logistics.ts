@@ -74,8 +74,13 @@ logistics.get('/', async (c) => {
       travelMode: ath.travelMode as LogisticsEntry['travelMode'],
       arrivalDate: ath.arrivalDate,
       arrivalTime: ath.arrivalTime,
+      arrivalFrom: ath.arrivalFrom,
+      arrivalFlight: ath.arrivalFlight,
       departureDate: ath.departureDate,
       departureTime: ath.departureTime,
+      departureTo: ath.departureTo,
+      departureFlight: ath.departureFlight,
+      accommodationReqs: ath.accommodationReqs,
       logisticsComplete: isLogisticsComplete(ath),
     }
   })
@@ -114,12 +119,12 @@ logistics.post('/:athleteId/send-email', async (c) => {
     recipientEmail = manager?.email ?? null
     recipientLang = (manager?.preferredLang as 'en' | 'fr') ?? 'en'
     portalUserId = ath.managerId
-    portalRedirect = '/manager/portal'
+    portalRedirect = `/manager/athletes/${athleteId}?tab=logistics`
   } else {
     recipientName = `${ath.firstName} ${ath.lastName}`
     recipientEmail = ath.athleteEmail
     portalUserId = ath.userId
-    portalRedirect = '/athlete/portal'
+    portalRedirect = `/athlete/athletes/${athleteId}?tab=logistics`
     if (ath.userId) {
       const userRows = await db.select().from(schema.user).where(eq(schema.user.id, ath.userId)).limit(1)
       recipientLang = (userRows[0]?.preferredLang as 'en' | 'fr') ?? 'en'

@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { api } from '@web/lib/api'
 import { EmailPreviewModal } from '@web/pages/collaborator/athlete/modals'
-import type { LogisticsEntry } from '@shared/types'
+import type { LogisticsEntry, TravelMode } from '@shared/types'
 
 type SortColumn = 'athlete' | 'recipient' | 'travelMode' | 'status'
 type SortDirection = 'asc' | 'desc'
@@ -18,15 +18,24 @@ interface FilterConfig {
   athlete: string
   recipient: string
   status: 'all' | 'complete' | 'pending'
+  travelMode: 'all' | TravelMode
 }
 
-const DEFAULT_FILTERS: FilterConfig = { athlete: '', recipient: '', status: 'all' }
+const DEFAULT_FILTERS: FilterConfig = { athlete: '', recipient: '', status: 'all', travelMode: 'all' }
 
 const TRAVEL_MODE_KEY = {
   plane: 'logistics.byPlane',
   train: 'logistics.byTrain',
   road: 'logistics.byRoad',
 } as const
+
+// Renders a "YYYY-MM-DD" date and optional "HH:MM" time as "dd.mm.yyyy HH:MM".
+function formatDateTime(date: string | null, time: string | null): string {
+  if (!date) return '—'
+  const [y, m, d] = date.split('-')
+  const datePart = `${d}.${m}.${y}`
+  return time ? `${datePart} ${time}` : datePart
+}
 
 function SortIcon({ column, sortConfig }: { column: SortColumn; sortConfig: SortConfig | null }) {
   if (!sortConfig || sortConfig.column !== column) {
@@ -48,6 +57,8 @@ export default function LogisticsPage() {
   const [sendingId, setSendingId] = useState<string | null>(null)
   const [sortConfig, setSortConfig] = useState<SortConfig | null>(null)
   const [filters, setFilters] = useState<FilterConfig>(DEFAULT_FILTERS)
+  const [hoveredPlaneId, setHoveredPlaneId] = useState<string | null>(null)
+  const [hoveredRequestId, setHoveredRequestId] = useState<string | null>(null)
 
   const sendEmailMutation = useMutation({
     mutationFn: (athleteId: string) =>
@@ -67,6 +78,7 @@ export default function LogisticsPage() {
       if (filters.recipient && !e.recipientName.toLowerCase().includes(filters.recipient.toLowerCase())) return false
       if (filters.status === 'complete' && !e.logisticsComplete) return false
       if (filters.status === 'pending' && e.logisticsComplete) return false
+      if (filters.travelMode !== 'all' && e.travelMode !== filters.travelMode) return false
       return true
     })
   }, [entries, filters])
@@ -103,7 +115,8 @@ export default function LogisticsPage() {
   const hasActiveFilters =
     filters.athlete !== '' ||
     filters.recipient !== '' ||
-    filters.status !== 'all'
+    filters.status !== 'all' ||
+    filters.travelMode !== 'all'
 
   if (isLoading) {
     return (
@@ -167,6 +180,16 @@ export default function LogisticsPage() {
           <option value="pending">{t('logisticsTracking.pending')}</option>
           <option value="complete">{t('logisticsTracking.complete')}</option>
         </select>
+        <select
+          value={filters.travelMode}
+          onChange={e => setFilters(f => ({ ...f, travelMode: e.target.value as FilterConfig['travelMode'] }))}
+          className="text-sm border rounded px-2 py-1.5 bg-white"
+        >
+          <option value="all">{t('logisticsTracking.allTravelModes')}</option>
+          <option value="plane">{t('logistics.byPlane')}</option>
+          <option value="train">{t('logistics.byTrain')}</option>
+          <option value="road">{t('logistics.byRoad')}</option>
+        </select>
         {hasActiveFilters && (
           <button
             onClick={() => setFilters(DEFAULT_FILTERS)}
@@ -216,6 +239,7 @@ export default function LogisticsPage() {
                 {t('logisticsTracking.status')}
                 <SortIcon column="status" sortConfig={sortConfig} />
               </th>
+              <th className="px-3 py-2.5 text-left font-medium">{t('logisticsTracking.specialRequest')}</th>
               <th className="px-3 py-2.5 text-left font-medium">{t('common.actions')}</th>
             </tr>
           </thead>
@@ -225,7 +249,7 @@ export default function LogisticsPage() {
                 {/* Athlete */}
                 <td className="px-3 py-2.5">
                   <Link
-                    to={`/committee/athletes/${e.athleteId}`}
+                    to={`/committee/athletes/${e.athleteId}?tab=logistics`}
                     className="font-medium text-blue-600 hover:underline"
                   >
                     {e.athleteLastName}, {e.athleteFirstName}
@@ -234,30 +258,58 @@ export default function LogisticsPage() {
 
                 {/* Recipient */}
                 <td className="px-3 py-2.5 text-xs text-gray-600">
-                  <div className="font-medium">{e.recipientName}</div>
-                  {e.managerId && (
-                    <div className="text-gray-400">{t('manager.portal')}</div>
-                  )}
-                  {e.recipientEmail && (
-                    <div className="text-gray-400 truncate max-w-[140px]">{e.recipientEmail}</div>
-                  )}
+                  {e.recipientName}
+                  {e.managerId && <span className="text-gray-400 font-medium"> (MGR)</span>}
                 </td>
 
                 {/* Travel mode */}
-                <td className="px-3 py-2.5 text-xs">
-                  {e.travelMode ? t(TRAVEL_MODE_KEY[e.travelMode]) : (
+                <td className="px-3 py-2.5 text-xs relative">
+                  {e.travelMode ? (
+                    e.travelMode === 'plane' && e.logisticsComplete ? (
+                      <span
+                        className="relative inline-block underline decoration-dotted cursor-help"
+                        onMouseEnter={() => setHoveredPlaneId(e.athleteId)}
+                        onMouseLeave={() => setHoveredPlaneId(null)}
+                      >
+                        {t(TRAVEL_MODE_KEY.plane)}
+                        {hoveredPlaneId === e.athleteId && (
+                          <div className="absolute z-20 left-0 top-5 bg-white border rounded-lg shadow-lg p-3 text-xs w-56 normal-case cursor-default">
+                            <div className="flex justify-between gap-3 py-0.5">
+                              <span className="text-gray-500">{t('logistics.from')}</span>
+                              <span className="font-medium text-gray-900">{e.arrivalFrom || '—'}</span>
+                            </div>
+                            <div className="flex justify-between gap-3 py-0.5">
+                              <span className="text-gray-500">{t('logistics.flightNumber')}</span>
+                              <span className="font-medium text-gray-900">{e.arrivalFlight || '—'}</span>
+                            </div>
+                            <div className="border-t my-1" />
+                            <div className="flex justify-between gap-3 py-0.5">
+                              <span className="text-gray-500">{t('logistics.to')}</span>
+                              <span className="font-medium text-gray-900">{e.departureTo || '—'}</span>
+                            </div>
+                            <div className="flex justify-between gap-3 py-0.5">
+                              <span className="text-gray-500">{t('logistics.flightNumber')}</span>
+                              <span className="font-medium text-gray-900">{e.departureFlight || '—'}</span>
+                            </div>
+                          </div>
+                        )}
+                      </span>
+                    ) : (
+                      t(TRAVEL_MODE_KEY[e.travelMode])
+                    )
+                  ) : (
                     <span className="text-gray-400">{t('logisticsTracking.notSet')}</span>
                   )}
                 </td>
 
                 {/* Arrival */}
                 <td className="px-3 py-2.5 text-xs text-gray-600 whitespace-nowrap">
-                  {e.arrivalDate ? `${e.arrivalDate}${e.arrivalTime ? ` ${e.arrivalTime}` : ''}` : '—'}
+                  {formatDateTime(e.arrivalDate, e.arrivalTime)}
                 </td>
 
                 {/* Departure */}
                 <td className="px-3 py-2.5 text-xs text-gray-600 whitespace-nowrap">
-                  {e.departureDate ? `${e.departureDate}${e.departureTime ? ` ${e.departureTime}` : ''}` : '—'}
+                  {formatDateTime(e.departureDate, e.departureTime)}
                 </td>
 
                 {/* Status */}
@@ -271,6 +323,24 @@ export default function LogisticsPage() {
                   </span>
                 </td>
 
+                {/* Special request */}
+                <td className="px-3 py-2.5 text-xs relative">
+                  {e.accommodationReqs && (
+                    <span
+                      className="relative inline-block cursor-help text-amber-600"
+                      onMouseEnter={() => setHoveredRequestId(e.athleteId)}
+                      onMouseLeave={() => setHoveredRequestId(null)}
+                    >
+                      ●
+                      {hoveredRequestId === e.athleteId && (
+                        <div className="absolute z-20 left-0 top-5 bg-white border rounded-lg shadow-lg p-3 text-xs w-56 whitespace-pre-wrap font-normal text-gray-900 cursor-default">
+                          {e.accommodationReqs}
+                        </div>
+                      )}
+                    </span>
+                  )}
+                </td>
+
                 {/* Actions */}
                 <td className="px-3 py-2.5">
                   <button
@@ -282,7 +352,7 @@ export default function LogisticsPage() {
                         setSendingId(null)
                       }
                     }}
-                    disabled={sendingId === e.athleteId || !e.recipientEmail}
+                    disabled={sendingId === e.athleteId || !e.recipientEmail || e.logisticsComplete}
                     className="text-[10px] px-2 py-1 rounded border border-blue-200 text-blue-600 hover:bg-blue-50 disabled:opacity-50 whitespace-nowrap"
                   >
                     {sendingId === e.athleteId ? t('logisticsTracking.sending') : t('logisticsTracking.sendReminder')}
@@ -292,7 +362,7 @@ export default function LogisticsPage() {
             ))}
             {sortedEntries.length === 0 && (
               <tr>
-                <td colSpan={7} className="px-3 py-6 text-center text-sm text-gray-400">
+                <td colSpan={8} className="px-3 py-6 text-center text-sm text-gray-400">
                   {t('logisticsTracking.noResults')}
                 </td>
               </tr>

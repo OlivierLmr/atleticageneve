@@ -407,8 +407,13 @@ export interface LogisticsEntry {
   travelMode: TravelMode | null
   arrivalDate: string | null
   arrivalTime: string | null
+  arrivalFrom: string | null
+  arrivalFlight: string | null
   departureDate: string | null
   departureTime: string | null
+  departureTo: string | null
+  departureFlight: string | null
+  accommodationReqs: string | null
   logisticsComplete: boolean
 }
 
