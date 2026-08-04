@@ -527,9 +527,11 @@
     "filterByAthlete": "Filter by athlete…",
     "filterByRecipient": "Filter by recipient…",
     "allStatuses": "All statuses",
+    "allTravelModes": "All travel modes",
     "resetFilters": "Reset",
     "noResults": "No athletes match the current filters.",
     "noAthletes": "No confirmed athletes yet.",
+    "specialRequest": "Special request",
     "sendReminder": "Send reminder",
     "sending": "Sending…"
   }

@@ -21,8 +21,8 @@ export default function VerifyMagicLinkPage() {
     }
 
     verifyMagicLink(token)
-      .then((user) => {
-        const dest = user.role === 'manager' ? '/manager/portal' : '/athlete/portal'
+      .then(({ user, redirectUrl }) => {
+        const dest = redirectUrl ?? (user.role === 'manager' ? '/manager/portal' : '/athlete/portal')
         navigate(dest)
       })
       .catch(() => {

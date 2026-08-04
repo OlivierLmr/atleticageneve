@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Link, useParams, useNavigate } from 'react-router-dom'
+import { Link, useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '@web/lib/auth'
 import { LanguageSwitcher } from '@web/App'
 import { NEGOTIATION_TRANSITIONS, COMMITTEE_EXTRA_TRANSITIONS, ATHLETE_TRANSITIONS } from '@shared/constants'
@@ -28,13 +28,16 @@ export default function AthletePage() {
   const { id } = useParams<{ id: string }>()
   const { user, logout } = useAuth()
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
 
   // ── Data ───────────────────────────────���──────────────────────────────
   const { athlete, isLoading, staffUsers, allRooms, eapCities } = useAthleteData(id)
   const mutations = useAthleteMutations(id)
 
   // ── UI state ───────────────��──────────────────────────────────────────
-  const [activeTab, setActiveTab] = useState<'personal' | 'logistics' | 'negotiation'>('negotiation')
+  const tabParam = searchParams.get('tab')
+  const initialTab = tabParam === 'personal' || tabParam === 'logistics' || tabParam === 'negotiation' ? tabParam : 'negotiation'
+  const [activeTab, setActiveTab] = useState<'personal' | 'logistics' | 'negotiation'>(initialTab)
   const [confirmDialog, setConfirmDialog] = useState<{
     fromStatus: NegotiationStatus
     toStatus: NegotiationStatus

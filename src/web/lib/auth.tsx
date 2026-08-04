@@ -18,7 +18,7 @@ interface AuthContextType {
   isLoading: boolean
   login: (username: string, password: string) => Promise<void>
   requestMagicLink: (email: string) => Promise<void>
-  verifyMagicLink: (token: string) => Promise<AuthUser>
+  verifyMagicLink: (token: string) => Promise<{ user: AuthUser; redirectUrl: string | null }>
   logout: () => Promise<void>
 }
 
@@ -58,12 +58,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const verifyMagicLink = useCallback(async (token: string) => {
-    const res = await api.post<{ token: string; user: AuthUser }>('/api/v1/auth/verify-magic-link', {
+    const res = await api.post<{ token: string; user: AuthUser; redirectUrl: string | null }>('/api/v1/auth/verify-magic-link', {
       token,
     })
     localStorage.setItem('session_token', res.token)
     setUser(res.user)
-    return res.user
+    return { user: res.user, redirectUrl: res.redirectUrl }
   }, [])
 
   const logout = useCallback(async () => {
