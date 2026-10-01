@@ -1,7 +1,5 @@
 # EAP Conference 2026 – Meeting Organisers Questionnaire
 
-**From:** ATLETICAGENEVE Organising Committee
-**To:** Meeting Directors, EAP circuit
 **Please return by:** one week before the workshop, to [return e-mail address]
 **Estimated time:** about 10 minutes
 
@@ -107,5 +105,3 @@ To prepare a workshop that is relevant for you, we kindly ask you to fill in thi
 19. Any other comments:
 
 Thank you for your time. We look forward to meeting you at the workshop.
-
-*ATLETICAGENEVE Organising Committee*
