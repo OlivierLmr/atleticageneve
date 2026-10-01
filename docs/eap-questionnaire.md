@@ -11,16 +11,16 @@
 
 Dear Meeting Director,
 
-At the next EAP annual conference we will hold a workshop around **the Platform**, a tool we are developing at ATLETICAGENEVE to support meeting organisers during the phase in which the athlete field is put together.
+At the next EAP annual conference we will hold a workshop around the platform to support meeting organisers during the phase in which the athlete field is put together.
 
 The purpose of the workshop is to:
 
-- share the Platform with you and find out whether such a tool could be useful for your own meeting;
+- find out whether such a tool could be useful for your own meeting;
 - learn how you currently work when building your athlete field;
 - understand your needs and the difficulties you meet;
 - get a first idea of what a tool like this would be worth to you.
 
-To prepare a workshop that is relevant for you, we kindly ask you to fill in this short questionnaire beforehand. It builds on the questionnaire previously circulated by the EAP President.
+To prepare a workshop that is relevant for you, we kindly ask you to fill in this short questionnaire beforehand. It builds on the questionnaire previously circulated by the Pablo at the last Spring Talks.
 
 ### What the Platform does
 
